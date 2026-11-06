@@ -1,0 +1,1682 @@
+[
+  {
+    "id": "sample-us-capitals",
+    "stableId": "sample-us-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of United States?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "US",
+    "options": [
+      {
+        "id": "a",
+        "label": "Washington, D.C."
+      },
+      {
+        "id": "b",
+        "label": "London"
+      },
+      {
+        "id": "c",
+        "label": "Mexico City"
+      },
+      {
+        "id": "d",
+        "label": "Buenos Aires"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Washington, D.C. is the capital of United States.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-us-flags",
+    "stableId": "sample-us-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? Thirteen red and white stripes and a blue canton containing fifty white stars.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "US",
+    "options": [
+      {
+        "id": "a",
+        "label": "United States"
+      },
+      {
+        "id": "b",
+        "label": "United Kingdom"
+      },
+      {
+        "id": "c",
+        "label": "Mexico"
+      },
+      {
+        "id": "d",
+        "label": "Argentina"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of United States: Thirteen red and white stripes and a blue canton containing fifty white stars.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-us-currencies",
+    "stableId": "sample-us-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in United States?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "US",
+    "options": [
+      {
+        "id": "a",
+        "label": "United States dollar"
+      },
+      {
+        "id": "b",
+        "label": "Pound sterling"
+      },
+      {
+        "id": "c",
+        "label": "Mexican peso"
+      },
+      {
+        "id": "d",
+        "label": "Argentine peso"
+      }
+    ],
+    "correct": "a",
+    "explanation": "United States dollar was used in United States in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-us-regions",
+    "stableId": "sample-us-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, United States is in North America.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "US",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "true",
+    "explanation": "United States is grouped here in North America. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-gb-capitals",
+    "stableId": "sample-gb-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of United Kingdom?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "GB",
+    "options": [
+      {
+        "id": "a",
+        "label": "London"
+      },
+      {
+        "id": "b",
+        "label": "Mexico City"
+      },
+      {
+        "id": "c",
+        "label": "Buenos Aires"
+      },
+      {
+        "id": "d",
+        "label": "Wellington"
+      }
+    ],
+    "correct": "a",
+    "explanation": "London is the capital of United Kingdom.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-gb-flags",
+    "stableId": "sample-gb-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? The Union Flag combines red and white crosses on a blue field.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "GB",
+    "options": [
+      {
+        "id": "a",
+        "label": "United Kingdom"
+      },
+      {
+        "id": "b",
+        "label": "Mexico"
+      },
+      {
+        "id": "c",
+        "label": "Argentina"
+      },
+      {
+        "id": "d",
+        "label": "New Zealand"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of United Kingdom: The Union Flag combines red and white crosses on a blue field.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-gb-currencies",
+    "stableId": "sample-gb-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in United Kingdom?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "GB",
+    "options": [
+      {
+        "id": "a",
+        "label": "Pound sterling"
+      },
+      {
+        "id": "b",
+        "label": "Mexican peso"
+      },
+      {
+        "id": "c",
+        "label": "Argentine peso"
+      },
+      {
+        "id": "d",
+        "label": "New Zealand dollar"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Pound sterling was used in United Kingdom in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-gb-regions",
+    "stableId": "sample-gb-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, United Kingdom is in Asia.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "GB",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "false",
+    "explanation": "United Kingdom is grouped here in Europe. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-mx-capitals",
+    "stableId": "sample-mx-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Mexico?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "MX",
+    "options": [
+      {
+        "id": "a",
+        "label": "Mexico City"
+      },
+      {
+        "id": "b",
+        "label": "Buenos Aires"
+      },
+      {
+        "id": "c",
+        "label": "Wellington"
+      },
+      {
+        "id": "d",
+        "label": "Reykjavík"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Mexico City is the capital of Mexico.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-mx-flags",
+    "stableId": "sample-mx-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? Green, white, and red vertical bands with an eagle-and-serpent emblem in the center.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "MX",
+    "options": [
+      {
+        "id": "a",
+        "label": "Mexico"
+      },
+      {
+        "id": "b",
+        "label": "Argentina"
+      },
+      {
+        "id": "c",
+        "label": "New Zealand"
+      },
+      {
+        "id": "d",
+        "label": "Iceland"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Mexico: Green, white, and red vertical bands with an eagle-and-serpent emblem in the center.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-mx-currencies",
+    "stableId": "sample-mx-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Mexico?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "MX",
+    "options": [
+      {
+        "id": "a",
+        "label": "Mexican peso"
+      },
+      {
+        "id": "b",
+        "label": "Argentine peso"
+      },
+      {
+        "id": "c",
+        "label": "New Zealand dollar"
+      },
+      {
+        "id": "d",
+        "label": "Icelandic króna"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Mexican peso was used in Mexico in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-mx-regions",
+    "stableId": "sample-mx-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Mexico is in North America.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "MX",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "true",
+    "explanation": "Mexico is grouped here in North America. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-ar-capitals",
+    "stableId": "sample-ar-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Argentina?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "AR",
+    "options": [
+      {
+        "id": "a",
+        "label": "Buenos Aires"
+      },
+      {
+        "id": "b",
+        "label": "Wellington"
+      },
+      {
+        "id": "c",
+        "label": "Reykjavík"
+      },
+      {
+        "id": "d",
+        "label": "Helsinki"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Buenos Aires is the capital of Argentina.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-ar-flags",
+    "stableId": "sample-ar-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? Light-blue, white, and light-blue horizontal bands with a sun on the white band.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "AR",
+    "options": [
+      {
+        "id": "a",
+        "label": "Argentina"
+      },
+      {
+        "id": "b",
+        "label": "New Zealand"
+      },
+      {
+        "id": "c",
+        "label": "Iceland"
+      },
+      {
+        "id": "d",
+        "label": "Finland"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Argentina: Light-blue, white, and light-blue horizontal bands with a sun on the white band.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-ar-currencies",
+    "stableId": "sample-ar-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Argentina?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "AR",
+    "options": [
+      {
+        "id": "a",
+        "label": "Argentine peso"
+      },
+      {
+        "id": "b",
+        "label": "New Zealand dollar"
+      },
+      {
+        "id": "c",
+        "label": "Icelandic króna"
+      },
+      {
+        "id": "d",
+        "label": "Euro"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Argentine peso was used in Argentina in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-ar-regions",
+    "stableId": "sample-ar-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Argentina is in Europe.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "AR",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "false",
+    "explanation": "Argentina is grouped here in South America. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-nz-capitals",
+    "stableId": "sample-nz-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of New Zealand?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "NZ",
+    "options": [
+      {
+        "id": "a",
+        "label": "Wellington"
+      },
+      {
+        "id": "b",
+        "label": "Reykjavík"
+      },
+      {
+        "id": "c",
+        "label": "Helsinki"
+      },
+      {
+        "id": "d",
+        "label": "Copenhagen"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Wellington is the capital of New Zealand.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-nz-flags",
+    "stableId": "sample-nz-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? A blue field with the Union Jack and four red stars outlined in white.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "NZ",
+    "options": [
+      {
+        "id": "a",
+        "label": "New Zealand"
+      },
+      {
+        "id": "b",
+        "label": "Iceland"
+      },
+      {
+        "id": "c",
+        "label": "Finland"
+      },
+      {
+        "id": "d",
+        "label": "Denmark"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of New Zealand: A blue field with the Union Jack and four red stars outlined in white.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-nz-currencies",
+    "stableId": "sample-nz-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in New Zealand?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "NZ",
+    "options": [
+      {
+        "id": "a",
+        "label": "New Zealand dollar"
+      },
+      {
+        "id": "b",
+        "label": "Icelandic króna"
+      },
+      {
+        "id": "c",
+        "label": "Euro"
+      },
+      {
+        "id": "d",
+        "label": "Danish krone"
+      }
+    ],
+    "correct": "a",
+    "explanation": "New Zealand dollar was used in New Zealand in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-nz-regions",
+    "stableId": "sample-nz-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, New Zealand is in Oceania.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "NZ",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "true",
+    "explanation": "New Zealand is grouped here in Oceania. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-is-capitals",
+    "stableId": "sample-is-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Iceland?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "IS",
+    "options": [
+      {
+        "id": "a",
+        "label": "Reykjavík"
+      },
+      {
+        "id": "b",
+        "label": "Helsinki"
+      },
+      {
+        "id": "c",
+        "label": "Copenhagen"
+      },
+      {
+        "id": "d",
+        "label": "Cairo"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Reykjavík is the capital of Iceland.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-is-flags",
+    "stableId": "sample-is-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? A red Nordic cross outlined in white on a blue field.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "IS",
+    "options": [
+      {
+        "id": "a",
+        "label": "Iceland"
+      },
+      {
+        "id": "b",
+        "label": "Finland"
+      },
+      {
+        "id": "c",
+        "label": "Denmark"
+      },
+      {
+        "id": "d",
+        "label": "Egypt"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Iceland: A red Nordic cross outlined in white on a blue field.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-is-currencies",
+    "stableId": "sample-is-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Iceland?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "IS",
+    "options": [
+      {
+        "id": "a",
+        "label": "Icelandic króna"
+      },
+      {
+        "id": "b",
+        "label": "Euro"
+      },
+      {
+        "id": "c",
+        "label": "Danish krone"
+      },
+      {
+        "id": "d",
+        "label": "Egyptian pound"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Icelandic króna was used in Iceland in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-is-regions",
+    "stableId": "sample-is-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Iceland is in Asia.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "IS",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "false",
+    "explanation": "Iceland is grouped here in Europe. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-fi-capitals",
+    "stableId": "sample-fi-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Finland?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "FI",
+    "options": [
+      {
+        "id": "a",
+        "label": "Helsinki"
+      },
+      {
+        "id": "b",
+        "label": "Copenhagen"
+      },
+      {
+        "id": "c",
+        "label": "Cairo"
+      },
+      {
+        "id": "d",
+        "label": "Abuja"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Helsinki is the capital of Finland.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-fi-flags",
+    "stableId": "sample-fi-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? A blue Nordic cross on a white field.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "FI",
+    "options": [
+      {
+        "id": "a",
+        "label": "Finland"
+      },
+      {
+        "id": "b",
+        "label": "Denmark"
+      },
+      {
+        "id": "c",
+        "label": "Egypt"
+      },
+      {
+        "id": "d",
+        "label": "Nigeria"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Finland: A blue Nordic cross on a white field.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-fi-currencies",
+    "stableId": "sample-fi-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Finland?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "FI",
+    "options": [
+      {
+        "id": "a",
+        "label": "Euro"
+      },
+      {
+        "id": "b",
+        "label": "Danish krone"
+      },
+      {
+        "id": "c",
+        "label": "Egyptian pound"
+      },
+      {
+        "id": "d",
+        "label": "Nigerian naira"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Euro was used in Finland in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-fi-regions",
+    "stableId": "sample-fi-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Finland is in Europe.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "FI",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "true",
+    "explanation": "Finland is grouped here in Europe. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-dk-capitals",
+    "stableId": "sample-dk-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Denmark?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "DK",
+    "options": [
+      {
+        "id": "a",
+        "label": "Copenhagen"
+      },
+      {
+        "id": "b",
+        "label": "Cairo"
+      },
+      {
+        "id": "c",
+        "label": "Abuja"
+      },
+      {
+        "id": "d",
+        "label": "Bangkok"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Copenhagen is the capital of Denmark.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-dk-flags",
+    "stableId": "sample-dk-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? A white Nordic cross on a red field.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "DK",
+    "options": [
+      {
+        "id": "a",
+        "label": "Denmark"
+      },
+      {
+        "id": "b",
+        "label": "Egypt"
+      },
+      {
+        "id": "c",
+        "label": "Nigeria"
+      },
+      {
+        "id": "d",
+        "label": "Thailand"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Denmark: A white Nordic cross on a red field.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-dk-currencies",
+    "stableId": "sample-dk-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Denmark?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "DK",
+    "options": [
+      {
+        "id": "a",
+        "label": "Danish krone"
+      },
+      {
+        "id": "b",
+        "label": "Egyptian pound"
+      },
+      {
+        "id": "c",
+        "label": "Nigerian naira"
+      },
+      {
+        "id": "d",
+        "label": "Thai baht"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Danish krone was used in Denmark in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-dk-regions",
+    "stableId": "sample-dk-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Denmark is in Asia.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "DK",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "false",
+    "explanation": "Denmark is grouped here in Europe. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-eg-capitals",
+    "stableId": "sample-eg-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Egypt?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "EG",
+    "options": [
+      {
+        "id": "a",
+        "label": "Cairo"
+      },
+      {
+        "id": "b",
+        "label": "Abuja"
+      },
+      {
+        "id": "c",
+        "label": "Bangkok"
+      },
+      {
+        "id": "d",
+        "label": "Hanoi"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Cairo is the capital of Egypt.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-eg-flags",
+    "stableId": "sample-eg-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? Red, white, and black horizontal bands with a gold eagle in the center.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "EG",
+    "options": [
+      {
+        "id": "a",
+        "label": "Egypt"
+      },
+      {
+        "id": "b",
+        "label": "Nigeria"
+      },
+      {
+        "id": "c",
+        "label": "Thailand"
+      },
+      {
+        "id": "d",
+        "label": "Vietnam"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Egypt: Red, white, and black horizontal bands with a gold eagle in the center.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-eg-currencies",
+    "stableId": "sample-eg-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Egypt?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "EG",
+    "options": [
+      {
+        "id": "a",
+        "label": "Egyptian pound"
+      },
+      {
+        "id": "b",
+        "label": "Nigerian naira"
+      },
+      {
+        "id": "c",
+        "label": "Thai baht"
+      },
+      {
+        "id": "d",
+        "label": "Vietnamese đồng"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Egyptian pound was used in Egypt in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-eg-regions",
+    "stableId": "sample-eg-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Egypt is in Africa.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "EG",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "true",
+    "explanation": "Egypt is grouped here in Africa. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-ng-capitals",
+    "stableId": "sample-ng-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Nigeria?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "NG",
+    "options": [
+      {
+        "id": "a",
+        "label": "Abuja"
+      },
+      {
+        "id": "b",
+        "label": "Bangkok"
+      },
+      {
+        "id": "c",
+        "label": "Hanoi"
+      },
+      {
+        "id": "d",
+        "label": "Washington, D.C."
+      }
+    ],
+    "correct": "a",
+    "explanation": "Abuja is the capital of Nigeria.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-ng-flags",
+    "stableId": "sample-ng-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? Three vertical bands of green, white, and green.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "NG",
+    "options": [
+      {
+        "id": "a",
+        "label": "Nigeria"
+      },
+      {
+        "id": "b",
+        "label": "Thailand"
+      },
+      {
+        "id": "c",
+        "label": "Vietnam"
+      },
+      {
+        "id": "d",
+        "label": "United States"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Nigeria: Three vertical bands of green, white, and green.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-ng-currencies",
+    "stableId": "sample-ng-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Nigeria?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "NG",
+    "options": [
+      {
+        "id": "a",
+        "label": "Nigerian naira"
+      },
+      {
+        "id": "b",
+        "label": "Thai baht"
+      },
+      {
+        "id": "c",
+        "label": "Vietnamese đồng"
+      },
+      {
+        "id": "d",
+        "label": "United States dollar"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Nigerian naira was used in Nigeria in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-ng-regions",
+    "stableId": "sample-ng-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Nigeria is in Europe.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "NG",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "false",
+    "explanation": "Nigeria is grouped here in Africa. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-th-capitals",
+    "stableId": "sample-th-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Thailand?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "TH",
+    "options": [
+      {
+        "id": "a",
+        "label": "Bangkok"
+      },
+      {
+        "id": "b",
+        "label": "Hanoi"
+      },
+      {
+        "id": "c",
+        "label": "Washington, D.C."
+      },
+      {
+        "id": "d",
+        "label": "London"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Bangkok is the capital of Thailand.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-th-flags",
+    "stableId": "sample-th-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? Five horizontal bands of red, white, blue, white, and red, with a wider blue middle band.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "TH",
+    "options": [
+      {
+        "id": "a",
+        "label": "Thailand"
+      },
+      {
+        "id": "b",
+        "label": "Vietnam"
+      },
+      {
+        "id": "c",
+        "label": "United States"
+      },
+      {
+        "id": "d",
+        "label": "United Kingdom"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Thailand: Five horizontal bands of red, white, blue, white, and red, with a wider blue middle band.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-th-currencies",
+    "stableId": "sample-th-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Thailand?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "TH",
+    "options": [
+      {
+        "id": "a",
+        "label": "Thai baht"
+      },
+      {
+        "id": "b",
+        "label": "Vietnamese đồng"
+      },
+      {
+        "id": "c",
+        "label": "United States dollar"
+      },
+      {
+        "id": "d",
+        "label": "Pound sterling"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Thai baht was used in Thailand in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-th-regions",
+    "stableId": "sample-th-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Thailand is in Asia.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "TH",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "true",
+    "explanation": "Thailand is grouped here in Asia. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-vn-capitals",
+    "stableId": "sample-vn-capitals",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the capital of Vietnam?",
+    "category": "geography",
+    "subcategory": "capitals",
+    "difficulty": "easy",
+    "countryCode": "VN",
+    "options": [
+      {
+        "id": "a",
+        "label": "Hanoi"
+      },
+      {
+        "id": "b",
+        "label": "Washington, D.C."
+      },
+      {
+        "id": "c",
+        "label": "London"
+      },
+      {
+        "id": "d",
+        "label": "Mexico City"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Hanoi is the capital of Vietnam.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-vn-flags",
+    "stableId": "sample-vn-flags",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which country's flag matches this description? A yellow five-pointed star centered on a red field.",
+    "category": "geography",
+    "subcategory": "flags",
+    "difficulty": "easy",
+    "countryCode": "VN",
+    "options": [
+      {
+        "id": "a",
+        "label": "Vietnam"
+      },
+      {
+        "id": "b",
+        "label": "United States"
+      },
+      {
+        "id": "c",
+        "label": "United Kingdom"
+      },
+      {
+        "id": "d",
+        "label": "Mexico"
+      }
+    ],
+    "correct": "a",
+    "explanation": "This description identifies the flag of Vietnam: A yellow five-pointed star centered on a red field.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  },
+  {
+    "id": "sample-vn-currencies",
+    "stableId": "sample-vn-currencies",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Using a 2024 reference year, which listed currency was used in Vietnam?",
+    "category": "geography",
+    "subcategory": "currencies",
+    "difficulty": "easy",
+    "countryCode": "VN",
+    "options": [
+      {
+        "id": "a",
+        "label": "Vietnamese đồng"
+      },
+      {
+        "id": "b",
+        "label": "United States dollar"
+      },
+      {
+        "id": "c",
+        "label": "Pound sterling"
+      },
+      {
+        "id": "d",
+        "label": "Mexican peso"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Vietnamese đồng was used in Vietnam in the stated reference year. This question does not imply it was the only accepted currency.",
+    "source": "https://www.cia.gov/the-world-factbook/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": 2024,
+    "asset": null
+  },
+  {
+    "id": "sample-vn-regions",
+    "stableId": "sample-vn-regions",
+    "expectedVersion": 0,
+    "type": "tf",
+    "prompt": "In this quiz's six-region geographical convention, Vietnam is in Europe.",
+    "category": "geography",
+    "subcategory": "regions",
+    "difficulty": "easy",
+    "countryCode": "VN",
+    "options": [
+      {
+        "id": "true",
+        "label": "True"
+      },
+      {
+        "id": "false",
+        "label": "False"
+      }
+    ],
+    "correct": "false",
+    "explanation": "Vietnam is grouped here in Asia. The quiz separates North and South America and uses Oceania as a region; it is not asserting that there is only one continent-count convention.",
+    "source": "https://unstats.un.org/unsd/methodology/m49/",
+    "sourceVerified": false,
+    "reviewStatus": "draft",
+    "lastReviewed": null,
+    "referenceYear": null,
+    "asset": null
+  }
+]

@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: dark; }
+  body {
+    @apply bg-ink text-paper antialiased;
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background-image:
+      radial-gradient(ellipse at 80% 0%, #8b7cf810, transparent 40%),
+      radial-gradient(ellipse at 0% 40%, #35d0c507, transparent 35%);
+  }
+  button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  button { touch-action: manipulation; }
+  button:disabled { @apply opacity-50 cursor-not-allowed; }
+  :focus-visible { outline: 3px solid #35D0C5; outline-offset: 4px; }
+  h1:focus { outline: none; }
+  label { @apply block text-sm font-medium; }
+  input:not([type=checkbox]):not([type=radio]), select, textarea {
+    @apply block w-full mt-2 bg-ink border border-muted/40 rounded-xl px-3 py-3 text-paper;
+    min-height: 46px;
+    font-size: 16px;
+  }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: #35D0C5; }
+  progress { accent-color: #35D0C5; height: 10px; }
+  nav a { @apply px-3 py-3 rounded-xl text-muted; min-height: 44px; }
+  nav a.active { @apply text-mint bg-mint/10; }
+}
+
+@layer components {
+  .shell {
+    @apply max-w-6xl mx-auto;
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+  .card { @apply bg-surface border border-white/10 rounded-2xl p-5 md:p-6; }
+  .heading { @apply text-3xl md:text-4xl font-black tracking-tight; }
+  .muted { @apply text-muted; }
+  .eyebrow { @apply text-mint text-xs font-bold tracking-[0.18em] uppercase; }
+  .primary, .secondary, .danger-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold text-sm;
+    min-height: 46px;
+    transition: transform .15s ease, background-color .15s ease;
+  }
+  .primary { @apply bg-mint text-ink; }
+  .primary:hover:not(:disabled) { @apply bg-mint/90; transform: translateY(-1px); }
+  .secondary { @apply bg-raised text-paper border border-white/15; }
+  .secondary:hover:not(:disabled) { @apply bg-raised/80; }
+  .danger-button { @apply bg-danger text-ink; }
+  .pill { @apply rounded-full bg-violet/15 border border-violet/40 px-4 py-2 text-paper text-sm; }
+  .mode-card { @apply card cursor-pointer relative; min-height: 205px; }
+  .mode-card:focus-within { outline: 3px solid #35D0C5; outline-offset: 4px; }
+  .mode-card.selected { @apply border-mint bg-mint/5; }
+  .answer {
+    @apply rounded-xl border border-muted/40 bg-raised p-4 flex items-center gap-4 font-semibold;
+    min-height: 64px;
+  }
+  .answer:hover:not(:disabled) { @apply border-mint bg-mint/10; }
+  .keycap { @apply border border-muted/40 rounded-lg w-8 h-8 flex shrink-0 justify-center items-center text-sm text-muted; }
+  .error { @apply mt-4 p-4 rounded-xl border border-danger/50 bg-danger/10 text-paper; }
+  .check { @apply flex items-center gap-3; min-height: 44px; }
+  .demo-banner { @apply text-center text-xs text-paper bg-violet/15 border-b border-violet/20 px-4 py-3; }
+  .logo { @apply bg-mint text-ink w-10 h-10 flex items-center justify-center rounded-xl text-2xl; }
+  .globe-card {
+    @apply rounded-[2rem] border border-white/10 p-6;
+    background: radial-gradient(circle at 50% 40%, #35d0c518, #141d3270 65%);
+  }
+  .skip { position: fixed; top: -100px; left: 1rem; z-index: 100; }
+  .skip:focus { @apply primary; top: 1rem; }
+}
+footer { padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+html[data-motion=reduce] *, html[data-motion=reduce] *::before {
+  animation: none !important; transition: none !important;
+}

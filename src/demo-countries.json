@@ -1,0 +1,122 @@
+[
+  {
+    "code": "US",
+    "name": "United States",
+    "capital": "Washington, D.C.",
+    "region": "North America",
+    "currency": "United States dollar",
+    "flag": "Thirteen red and white stripes and a blue canton containing fifty white stars.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "GB",
+    "name": "United Kingdom",
+    "capital": "London",
+    "region": "Europe",
+    "currency": "Pound sterling",
+    "flag": "The Union Flag combines red and white crosses on a blue field.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "MX",
+    "name": "Mexico",
+    "capital": "Mexico City",
+    "region": "North America",
+    "currency": "Mexican peso",
+    "flag": "Green, white, and red vertical bands with an eagle-and-serpent emblem in the center.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "AR",
+    "name": "Argentina",
+    "capital": "Buenos Aires",
+    "region": "South America",
+    "currency": "Argentine peso",
+    "flag": "Light-blue, white, and light-blue horizontal bands with a sun on the white band.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "NZ",
+    "name": "New Zealand",
+    "capital": "Wellington",
+    "region": "Oceania",
+    "currency": "New Zealand dollar",
+    "flag": "A blue field with the Union Jack and four red stars outlined in white.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "IS",
+    "name": "Iceland",
+    "capital": "Reykjavík",
+    "region": "Europe",
+    "currency": "Icelandic króna",
+    "flag": "A red Nordic cross outlined in white on a blue field.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "FI",
+    "name": "Finland",
+    "capital": "Helsinki",
+    "region": "Europe",
+    "currency": "Euro",
+    "flag": "A blue Nordic cross on a white field.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "DK",
+    "name": "Denmark",
+    "capital": "Copenhagen",
+    "region": "Europe",
+    "currency": "Danish krone",
+    "flag": "A white Nordic cross on a red field.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "EG",
+    "name": "Egypt",
+    "capital": "Cairo",
+    "region": "Africa",
+    "currency": "Egyptian pound",
+    "flag": "Red, white, and black horizontal bands with a gold eagle in the center.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "NG",
+    "name": "Nigeria",
+    "capital": "Abuja",
+    "region": "Africa",
+    "currency": "Nigerian naira",
+    "flag": "Three vertical bands of green, white, and green.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "TH",
+    "name": "Thailand",
+    "capital": "Bangkok",
+    "region": "Asia",
+    "currency": "Thai baht",
+    "flag": "Five horizontal bands of red, white, blue, white, and red, with a wider blue middle band.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  },
+  {
+    "code": "VN",
+    "name": "Vietnam",
+    "capital": "Hanoi",
+    "region": "Asia",
+    "currency": "Vietnamese đồng",
+    "flag": "A yellow five-pointed star centered on a red field.",
+    "difficulty": "easy",
+    "source": "https://www.cia.gov/the-world-factbook/"
+  }
+]
