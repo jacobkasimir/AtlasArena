@@ -36,11 +36,11 @@ function Layout() {
   const navigate = useNavigate();
   const [userMenu, setUserMenu] = useState(false);
   const [menuMessage,setMenuMessage]=useState("");
-  const [identity, setIdentity] = useState<{username:string; avatar:number; isAnonymous:boolean} | null>(null);
+  const [identity, setIdentity] = useState<{username:string; avatar:number; isAnonymous:boolean; isAdmin:boolean; userId:string} | null>(null);
   const menuButtonRef=useRef<HTMLButtonElement>(null);
-  useEffect(() => { let live=true; if (isDemo) { setIdentity(localStorage.getItem("atlas-demo-signed-out")==="yes"?null:{username:"Traveler",avatar:0,isAnonymous:true}); return; }
-    supabase?.auth.getSession().then(({data})=>{if(live&&data.session?.user){const m=data.session.user.user_metadata??{};const isAnonymous=Boolean(data.session.user.is_anonymous);setIdentity({username:String(m.username??m.requested_username??"Explorer"),avatar:Number(m.avatar??0),isAnonymous});
-      api.dashboard().then(d=>{if(live)setIdentity({username:d.profile.username,avatar:d.profile.avatar,isAnonymous})}).catch(()=>{});
+  useEffect(() => { let live=true; if (isDemo) { setIdentity(localStorage.getItem("atlas-demo-signed-out")==="yes"?null:{username:"Traveler",avatar:0,isAnonymous:true,isAdmin:false,userId:"demo"}); return; }
+    supabase?.auth.getSession().then(({data})=>{if(live&&data.session?.user){const user=data.session.user;const m=user.user_metadata??{};const isAnonymous=Boolean(user.is_anonymous);const isAdmin=Boolean(identity?.userId===user.id&&identity.isAdmin);setIdentity({username:String(m.username??m.requested_username??"Explorer"),avatar:Number(m.avatar??0),isAnonymous,isAdmin,userId:user.id});
+      api.dashboard().then(d=>{if(live)setIdentity({username:d.profile.username,avatar:d.profile.avatar,isAnonymous,isAdmin:Boolean(d.profile.admin),userId:user.id})}).catch(()=>{});
     }});
     return () => { live=false; };
   }, [location.pathname]);
@@ -64,6 +64,7 @@ function Layout() {
         </Link>
         <nav aria-label="Primary" className="topbar-nav flex flex-wrap gap-1 items-center">
           {identity && <><NavLink to="/home">Play</NavLink><NavLink to="/explorer">Explorer</NavLink>
+          {identity.isAdmin && <NavLink className="admin-nav-link" to="/admin" aria-label="Admin-Bereich">Admin</NavLink>}
           <NavLink className="topbar-icon" to="/profile" aria-label="Statistiken" title="Statistiken"><ChartIcon/></NavLink>
           <NavLink className="topbar-icon" to="/settings" aria-label="Einstellungen" title="Einstellungen"><SettingsIcon/></NavLink>
           <div className="user-menu-wrap"><button ref={menuButtonRef} className="user-menu-button" aria-label="Benutzermenü öffnen" aria-expanded={userMenu} aria-haspopup="menu" onClick={()=>setUserMenu(v=>!v)}><span aria-hidden="true">{avatars[identity.avatar] ?? avatars[0]}</span><span className="user-name">{identity.username}</span><span aria-hidden="true">⌄</span></button>

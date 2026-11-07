@@ -173,6 +173,8 @@ html[data-theme="dark"] .logo-dark,html[data-theme="dark"] .wordmark-dark {displ
 .user-menu a,.user-menu button { display:block;width:100%;text-align:left;padding:.8rem;border-radius:.65rem;min-height:44px;color:rgb(var(--c-text)); }
 .user-menu a:hover,.user-menu button:hover { background:rgb(var(--c-raised)); }
 .topbar-nav { gap:.3rem; }
+.topbar-nav .admin-nav-link { color:rgb(var(--c-mint-ink));background:rgb(var(--c-mint));font-weight:750; }
+.topbar-nav .admin-nav-link:hover { filter:brightness(1.06); }
 .topbar-icon { width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;padding:.65rem!important;border:1px solid transparent;transition:background-color .18s ease,border-color .18s ease,color .18s ease; }
 .topbar-icon svg { width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round; }
 .topbar-icon:hover { background:rgb(var(--c-mint) / .08);border-color:rgb(var(--c-mint) / .2); }
