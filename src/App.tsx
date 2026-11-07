@@ -68,13 +68,11 @@ function Layout() {
           {userMenu && <div className="user-menu" role="menu">
             {identity.isAnonymous&&<Link role="menuitem" to="/auth?mode=link" onClick={()=>setUserMenu(false)}>Konto erstellen und Spielstand sichern</Link>}
             {menuMessage&&<p className="error" role="alert">{menuMessage}</p>}
-            <button role="menuitem" onClick={async()=>{
+            {!identity.isAnonymous&&<button role="menuitem" onClick={async()=>{
               try {
-                const u=await api.currentUser();
-                if(u.isAnonymous&&!confirm("Nicht gesicherter Gastfortschritt ist nach dem Abmelden möglicherweise nicht wieder zugänglich. Wähle Abbrechen und dann „Konto erstellen und Spielstand sichern“, um ihn zu behalten."))return;
                 await api.signOut(); localStorage.removeItem("atlas-view-cache"); setIdentity(null); navigate("/",{replace:true});
               } catch(e) { setMenuMessage((e as Error).message||"Abmelden fehlgeschlagen. Deine Sitzung bleibt aktiv."); }
-            }}>Abmelden</button>
+            }}>Abmelden</button>}
           </div>}</div></>}
         </nav>
       </div>
@@ -625,11 +623,13 @@ function Protected({children}:{children:JSX.Element}) {
 
 function Settings() {
   const navigate = useNavigate();
+  const [isAnonymous,setIsAnonymous] = useState<boolean|null>(null);
   const [consent, setConsent] = useState(analyticsEnabled());
   const [motion, setMotion] = useState(localStorage.getItem("atlas-motion") === "reduce");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
   const [theme,setTheme] = useState(localStorage.getItem("atlas-theme") ?? "system");
+  useEffect(()=>{api.currentUser().then(user=>setIsAnonymous(user.isAnonymous)).catch(()=>setIsAnonymous(null))},[]);
   async function run(task: () => Promise<unknown>) {
     setPending(true); setMessage("");
     try { await task(); }
@@ -664,10 +664,9 @@ function Settings() {
         <button className="secondary" disabled={pending} onClick={() => void run(async () => {
           download("atlas-data.json", await api.exportData());
         })}>Export my data</button>
-        <button className="secondary" disabled={pending} onClick={() => void run(async () => {
-          const u=await api.currentUser();if(u.isAnonymous&&!confirm("Nicht gesicherter Gastfortschritt ist nach dem Abmelden möglicherweise nicht wieder zugänglich. Wähle Abbrechen und öffne im Profil „Konto erstellen und Spielstand sichern“, um ihn zu behalten."))return;
+        {isAnonymous===false&&<button className="secondary" disabled={pending} onClick={() => void run(async () => {
           await api.signOut();setAnalytics(false);navigate("/",{replace:true});
-        })}>Sign out</button>
+        })}>Sign out</button>}
         <button className="danger-button" disabled={pending} onClick={() => {
           if (prompt("Type DELETE to permanently delete this account and its progress.") !== "DELETE") return;
           void run(async () => {
