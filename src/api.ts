@@ -124,9 +124,27 @@ export const api = {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
   },
-  adminList: (search = "", offset = 0) =>
-    rpc<{ items: Record<string, unknown>[] }>("arena_admin_list", {
-      p_search: search, p_offset: offset
+  adminList: (filters: {
+    search: string; offset: number; category: string; topic: string;
+    difficulty: string; reviewStatus: string; sourceVerified: boolean | null;
+    type: string; countryCode: string; referenceYear: number | null
+  }) =>
+    rpc<{
+      items: Record<string, unknown>[];
+      topics: string[];
+      categories: string[];
+      difficulties: string[];
+    }>("arena_admin_list_filtered", {
+      p_search: filters.search,
+      p_offset: filters.offset,
+      p_category: filters.category || null,
+      p_subcategory: filters.topic || null,
+      p_difficulty: filters.difficulty || null,
+      p_review_status: filters.reviewStatus || null,
+      p_source_verified: filters.sourceVerified,
+      p_type: filters.type || null,
+      p_country_code: filters.countryCode || null,
+      p_reference_year: filters.referenceYear
     }),
   adminImport: (
     records: unknown[], dryRun: boolean, policy: "reject" | "version", publish: boolean
