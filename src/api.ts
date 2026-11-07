@@ -64,7 +64,7 @@ export const api = {
       p_username: profile.username.trim(), p_avatar: profile.avatar, p_favorites: profile.favorites
     });
     const username = profile.username.trim();
-    const { error } = await supabase!.auth.updateUser({ data: { username, full_name: username, avatar: profile.avatar } });
+    const { error } = await supabase!.auth.updateUser({ data: { username, display_name: username, full_name: username, avatar: profile.avatar } });
     if (error) throw error;
   },
   explore: () =>
@@ -90,7 +90,7 @@ export const api = {
   signUp: async (email: string, password: string, username: string) => {
     if (!supabase) throw new Error("Accounts require Supabase configuration.");
     const requestedUsername = username.trim();
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/auth", data: { requested_username: requestedUsername, full_name: requestedUsername } } });
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/auth", data: { requested_username: requestedUsername, display_name: requestedUsername, full_name: requestedUsername } } });
     if (error) throw error;
     return { needsConfirmation: !data.session };
   },
