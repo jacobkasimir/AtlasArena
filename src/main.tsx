@@ -6,6 +6,10 @@ import "./style.css";
 import { track } from "./analytics";
 
 document.documentElement.dataset.motion = localStorage.getItem("atlas-motion") ?? "system";
+const savedTheme=localStorage.getItem("atlas-theme");
+if(savedTheme) document.documentElement.dataset.theme=savedTheme;
+const themeColor=document.querySelector('meta[name="theme-color"]');
+if(themeColor)themeColor.setAttribute("content",savedTheme==="light"||(!savedTheme&&matchMedia("(prefers-color-scheme: light)").matches)?"#f5f8ff":"#0B1020");
 track("return_visit");
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   canTransition, eligibleDifficulty, eligibleXP, expired, level, score,
-  shuffle, validateOption, PlayableQuestion
+  shuffle, validateOption, PlayableQuestion, validUsername, normalizeUsername
 } from "./domain";
+
+describe("username rules", () => {
+  it("trims names and accepts the shared 2–24 character alphabet", () => {
+    expect(normalizeUsername("  Atlas_7 ")).toBe("Atlas_7");
+    expect(validUsername("  Atlas_7 ")).toBe(true);
+    expect(validUsername("A")).toBe(false);
+    expect(validUsername("A".repeat(25))).toBe(false);
+    expect(validUsername("bad/name")).toBe(false);
+  });
+});
 
 describe("scoring", () => {
   it("applies integer difficulty scores", () => {

@@ -3,9 +3,9 @@ import {
   Link, NavLink, Outlet, Route, Routes, useLocation, useNavigate,
   useParams, useSearchParams
 } from "react-router-dom";
-import { api, configurationError, isDemo } from "./api";
+import { api, configurationError, isDemo, supabase } from "./api";
 import {
-  avatars, categories, difficulties, level, Mode, modes, Difficulty, View
+  avatars, categories, difficulties, level, Mode, modes, Difficulty, View, validUsername
 } from "./domain";
 import { ErrorBox, Feedback, Loading, download, useLoad } from "./components";
 import { analyticsEnabled, readEvents, setAnalytics, track } from "./analytics";
@@ -23,9 +23,29 @@ const descriptions: Record<Mode, string> = {
   timed: "One minute. How far can your knowledge take you?",
   endless: "Three lives. Rising difficulty. Find your limit."
 };
+function applyTheme(theme:string){
+  if(theme==="system")delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme=theme;
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.setAttribute("content",theme==="light"||(theme==="system"&&matchMedia("(prefers-color-scheme: light)").matches)?"#f5f8ff":"#0B1020");
+}
 
 function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [userMenu, setUserMenu] = useState(false);
+  const [menuMessage,setMenuMessage]=useState("");
+  const [identity, setIdentity] = useState<{username:string; avatar:number; isAnonymous:boolean} | null>(null);
+  const menuButtonRef=useRef<HTMLButtonElement>(null);
+  useEffect(() => { let live=true; if (isDemo) { setIdentity(localStorage.getItem("atlas-demo-signed-out")==="yes"?null:{username:"Traveler",avatar:0,isAnonymous:true}); return; }
+    supabase?.auth.getSession().then(({data})=>{if(live&&data.session?.user){const m=data.session.user.user_metadata??{};const isAnonymous=Boolean(data.session.user.is_anonymous);setIdentity({username:String(m.username??m.requested_username??"Explorer"),avatar:Number(m.avatar??0),isAnonymous});
+      api.dashboard().then(d=>{if(live)setIdentity({username:d.profile.username,avatar:d.profile.avatar,isAnonymous})}).catch(()=>{});
+    }});
+    return () => { live=false; };
+  }, [location.pathname]);
+  useEffect(() => { if(!userMenu) return; const close=(e:KeyboardEvent)=>{if(e.key==="Escape"){setUserMenu(false);menuButtonRef.current?.focus()}};
+    window.addEventListener("keydown",close); return ()=>window.removeEventListener("keydown",close);
+  },[userMenu]);
   useEffect(() => {
     const title = document.querySelector("main h1") as HTMLElement | null;
     title?.focus({ preventScroll: true });
@@ -34,15 +54,28 @@ function Layout() {
     <a className="skip" href="#main">Skip to content</a>
     <header className="border-b border-white/10">
       <div className="shell flex flex-wrap items-center justify-between gap-3 py-4">
-        <Link to="/" className="flex items-center gap-3 font-black tracking-wider">
-          <span className="logo" aria-hidden="true">A</span>
-          ATLAS <span className="text-mint">ARENA</span>
+        <Link to="/home" className="brand-link" aria-label="Atlas Arena – Startseite">
+          <img className="brand-mark logo-light" src="/icons/light.jpg" alt="" />
+          <img className="brand-mark logo-dark" src="/icons/dark.png" alt="" />
+          <img className="brand-wordmark wordmark-light" src="/icons/text_light.jpg" alt="" />
+          <img className="brand-wordmark wordmark-dark" src="/icons/text_dark.png" alt="" />
         </Link>
-        <nav aria-label="Primary" className="flex flex-wrap gap-1">
-          <NavLink to="/home">Play</NavLink>
-          <NavLink to="/explorer">Explorer</NavLink>
-          <NavLink to="/profile">Profile</NavLink>
-          <NavLink to="/settings">Settings</NavLink>
+        <nav aria-label="Primary" className="flex flex-wrap gap-1 items-center">
+          {identity && <><NavLink to="/home">Play</NavLink><NavLink to="/explorer">Explorer</NavLink>
+          <div className="user-menu-wrap"><button ref={menuButtonRef} className="user-menu-button" aria-label="Benutzermenü öffnen" aria-expanded={userMenu} aria-haspopup="menu" onClick={()=>setUserMenu(v=>!v)}><span aria-hidden="true">{avatars[identity.avatar] ?? avatars[0]}</span><span className="user-name">{identity.username}</span><span aria-hidden="true">⌄</span></button>
+          {userMenu && <div className="user-menu" role="menu">
+            <Link role="menuitem" to="/profile" onClick={()=>setUserMenu(false)}>Profil · Statistiken</Link>
+            <Link role="menuitem" to="/settings" onClick={()=>setUserMenu(false)}>Kontoeinstellungen</Link>
+            {identity.isAnonymous&&<Link role="menuitem" to="/auth?mode=link" onClick={()=>setUserMenu(false)}>Konto erstellen und Spielstand sichern</Link>}
+            {menuMessage&&<p className="error" role="alert">{menuMessage}</p>}
+            <button role="menuitem" onClick={async()=>{
+              try {
+                const u=await api.currentUser();
+                if(u.isAnonymous&&!confirm("Nicht gesicherter Gastfortschritt ist nach dem Abmelden möglicherweise nicht wieder zugänglich. Wähle Abbrechen und dann „Konto erstellen und Spielstand sichern“, um ihn zu behalten."))return;
+                await api.signOut(); localStorage.removeItem("atlas-view-cache"); setIdentity(null); navigate("/",{replace:true});
+              } catch(e) { setMenuMessage((e as Error).message||"Abmelden fehlgeschlagen. Deine Sitzung bleibt aktiv."); }
+            }}>Abmelden</button>
+          </div>}</div></>}
         </nav>
       </div>
     </header>
@@ -80,11 +113,11 @@ function Welcome() {
         into your next great run.
       </p>
       <div className="flex flex-wrap gap-3 mt-8">
-        <button className="primary" disabled={pending} onClick={start}>
-          {pending ? "Preparing…" : "Play as Guest"} <span aria-hidden="true">→</span>
-        </button>
-        {!isDemo && <Link className="secondary" to="/auth">Sign in / create account</Link>}
+        {!isDemo && <Link className="primary" to="/auth?mode=guest">Als Gast spielen →</Link>}
+        {isDemo && <button className="primary" disabled={pending} onClick={start}>{pending ? "Preparing…" : "Als Gast spielen →"}</button>}
+        {!isDemo && <Link className="secondary" to="/auth?mode=signin">Anmelden</Link>}
       </div>
+      {!isDemo && <p className="mt-3"><Link className="text-mint underline" to="/auth?mode=signup">Konto erstellen</Link></p>}
       <p className="text-sm muted mt-4">No account required. Your first adventure starts here.</p>
       <ErrorBox message={error} />
     </section>
@@ -416,7 +449,7 @@ function ProfilePage() {
         favorites: form.getAll("favorites").map(String)
       });
       setMessage("Profile saved."); reload();
-    } catch (e) { setMessage((e as Error).message); }
+    } catch (e) { setMessage(authMessage((e as Error).message)); }
     finally { setSaving(false); }
   }
   return <>
@@ -451,7 +484,7 @@ function ProfilePage() {
           <p key={m} className="flex justify-between py-2 border-b border-white/10">
             <span>{names[m]}</span><strong>{data.best[m] ?? "—"}</strong>
           </p>)}
-        {!isDemo && <Link className="secondary mt-5" to="/auth">Secure guest progress / sign in</Link>}
+        {!isDemo && <AccountActions/>}
         {data.profile.admin && <Link className="secondary mt-3" to="/admin">Content administration</Link>}
       </section>
     </div>
@@ -473,22 +506,45 @@ function ProfilePage() {
     </div>
   </>;
 }
+function authMessage(message:string){const m=message.toLowerCase();if(m.includes("invalid login credentials"))return "E-Mail oder Passwort ist nicht korrekt.";if(m.includes("email not confirmed"))return "Bitte bestätige zuerst deine E-Mail-Adresse.";if(m.includes("user already registered")||m.includes("already been registered"))return "Für diese E-Mail gibt es bereits ein Konto. Melde dich an oder setze dein Passwort zurück.";if(m.includes("password")&&m.includes("least"))return "Das Passwort erfüllt die Mindestlänge nicht.";if(m.includes("email address")&&m.includes("already"))return "Diese E-Mail-Adresse wird bereits verwendet.";if(/duplicate|unique|username_taken/i.test(message))return "Dieser Benutzername ist bereits vergeben. Bitte wähle einen anderen.";return message;}
+
+function Onboarding(){const [message,setMessage]=useState("");const [pending,setPending]=useState(false);const nav=useNavigate();
+  async function save(e:FormEvent<HTMLFormElement>){e.preventDefault();setPending(true);setMessage("");const name=String(new FormData(e.currentTarget).get("username")??"").trim();
+    try{if(!validUsername(name))throw new Error("Verwende 2–24 Zeichen: Buchstaben, Zahlen, Leerzeichen, _ oder -.");await api.claimUsername(name);if(isDemo)localStorage.setItem("atlas-demo-onboarded","yes");nav("/home",{replace:true});}
+    catch(err){const m=(err as Error).message;setMessage(/duplicate|unique|username_taken/i.test(m)?"Dieser Benutzername ist bereits vergeben. Bitte wähle einen anderen.":m)}finally{setPending(false)}}
+  return <section className="card max-w-lg mx-auto"><h1 className="heading">Wähle deinen Benutzernamen</h1><p className="muted mt-3">Dein Name ist für alle Spielkonten eindeutig.</p><form onSubmit={save} className="mt-5 space-y-4"><label>Benutzername<input name="username" minLength={2} maxLength={24} pattern="[A-Za-z0-9 _\-]+" required autoComplete="nickname"/></label><button className="primary">{pending?"Speichern…":"Weiter"}</button><p role="alert">{message}</p></form></section>}
+function AccountActions(){const [user,setUser]=useState<{isAnonymous:boolean;email:string|null}|null>(null);useEffect(()=>{api.currentUser().then(setUser).catch(()=>setUser(null))},[]);const[theme,setTheme]=useState(localStorage.getItem("atlas-theme")??"system");
+ return <div className="mt-5 space-y-4"><p className="muted">{user?.isAnonymous?"Gastkonto · Spielstand nur auf diesem Gerät gesichert.":`Konto · ${user?.email??""}`}</p>{user?.isAnonymous&&<Link className="primary" to="/auth?mode=link">Konto erstellen und Spielstand sichern</Link>}
+ <label>Darstellung<select value={theme} onChange={e=>{const v=e.target.value;setTheme(v);if(v==="system")localStorage.removeItem("atlas-theme");else localStorage.setItem("atlas-theme",v);applyTheme(v)}}><option value="system">System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label></div>}
 
 function Auth() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [action, setAction] = useState(params.has("recovery") ? "change" : "link");
+  const [action, setAction] = useState(params.has("recovery") ? "change" : params.get("mode") ?? "signin");
+  const [checkingSession,setCheckingSession]=useState(Boolean(supabase));
+  const [activeSession,setActiveSession]=useState(false);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  useEffect(()=>{if(!supabase)return;let active=true;supabase.auth.getSession().then(({data,error})=>{if(!active)return;const keepFlow=params.has("recovery")||action==="change"||action==="link"||action==="reset";const hasSession=Boolean(data.session);setActiveSession(hasSession&&!keepFlow);setCheckingSession(false);if(hasSession&&!keepFlow)navigate("/home",{replace:true});}).catch(()=>{if(active)setCheckingSession(false)});return()=>{active=false}},[action,navigate,params]);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setPending(true); setMessage("");
     const form = new FormData(e.currentTarget);
     const email = String(form.get("email") ?? "");
     const password = String(form.get("password") ?? "");
+    const username = String(form.get("username") ?? "").trim();
     try {
       if (action === "signin") {
-        if (!confirm("Signing into a different existing account does not merge this guest's progress. Continue?")) return;
-        await api.signIn(email, password); navigate("/home");
+        await api.signIn(email, password);
+        const u=await api.currentUser();
+        if(u.requestedUsername) { try { await api.claimUsername(u.requestedUsername); } catch(e) { if(!String((e as Error).message).toLowerCase().includes("duplicate")&&!String((e as Error).message).toLowerCase().includes("username")) throw e; } }
+        navigate("/home",{replace:true});
+      } else if (action === "signup") {
+        if(!validUsername(username)) throw new Error("Name: 2–24 Zeichen, Buchstaben, Zahlen, Leerzeichen, _ oder -.");
+        const result=await api.signUp(email,password,username);
+        setMessage(result.needsConfirmation ? "Bitte bestätige deine E-Mail. Danach kannst du dich regulär anmelden." : "Konto erstellt. Dein Profil wird eingerichtet.");
+        if(!result.needsConfirmation) { await api.claimUsername(username); navigate("/home",{replace:true}); }
+      } else if (action === "guest") {
+        await api.guest(); navigate("/onboarding",{replace:true});
       } else if (action === "reset") {
         await api.resetPassword(email);
         setMessage("If the account exists, a recovery message has been requested.");
@@ -496,28 +552,56 @@ function Auth() {
         await api.changePassword(password); navigate("/home");
       } else {
         await api.link(email, password);
-        setMessage("Account update requested. Follow the email confirmation link if required. This upgrades the current guest identity; it does not merge accounts.");
+        setMessage("Bestätige die E-Mail, falls Supabase dies verlangt. Deine Gast-ID und dein Fortschritt bleiben erhalten.");
       }
-    } catch (e) { setMessage((e as Error).message); }
+    } catch (e) { setMessage(authMessage((e as Error).message)); }
     finally { setPending(false); }
   }
+  if(checkingSession||activeSession)return <Loading/>;
   return <section className="card max-w-lg mx-auto">
-    <h1 tabIndex={-1} className="heading">Keep your discoveries.</h1>
+    <h1 tabIndex={-1} className="heading">{action==="guest"?"Als Gast weiterspielen":"Deine Entdeckungen bleiben."}</h1>
     {isDemo ? <p className="muted mt-4">Account features require Supabase. Local demo data is not imported into server accounts.</p>
       : <form className="space-y-5 mt-5" onSubmit={submit}>
-        <label>Account action<select value={action} onChange={e => setAction(e.target.value)}>
-          <option value="link">Create account from this guest</option>
-          <option value="signin">Sign in to an existing account</option>
-          <option value="reset">Request password reset</option>
-          {params.has("recovery") && <option value="change">Set a new password</option>}
+        <label>Vorgang<select value={action} onChange={e => setAction(e.target.value)}>
+          <option value="signin">Anmelden</option><option value="signup">Registrieren</option>
+          <option value="guest">Als Gast spielen</option><option value="link">Gastkonto sichern</option>
+          <option value="reset">Passwort zurücksetzen</option>
+          {params.has("recovery") && <option value="change">Neues Passwort setzen</option>}
         </select></label>
-        {action !== "change" && <label>Email<input type="email" name="email" autoComplete="email" required/></label>}
-        {action !== "reset" && <label>Password<input type="password" name="password" minLength={12}
+        {action === "signup" && <label>Benutzername<input name="username" required minLength={2} maxLength={24} pattern="[A-Za-z0-9 _\-]+" autoComplete="nickname"/></label>}
+        {!["change","guest"].includes(action) && <label>E-Mail<input type="email" name="email" autoComplete="email" required/></label>}
+        {! ["reset","guest"].includes(action) && <label>Passwort<input type="password" name="password" minLength={action==="signin"?undefined:12}
           autoComplete={action === "signin" ? "current-password" : "new-password"} required/></label>}
-        <button className="primary w-full" disabled={pending}>{pending ? "Working…" : "Continue"}</button>
+        <button className="primary w-full" disabled={pending}>{pending ? "Bitte warten…" : action==="signin"?"Anmelden":action==="guest"?"Gastnamen sichern":action==="signup"?"Registrieren":"Weiter"}</button>
       </form>}
     <p className="mt-4" role="status">{message}</p>
   </section>;
+}
+
+function AuthRedirect() {
+  const navigate=useNavigate(); const [state,setState]=useState<"loading"|"guest"|"account"|"out"|"error">(isDemo?(localStorage.getItem("atlas-demo-signed-out")==="yes"?"out":"guest"):"loading");
+  useEffect(()=>{if(!supabase)return; let active=true; supabase.auth.getSession().then(({data,error})=>{if(active)setState(error?"error":!data.session?"out":data.session.user?.is_anonymous===false?"account":"guest");}).catch(()=>{if(active)setState("error")});
+    const subscription=supabase.auth.onAuthStateChange?.((_e,s)=>setState(!s?"out":s.user.is_anonymous?"guest":"account"))?.data.subscription;return()=>{active=false;subscription?.unsubscribe()};},[]);
+  useEffect(()=>{if(state==="guest"||state==="account") navigate("/home",{replace:true})},[state,navigate]);
+  return state==="error"?<ErrorBox message="Deine Sitzung konnte nicht wiederhergestellt werden. Bitte prüfe die Verbindung und lade erneut." retry={()=>window.location.reload()}/>:state==="loading"?<Loading/>:<Welcome/>;
+}
+function Protected({children}:{children:JSX.Element}) {
+  const location=useLocation(), navigate=useNavigate(); const [state,setState]=useState<"loading"|"guest"|"account"|"out"|"onboarding"|"error">("loading");
+  useEffect(()=>{let active=true;
+    if(isDemo){if(localStorage.getItem("atlas-demo-signed-out")==="yes"){setState("out");return()=>{active=false}}if(location.pathname==="/onboarding"){setState("guest");return()=>{active=false}}api.dashboard().then(d=>{if(active)setState(d.profile.username==="Traveler"&&!localStorage.getItem("atlas-demo-onboarded")?"onboarding":"guest")}).catch(()=>{if(active)setState("error")});return()=>{active=false}}
+    if(!supabase)return;
+    const resolve=async(session:any)=>{if(!session){if(active)setState("out");return}const kind=session.user?.is_anonymous===false?"account":"guest";if(location.pathname==="/onboarding"){if(active)setState(kind);return}
+      try{const d=await api.dashboard();const confirmed=await api.usernameConfirmed();const requested=String(session.user?.user_metadata?.requested_username??"");
+        if(!confirmed&&requested){try{await api.claimUsername(requested);if(active)setState(kind);return}catch(e){if(/duplicate|unique|username_taken/i.test((e as Error).message)){if(active)setState("onboarding");return}throw e}}
+        if(active)setState(!confirmed||!validUsername(d.profile.username)?"onboarding":kind)
+      }catch{if(active)setState("error")}};
+    supabase.auth.getSession().then(({data,error})=>{if(error){if(active)setState("error")}else void resolve(data.session)});
+    const subscription=supabase.auth.onAuthStateChange?.((_e,s)=>{void resolve(s)})?.data.subscription;return()=>{active=false;subscription?.unsubscribe()};},[location.pathname]);
+  useEffect(()=>{if(state==="out")navigate(isDemo?"/":"/auth?mode=signin&next="+encodeURIComponent(location.pathname),{replace:true})},[state,location.pathname,navigate]);
+  useEffect(()=>{if(state==="onboarding")navigate("/onboarding",{replace:true})},[state,navigate]);
+  if(state==="loading"||state==="out"||state==="onboarding")return <Loading/>;
+  if(state==="error")return <ErrorBox message="Sitzung oder Profil konnte nicht geladen werden. Bitte prüfe die Verbindung und lade erneut." retry={()=>location.pathname&&window.location.reload()}/>;
+  return children;
 }
 
 function Settings() {
@@ -526,6 +610,7 @@ function Settings() {
   const [motion, setMotion] = useState(localStorage.getItem("atlas-motion") === "reduce");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const [theme,setTheme] = useState(localStorage.getItem("atlas-theme") ?? "system");
   async function run(task: () => Promise<unknown>) {
     setPending(true); setMessage("");
     try { await task(); }
@@ -536,6 +621,7 @@ function Settings() {
     <h1 tabIndex={-1} className="heading">Make yourself at home.</h1>
     <section className="card mt-6 space-y-5">
       <h2 className="text-xl font-bold">Comfort and privacy</h2>
+      <label>Darstellung<select value={theme} onChange={e=>{const v=e.target.value;setTheme(v);if(v==="system")localStorage.removeItem("atlas-theme");else localStorage.setItem("atlas-theme",v);applyTheme(v)}}><option value="system">System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label>
       <label className="check"><input type="checkbox" checked={motion} onChange={e => {
         setMotion(e.target.checked);
         localStorage.setItem("atlas-motion", e.target.checked ? "reduce" : "system");
@@ -560,14 +646,15 @@ function Settings() {
           download("atlas-data.json", await api.exportData());
         })}>Export my data</button>
         <button className="secondary" disabled={pending} onClick={() => void run(async () => {
-          await api.signOut(); navigate("/");
+          const u=await api.currentUser();if(u.isAnonymous&&!confirm("Nicht gesicherter Gastfortschritt ist nach dem Abmelden möglicherweise nicht wieder zugänglich. Wähle Abbrechen und öffne im Profil „Konto erstellen und Spielstand sichern“, um ihn zu behalten."))return;
+          await api.signOut();setAnalytics(false);navigate("/",{replace:true});
         })}>Sign out</button>
         <button className="danger-button" disabled={pending} onClick={() => {
           if (prompt("Type DELETE to permanently delete this account and its progress.") !== "DELETE") return;
           void run(async () => {
             await api.deleteAccount();
             setAnalytics(false);
-            navigate("/");
+            navigate("/",{replace:true});
           });
         }}>Delete {isDemo ? "demo data" : "account"}</button>
       </div>
@@ -594,15 +681,16 @@ export default function App() {
   if (configurationError) return <main className="shell py-10"><ErrorBox message={configurationError}/></main>;
   return <Routes>
     <Route element={<Layout/>}>
-      <Route index element={<Welcome/>}/>
-      <Route path="home" element={<Home/>}/>
-      <Route path="play/:id" element={<Game/>}/>
-      <Route path="results/:id" element={<Results/>}/>
-      <Route path="profile" element={<ProfilePage/>}/>
-      <Route path="settings" element={<Settings/>}/>
+      <Route index element={<AuthRedirect/>}/>
+      <Route path="home" element={<Protected><Home/></Protected>}/>
+      <Route path="play/:id" element={<Protected><Game/></Protected>}/>
+      <Route path="results/:id" element={<Protected><Results/></Protected>}/>
+      <Route path="profile" element={<Protected><ProfilePage/></Protected>}/>
+      <Route path="onboarding" element={<Protected><Onboarding/></Protected>}/>
+      <Route path="settings" element={<Protected><Settings/></Protected>}/>
       <Route path="auth" element={<Auth/>}/>
-      <Route path="explorer" element={<Explorer/>}/>
-      <Route path="admin" element={<Admin/>}/>
+      <Route path="explorer" element={<Protected><Explorer/></Protected>}/>
+      <Route path="admin" element={<Protected><Admin/></Protected>}/>
       <Route path="*" element={<section className="card">
         <h1 tabIndex={-1} className="heading">Uncharted territory.</h1>
         <Link className="primary mt-5" to="/">Return home</Link>

@@ -14,6 +14,61 @@ afterAll(async () => {
 });
 
 describe.skipIf(!configured)("isolated Supabase integration project", () => {
+  it("keeps generated usernames unconfirmed until the player claims one", async () => {
+    const client = createClient(url!, anon!, { auth: { persistSession: false } });
+    const signed = await client.auth.signInAnonymously();
+    expect(signed.error).toBeNull();
+    users.push(signed.data.user!.id);
+    await client.rpc("arena_dashboard");
+    const initial = await client.rpc("arena_username_confirmed");
+    expect(initial.data).toBe(false);
+    const username = `Player-${crypto.randomUUID().slice(0, 8)}`;
+    const claimed = await client.rpc("arena_profile", {
+      p_username: username, p_avatar: 0, p_favorites: []
+    });
+    expect(claimed.error).toBeNull();
+    const confirmed = await client.rpc("arena_username_confirmed");
+    expect(confirmed.data).toBe(true);
+  });
+
+  it("enforces trimmed case-insensitive usernames and serializes concurrent claims", async () => {
+    root = createClient(url!, service!, { auth: { persistSession: false } });
+    const clients = await Promise.all([0, 1].map(async () => {
+      const client = createClient(url!, anon!, { auth: { persistSession: false } });
+      const signed = await client.auth.signInAnonymously();
+      expect(signed.error).toBeNull();
+      users.push(signed.data.user!.id);
+      await client.rpc("arena_dashboard");
+      return client;
+    }));
+    const name = `Race-${crypto.randomUUID().slice(0, 7)}`;
+    const claims = await Promise.all(clients.map((client, index) => client.rpc("arena_profile", {
+      p_username: index ? ` ${name.toLowerCase()} ` : name,
+      p_avatar: index, p_favorites: []
+    })));
+    expect(claims.filter(result => !result.error)).toHaveLength(1);
+    expect(claims.filter(result => result.error)).toHaveLength(1);
+    const profiles = await root.from("profiles").select("username").in("id", users);
+    expect(new Set(profiles.data?.map(row => row.username.toLowerCase())).size).toBe(2);
+  });
+
+  it("keeps the user ID and profile progress when the anonymous identity is upgraded", async () => {
+    root = root ?? createClient(url!, service!, { auth: { persistSession: false } });
+    const client = createClient(url!, anon!, { auth: { persistSession: false } });
+    const signed = await client.auth.signInAnonymously();
+    const id = signed.data.user!.id;
+    users.push(id);
+    await client.rpc("arena_dashboard");
+    await client.rpc("arena_profile", {p_username:`Upgrade-${crypto.randomUUID().slice(0,7)}`,p_avatar:2,p_favorites:[]});
+    const before = await client.rpc("arena_dashboard");
+    const upgradeEmail = `upgrade-${crypto.randomUUID()}@example.test`;
+    const upgraded = await client.auth.updateUser({email:upgradeEmail,password:"isolated-test-password-123"});
+    expect(upgraded.error).toBeNull();
+    const after = await client.rpc("arena_dashboard");
+    expect(upgraded.data.user?.id).toBe(id);
+    expect(after.data.profile).toMatchObject({username:before.data.profile.username,avatar:2,xp:before.data.profile.xp});
+  });
+
   it("checks authorization, import, secrecy, duplicates, and idempotent XP", async () => {
     root = createClient(url!, service!, { auth: { persistSession: false } });
     const a = createClient(url!, anon!, { auth: { persistSession: false } });

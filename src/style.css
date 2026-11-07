@@ -74,6 +74,35 @@ footer { padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+html[data-theme="light"] { color-scheme: light; }
+@media (prefers-color-scheme: light) { html:not([data-theme="dark"]) { color-scheme: light; } }
+html[data-theme="light"] body { background-color:#f5f8ff; color:#111827; background-image:radial-gradient(ellipse at 80% 0%,#8b7cf810,transparent 40%); }
+html[data-theme="light"] .card { background:#fff; border-color:#cbd5e1; color:#111827; }
+html[data-theme="light"] input:not([type=checkbox]):not([type=radio]), html[data-theme="light"] select, html[data-theme="light"] textarea { background:#fff;color:#111827;border-color:#94a3b8; }
+html[data-theme="light"] .secondary { background:#e8edf5;color:#111827;border-color:#94a3b8; }
+html[data-theme="light"] .error { color:#7f1d1d;background:#fff1f2; }
+html[data-theme="light"] .muted{color:#475569}
+html[data-theme="light"] .text-mint{color:#087f78}
+html[data-theme="light"] .text-paper{color:#172033}
+html[data-theme="light"] .eyebrow{color:#087f78}
+html[data-theme="light"] .text-success{color:#047857}
+html[data-theme="light"] .text-danger{color:#b91c1c}
+@media(prefers-color-scheme:light){html:not([data-theme="dark"]):not([data-theme="light"]) body{background-color:#f5f8ff;color:#111827;background-image:radial-gradient(ellipse at 80% 0%,#8b7cf810,transparent 40%)}html:not([data-theme="dark"]):not([data-theme="light"]) .card{background:#fff;border-color:#cbd5e1;color:#111827}html:not([data-theme="dark"]):not([data-theme="light"]) input:not([type=checkbox]):not([type=radio]),html:not([data-theme="dark"]):not([data-theme="light"]) select,html:not([data-theme="dark"]):not([data-theme="light"]) textarea{background:#fff;color:#111827;border-color:#94a3b8}html:not([data-theme="dark"]):not([data-theme="light"]) .secondary{background:#e8edf5;color:#111827;border-color:#94a3b8}html:not([data-theme="dark"]):not([data-theme="light"]) .error{color:#7f1d1d;background:#fff1f2}html:not([data-theme="dark"]):not([data-theme="light"]) .muted{color:#475569}html:not([data-theme="dark"]):not([data-theme="light"]) .text-mint,html:not([data-theme="dark"]):not([data-theme="light"]) .eyebrow{color:#087f78}html:not([data-theme="dark"]):not([data-theme="light"]) .text-paper{color:#172033}html:not([data-theme="dark"]):not([data-theme="light"]) .text-success{color:#047857}html:not([data-theme="dark"]):not([data-theme="light"]) .text-danger{color:#b91c1c}}
+.brand-link { display:flex;align-items:center;gap:.65rem;min-width:0; }
+.brand-mark { width:44px;height:44px;object-fit:contain;border-radius:10px; }
+.brand-wordmark { display:block;width:clamp(125px,22vw,205px);height:auto;max-height:44px;object-fit:contain; }
+.logo-light,.wordmark-light { display:block; }.logo-dark,.wordmark-dark { display:none; }
+html[data-theme="dark"] .logo-light,html[data-theme="dark"] .wordmark-light {display:none}
+html[data-theme="dark"] .logo-dark,html[data-theme="dark"] .wordmark-dark {display:block}
+@media(prefers-color-scheme:dark){html:not([data-theme="light"]) .logo-light,html:not([data-theme="light"]) .wordmark-light{display:none}html:not([data-theme="light"]) .logo-dark,html:not([data-theme="light"]) .wordmark-dark{display:block}}
+.user-menu-wrap { position:relative; }
+.user-menu-button { min-height:44px;display:flex;align-items:center;gap:.5rem;padding:.4rem .65rem;border-radius:.75rem;background:#1b2842;color:#f3f6fc; }
+.user-menu { position:absolute;z-index:30;right:0;top:calc(100% + .35rem);min-width:210px;padding:.4rem;border:1px solid #64748b;border-radius:.8rem;background:#141d32;box-shadow:0 12px 32px #0005; }
+.user-menu a,.user-menu button { display:block;width:100%;text-align:left;padding:.75rem;border-radius:.5rem;min-height:44px;color:#f3f6fc; }
+.user-menu a:hover,.user-menu button:hover { background:#1b2842; }
+@media(max-width:400px){.user-name{display:none}.brand-wordmark{width:120px}}
+@media(min-width:768px){.shell{width:100%}}
+body { min-height:100vh; min-height:100dvh; overflow-x:hidden; }
 html[data-motion=reduce] *, html[data-motion=reduce] *::before {
   animation: none !important; transition: none !important;
 }

@@ -31,7 +31,7 @@ async function requireSession() {
 
 export const api = {
   guest: async () => {
-    if (isDemo) return demo.guest();
+    if (isDemo) { localStorage.removeItem("atlas-demo-signed-out"); return demo.guest(); }
     const { data, error: restoreError } = await supabase!.auth.getSession();
     if (restoreError) throw new Error(`Could not restore your session: ${restoreError.message}`);
     if (!data.session) {
@@ -57,22 +57,27 @@ export const api = {
     isDemo ? demo.abandon(id) : rpc<void>("arena_abandon", { p_id: id }),
   dashboard: (offset = 0) =>
     isDemo ? demo.dashboard(offset) : rpc<Dashboard>("arena_dashboard", { p_offset: offset }),
-  saveProfile: (profile: Omit<Profile, "xp" | "admin">) =>
-    isDemo ? demo.saveProfile(profile) : rpc<void>("arena_profile", {
-      p_username: profile.username, p_avatar: profile.avatar, p_favorites: profile.favorites
-    }),
+  usernameConfirmed: () => rpc<boolean>("arena_username_confirmed"),
+  saveProfile: async (profile: Omit<Profile, "xp" | "admin">) => {
+    if (isDemo) return demo.saveProfile(profile);
+    await rpc<void>("arena_profile", {
+      p_username: profile.username.trim(), p_avatar: profile.avatar, p_favorites: profile.favorites
+    });
+    const { error } = await supabase!.auth.updateUser({ data: { username: profile.username.trim(), avatar: profile.avatar } });
+    if (error) throw error;
+  },
   explore: () =>
     isDemo ? demo.explore() : rpc<Country[]>("arena_explore"),
   exportData: () =>
     isDemo ? demo.exportData() : rpc<unknown>("arena_export"),
   deleteAccount: async () => {
-    if (isDemo) return demo.deleteAccount();
+    if (isDemo) { await demo.deleteAccount(); localStorage.setItem("atlas-demo-signed-out", "yes"); return; }
     const { error } = await supabase!.functions.invoke("delete-account", { method: "DELETE" });
     if (error) throw error;
     await supabase!.auth.signOut();
   },
   signOut: async () => {
-    if (isDemo) return demo.signOut();
+    if (isDemo) { localStorage.setItem("atlas-demo-signed-out", "yes"); return demo.signOut(); }
     const { error } = await supabase!.auth.signOut();
     if (error) throw error;
   },
@@ -81,9 +86,27 @@ export const api = {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   },
+  signUp: async (email: string, password: string, username: string) => {
+    if (!supabase) throw new Error("Accounts require Supabase configuration.");
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/auth", data: { requested_username: username.trim() } } });
+    if (error) throw error;
+    return { needsConfirmation: !data.session };
+  },
+  currentUser: async () => {
+    if (isDemo) return { id: "demo", isAnonymous: true, email: null as string | null };
+    await requireSession();
+    const { data, error } = await supabase!.auth.getUser();
+    if (error) throw error;
+    return { id: data.user.id, isAnonymous: Boolean(data.user.is_anonymous), email: data.user.email ?? null, requestedUsername: String(data.user.user_metadata?.requested_username ?? "") };
+  },
+  claimUsername: async (username: string) => {
+    const existing = await api.dashboard();
+    return api.saveProfile({ username: username.trim(), avatar: existing.profile.avatar, favorites: existing.profile.favorites });
+  },
   link: async (email: string, password: string) => {
     if (!supabase) throw new Error("Accounts require Supabase configuration.");
-    await api.guest();
+    await requireSession();
+    if (!(await api.currentUser()).isAnonymous) throw new Error("This session already belongs to a permanent account.");
     const { error } = await supabase.auth.updateUser({ email, password });
     if (error) throw error;
   },

@@ -2,7 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/((?!assets/|icon-|manifest.webmanifest|sw.js).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|icons/|icon-|favicon-|manifest.webmanifest|sw.js).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
