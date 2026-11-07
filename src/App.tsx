@@ -7,7 +7,7 @@ import { api, configurationError, isDemo, supabase } from "./api";
 import {
   avatars, categories, difficulties, level, Mode, modes, Difficulty, View, validUsername
 } from "./domain";
-import { ErrorBox, Feedback, Loading, download, useLoad } from "./components";
+import { ErrorBox, Feedback, Loading, OfflineBanner, download, useLoad } from "./components";
 import { analyticsEnabled, readEvents, setAnalytics, track } from "./analytics";
 
 const Admin = lazy(() => import("./Admin"));
@@ -27,7 +27,8 @@ function applyTheme(theme:string){
   if(theme==="system")delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme=theme;
   const meta=document.querySelector('meta[name="theme-color"]');
-  if(meta)meta.setAttribute("content",theme==="light"||(theme==="system"&&matchMedia("(prefers-color-scheme: light)").matches)?"#f5f8ff":"#0B1020");
+  const prefersLight=typeof window!=="undefined"&&typeof window.matchMedia==="function"&&window.matchMedia("(prefers-color-scheme: light)").matches;
+  if(meta)meta.setAttribute("content",theme==="light"||(theme==="system"&&prefersLight)?"#f5f8ff":"#0B1020");
 }
 
 function Layout() {
@@ -50,14 +51,15 @@ function Layout() {
     const title = document.querySelector("main h1") as HTMLElement | null;
     title?.focus({ preventScroll: true });
   }, [location.pathname]);
+  useEffect(()=>{if(typeof window.matchMedia!=="function")return;const media=window.matchMedia("(prefers-color-scheme: light)");const update=()=>{if(!localStorage.getItem("atlas-theme")){const meta=document.querySelector('meta[name="theme-color"]');meta?.setAttribute("content",media.matches?"#f5f8ff":"#0B1020")}};media.addEventListener("change",update);return()=>media.removeEventListener("change",update)},[]);
   return <>
     <a className="skip" href="#main">Skip to content</a>
-    <header className="border-b border-white/10">
+    <header className="app-header border-b border-line/15">
       <div className="shell flex flex-wrap items-center justify-between gap-3 py-4">
         <Link to="/home" className="brand-link" aria-label="Atlas Arena – Startseite">
-          <img className="brand-mark logo-light" src="/icons/light.jpg" alt="" />
+          <img className="brand-mark logo-light" src="/icons/light-transparent.png" alt="" />
           <img className="brand-mark logo-dark" src="/icons/dark.png" alt="" />
-          <img className="brand-wordmark wordmark-light" src="/icons/text_light.jpg" alt="" />
+          <img className="brand-wordmark wordmark-light" src="/icons/text_light-transparent.png" alt="" />
           <img className="brand-wordmark wordmark-dark" src="/icons/text_dark.png" alt="" />
         </Link>
         <nav aria-label="Primary" className="topbar-nav flex flex-wrap gap-1 items-center">
@@ -80,10 +82,11 @@ function Layout() {
     {isDemo && <div className="demo-banner">
       LOCAL DEMO · Progress stays in this browser · Public, unverified sample questions
     </div>}
+    <OfflineBanner/>
     <main id="main" className="shell py-8 md:py-12">
       <Suspense fallback={<Loading />}><Outlet /></Suspense>
     </main>
-    <footer className="shell py-8 text-sm muted border-t border-white/10">
+    <footer className="shell py-8 text-sm muted border-t border-line/15">
       Built for curious minds. No ads. No public chat.
       <span className="block mt-2">Maps and multiplayer are planned, not playable features.</span>
     </footer>
@@ -103,8 +106,8 @@ function Welcome() {
     catch (e) { setError((e as Error).message); }
     finally { setPending(false); }
   }
-  return <div className="grid md:grid-cols-2 gap-12 items-center py-8">
-    <section>
+  return <div className="hero-shell grid md:grid-cols-[1.05fr_.95fr] gap-10 lg:gap-16 items-center py-8 md:py-12">
+    <section className="hero-copy">
       <p className="eyebrow">THE WORLD IS YOUR PLAYGROUND</p>
       <h1 tabIndex={-1} className="text-5xl md:text-7xl font-black leading-tight mt-5">
         Stay curious.<br /><span className="text-mint">Play the world.</span>
@@ -122,23 +125,8 @@ function Welcome() {
       <p className="text-sm muted mt-4">Dein Gastzugang funktioniert ohne Registrierung.</p>
       <ErrorBox message={error} />
     </section>
-    <div className="globe-card" aria-hidden="true">
-      <svg viewBox="0 0 400 400" className="w-full max-w-md mx-auto">
-        <defs>
-          <radialGradient id="ocean"><stop stopColor="#1B2842"/><stop offset="1" stopColor="#0B1020"/></radialGradient>
-        </defs>
-        <circle cx="200" cy="200" r="150" fill="url(#ocean)" stroke="#35D0C5" strokeWidth="2"/>
-        <g fill="none" stroke="#35D0C5" opacity=".35">
-          <ellipse cx="200" cy="200" rx="75" ry="150"/>
-          <ellipse cx="200" cy="200" rx="120" ry="150"/>
-          <ellipse cx="200" cy="200" rx="150" ry="55"/>
-          <ellipse cx="200" cy="200" rx="150" ry="105"/>
-          <path d="M50 200h300M200 50v300"/>
-        </g>
-        <circle cx="282" cy="123" r="7" fill="#35D0C5"/>
-        <circle cx="112" cy="226" r="7" fill="#8B7CF8"/>
-        <path d="M112 226Q170 70 282 123" fill="none" stroke="#8B7CF8" strokeDasharray="5 7"/>
-      </svg>
+    <div className="globe-card map-grid" aria-hidden="true">
+      <img className="marketing-icon" src="/icons/marketing_icon.png" alt="" />
       <p className="text-center font-mono text-sm muted">EXPLORE · LEARN · LEVEL UP</p>
     </div>
   </div>;
@@ -169,8 +157,8 @@ function Home() {
     finally { setPending(false); }
   }
 
-  return <>
-    <div className="flex justify-between flex-wrap gap-4 items-end">
+  return <div className="home-shell">
+    <div className="section-heading home-heading">
       <div>
         <p className="eyebrow">YOUR NEXT ADVENTURE</p>
         <h1 tabIndex={-1} className="heading mt-2">Welcome back{data ? `, ${data.profile.username}` : ""}.</h1>
@@ -179,17 +167,17 @@ function Home() {
     </div>
     <ErrorBox message={loadError} retry={reload}/>
     {loadError.includes("AUTH_REQUIRED") && <GuestSessionRecovery retry={reload}/>}
-    {data && <div className="grid grid-cols-3 gap-3 my-7">
+    {data && <div className="dashboard-stats grid grid-cols-3 gap-3 my-7">
       <Stat title="Completed" value={data.totals.games}/>
       <Stat title="Accuracy" value={accuracy(data.totals.correct, data.totals.incorrect)}/>
       <Stat title="Classic best" value={data.best.classic ?? "—"}/>
     </div>}
     {data?.sessions.filter(s => s.status === "awaiting_answer" || s.status === "showing_feedback")
-      .map(s => <Link className="card block mb-3 border-mint/40" key={s.id} to={"/play/" + s.id}>
-        Resume {names[s.mode]} <span aria-hidden="true">→</span>
+      .map(s => <Link className="resume-card card block mb-3" key={s.id} to={"/play/" + s.id}>
+        <span><strong>Resume {names[s.mode]}</strong><small className="muted">Your run is ready when you are.</small></span><span aria-hidden="true">→</span>
       </Link>)}
-    <form onSubmit={start} className="mt-8">
-      <fieldset>
+    <form onSubmit={start} className="challenge-form mt-8">
+      <fieldset className="challenge-fieldset">
         <legend className="text-xl font-bold mb-4">Choose your challenge</legend>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {modes.map((m, i) => <label key={m} className={`mode-card ${mode === m ? "selected" : ""}`}>
@@ -227,11 +215,11 @@ function Home() {
       </p>
       <ErrorBox message={error}/>
     </form>
-  </>;
+  </div>;
 }
 
 function Stat({ title, value }: { title: string; value: string | number }) {
-  return <div className="card p-4">
+  return <div className="card stat-card p-4">
     <p className="muted text-xs sm:text-sm">{title}</p>
     <p className="text-xl sm:text-3xl font-black mt-2">{value}</p>
   </div>;
@@ -341,68 +329,73 @@ function Game() {
     return () => window.removeEventListener("keydown", keydown);
   });
 
-  if (!view) return <><Loading/><ErrorBox message={error} retry={refresh}/></>;
+  if (!view) return error?<ErrorBox message={error} retry={refresh}/>:<Loading/>;
   if (view.status === "abandoned") return <section className="card">
     <h1 tabIndex={-1} className="heading">This run was abandoned.</h1>
     <Link className="primary mt-5" to="/home">Choose a new challenge</Link>
   </section>;
 
-  return <div className="max-w-3xl mx-auto">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="eyebrow">{names[view.mode]} · {view.current?.difficulty ?? view.difficulty}</p>
+  const questionNumber=Math.min(view.answered+1,view.total);
+  const progressPercent=view.total?Math.min(100,view.answered/view.total*100):0;
+  const remainingLives=Math.max(0,3-view.stats.incorrect);
+  return <div className="game-shell">
+    <div className="game-topline">
+      <div><p className="eyebrow">{names[view.mode]} · {view.current?.difficulty ?? view.difficulty}</p><p className="muted mt-1">Question {questionNumber} of {view.total}</p></div>
       <button className="secondary" disabled={pending} onClick={async () => {
         if (!confirm("Abandon this run? No XP will be awarded.")) return;
         try { await api.abandon(id); navigate("/home"); }
         catch (e) { setError((e as Error).message); }
       }}>Leave run</button>
     </div>
-    <div className="grid grid-cols-3 gap-3 my-6">
-      <Stat title="Score" value={view.stats.score}/>
-      <Stat title={view.mode === "endless" ? "Lives" : "Answered"}
-        value={view.mode === "endless" ? Math.max(0, 3 - view.stats.incorrect)
-          : `${view.answered}/${view.total}`}/>
-      <Stat title={remaining !== null ? "Time left" : "Streak"}
-        value={remaining !== null ? `${Math.ceil(remaining / 1000)}s` : view.stats.streak}/>
-    </div>
-    {remaining !== null && <div className="mb-6">
-      <label className="sr-only" htmlFor="time-progress">Session time remaining</label>
-      <progress id="time-progress" max={60000} value={remaining} className="w-full"/>
-      <p className="text-sm muted mt-2">60-second session. Server receipt determines whether an answer is on time.</p>
-    </div>}
-    {view.current && <section className="card">
-      <p className="muted text-sm capitalize">{view.current.subcategory}</p>
-      <h1 tabIndex={-1} className="text-2xl md:text-3xl font-bold mt-3 mb-6">{view.current.prompt}</h1>
-      <div className="grid gap-3">
+    <div className="game-layout mt-5"><div className="game-main">
+    {view.current && <section className="card game-question map-grid">
+      <div className="question-meta"><span className="pill">{view.current.subcategory}</span>{view.mode==="endless"&&<span className="muted">{remainingLives} {remainingLives===1?"life":"lives"} left</span>}</div>
+      <h1 tabIndex={-1} className="game-prompt mt-6">{view.current.prompt}</h1>
+      <div className="question-progress mt-7" role="progressbar" aria-label="Question progress" aria-valuemin={0} aria-valuemax={view.total} aria-valuenow={view.answered}>
+        <div className="game-progress"><span style={{width:`${progressPercent}%`}}/></div><span className="muted text-sm">{view.answered} answered</span>
+      </div>
+      <div className="answer-grid grid gap-3 sm:grid-cols-2 mt-7">
         {view.current.options.map((o, i) =>
           <button key={o.id} className="answer text-left"
             disabled={pending || view.status !== "awaiting_answer" || remaining === 0}
             onClick={() => void action("answer", o.id)}>
-            <span className="keycap" aria-hidden="true">{i + 1}</span>{o.label}
+            <span className="keycap" aria-hidden="true">{i + 1}</span><span>{o.label}</span>
           </button>)}
       </div>
+      <p className="keyboard-hint muted text-sm mt-5"><span className="keycap">1</span>–<span className="keycap">4</span> to answer</p>
     </section>}
     <ErrorBox message={error} retry={refresh}/>
     {view.feedback && <div className="mt-4">
       <Feedback review={view.feedback}/>
-      <button autoFocus className="primary w-full mt-4" disabled={pending || remaining === 0}
+      <button autoFocus className="primary w-full mt-3" disabled={pending || remaining === 0}
         onClick={() => void action("next")}>{pending ? "Loading…" : "Next question →"}</button>
     </div>}
     {remaining === 0 && view.status !== "completed" &&
-      <p className="mt-4" role="status">Time is up. Confirming the final result…</p>}
+      <p className="game-notice mt-4" role="status">Time is up. Confirming the final result…</p>}
+    </div><aside className="game-sidebar" aria-label="Live run statistics">
+      <div className="game-stat"><p className="muted text-sm">Score</p><p className="game-stat-value mt-2">{view.stats.score}</p><p className="muted text-xs mt-1">points</p></div>
+      {remaining!==null?<div className="game-stat timer-stat"><p className="muted text-sm">Time left</p><p className="game-stat-value mt-2">{Math.ceil(remaining/1000)}<small>s</small></p><div className="timer-track mt-3" role="progressbar" aria-label="Time remaining" aria-valuemin={0} aria-valuemax={60} aria-valuenow={Math.ceil(remaining/1000)}><span style={{width:`${Math.max(0,remaining/60000*100)}%`}}/></div></div>
+        :<div className="game-stat"><p className="muted text-sm">Current streak</p><p className="game-stat-value mt-2">{view.stats.streak}</p><p className="muted text-xs mt-1">Best {view.stats.bestStreak}</p></div>}
+      <div className="game-stat"><p className="muted text-sm">{view.mode==="endless"?"Lives remaining":"Progress"}</p><p className="game-stat-value mt-2">{view.mode==="endless"?remainingLives:`${view.answered}/${view.total}`}</p><p className="muted text-xs mt-1">{view.mode==="endless"?"Three chances":"questions answered"}</p></div>
+      {remaining!==null&&<p className="game-caption muted">60-second run. The server confirms whether each answer arrived in time.</p>}
+    </aside></div>
   </div>;
 }
 
 function Results() {
   const { id = "" } = useParams();
   const { data: v, error, reload } = useLoad(() => api.view(id), id);
-  if (!v) return <><Loading/><ErrorBox message={error} retry={reload}/></>;
+  if (!v) return error?<ErrorBox message={error} retry={reload}/>:<Loading/>;
   if (v.status !== "completed") return <section className="card">
     <h1 tabIndex={-1} className="heading">This run has not completed.</h1>
     <Link className="primary mt-4" to={"/play/" + id}>Resume run</Link>
   </section>;
-  return <>
+  return <div className="results-shell">
+    <section className="results-hero map-grid">
     <p className="eyebrow">ADVENTURE COMPLETE · {names[v.mode]}</p>
     <h1 tabIndex={-1} className="heading mt-3">A little more world. A little more you.</h1>
+    <p className="muted mt-3">Your results are in. Here’s how this run unfolded.</p>
+    </section>
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4 my-7">
       <Stat title="Final score" value={v.stats.score}/>
       <Stat title="Accuracy" value={accuracy(v.stats.correct, v.stats.incorrect)}/>
@@ -420,16 +413,16 @@ function Results() {
       <Link className="primary" to={`/home?mode=${v.mode}&difficulty=${v.difficulty}`}>Play again</Link>
       <Link className="secondary" to="/home">Change mode</Link>
     </div>
-    <h2 className="text-2xl font-bold mb-4">Your answer review</h2>
+    <div className="section-heading mt-9 mb-4"><h2 className="text-2xl font-bold">Your answer review</h2><span className="muted text-sm">{v.reviews.length} {v.reviews.length===1?"answer":"answers"}</span></div>
+    {!v.reviews.length&&<div className="empty-state"><p className="font-semibold">No answers were accepted in this run.</p></div>}
     <div className="grid gap-4">
-      {v.reviews.length === 0 && <p className="muted">No answers were accepted in this run.</p>}
       {[...v.reviews].sort((a, b) => Number(a.correct) - Number(b.correct)).map(r =>
         <article key={r.questionId}>
           <h3 className="font-semibold mb-2">{r.prompt}</h3>
           <Feedback review={r}/>
         </article>)}
     </div>
-  </>;
+  </div>;
 }
 
 function ProfilePage() {
@@ -437,9 +430,9 @@ function ProfilePage() {
   const { data, error, reload } = useLoad(() => api.dashboard(offset), offset);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  if (!data) return <><Loading/><ErrorBox message={error} retry={reload}/>
+  if (!data) return error?<><ErrorBox message={error} retry={reload}/>
     {error.includes("AUTH_REQUIRED") && <GuestSessionRecovery retry={reload}/>}
-  </>;
+  </>:<Loading/>;
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setSaving(true); setMessage("");
     const form = new FormData(e.currentTarget);
@@ -453,10 +446,10 @@ function ProfilePage() {
     } catch (e) { setMessage(authMessage((e as Error).message)); }
     finally { setSaving(false); }
   }
-  return <>
-    <h1 tabIndex={-1} className="heading">Your explorer profile</h1>
-    <div className="grid md:grid-cols-2 gap-6 mt-6">
-      <form className="card space-y-5" onSubmit={save} key={data.profile.username}>
+  return <div className="profile-shell">
+    <div className="page-intro"><div><p className="eyebrow">YOUR ATLAS</p><h1 tabIndex={-1} className="heading mt-2">Your explorer profile</h1></div><p className="muted">Your identity, progress, and personal bests.</p></div>
+    <div className="profile-layout mt-6">
+      <form className="card profile-form space-y-5" onSubmit={save} key={data.profile.username}>
         <label>Username<input name="username" required minLength={2} maxLength={24}
           pattern="[A-Za-z0-9 _\-]+" defaultValue={data.profile.username}/></label>
         <label>Avatar<select name="avatar" defaultValue={data.profile.avatar}>
@@ -474,7 +467,7 @@ function ProfilePage() {
         <button className="primary" disabled={saving}>Save profile</button>
         <p role="status">{message}</p>
       </form>
-      <section className="card">
+      <section className="card profile-summary">
         <p className="text-5xl" aria-label={`Avatar ${data.profile.avatar + 1}`}>{avatars[data.profile.avatar]}</p>
         <h2 className="text-2xl font-bold mt-4">Level {level(data.profile.xp)}</h2>
         <p className="muted">{data.profile.xp} XP · {500 - data.profile.xp % 500} XP to next level</p>
@@ -482,16 +475,16 @@ function ProfilePage() {
         <p>{data.totals.games} completed games · {accuracy(data.totals.correct, data.totals.incorrect)} accuracy</p>
         <h3 className="font-bold mt-6 mb-2">Best scores by mode</h3>
         {(["classic", "timed", "endless"] as Mode[]).map(m =>
-          <p key={m} className="flex justify-between py-2 border-b border-white/10">
+          <p key={m} className="flex justify-between py-2 border-b border-line/15">
             <span>{names[m]}</span><strong>{data.best[m] ?? "—"}</strong>
           </p>)}
         {!isDemo && <AccountActions/>}
         {data.profile.admin && <Link className="secondary mt-3" to="/admin">Content administration</Link>}
       </section>
     </div>
-    <h2 className="text-2xl font-bold mt-9 mb-4">Recent sessions</h2>
-    {!data.sessions.length && <p className="muted">No games yet. Your first run is waiting.</p>}
-    <div className="space-y-2">
+    <div className="section-heading mt-9 mb-4"><div><p className="eyebrow">YOUR JOURNEY</p><h2 className="text-2xl font-bold mt-2">Recent sessions</h2></div><span className="muted text-sm">{data.sessions.length} recent</span></div>
+    {!data.sessions.length && <div className="empty-state"><span className="empty-icon" aria-hidden="true">◎</span><h3 className="font-bold mt-3">Your first run is waiting</h3><p className="muted mt-2">Complete an adventure and your latest results will appear here.</p><Link className="primary mt-4" to="/home">Choose a challenge</Link></div>}
+    <div className="session-list grid gap-2">
       {data.sessions.map(s => <div key={s.id} className="card flex flex-wrap justify-between gap-3">
         <div><strong>{names[s.mode]}</strong><p className="muted text-sm">{new Date(s.createdAt).toLocaleString()} · {s.status}</p></div>
         <span>{s.score} points</span>
@@ -505,7 +498,7 @@ function ProfilePage() {
       <button className="secondary" disabled={offset === 0} onClick={() => setOffset(n => Math.max(0, n - 20))}>Previous</button>
       <button className="secondary" disabled={data.sessions.length < 20} onClick={() => setOffset(n => n + 20)}>Next</button>
     </div>
-  </>;
+  </div>;
 }
 function authMessage(message:string){const m=message.toLowerCase();if(m.includes("invalid login credentials"))return "E-Mail oder Passwort ist nicht korrekt.";if(m.includes("email not confirmed"))return "Bitte bestätige zuerst deine E-Mail-Adresse.";if(m.includes("user already registered")||m.includes("already been registered"))return "Für diese E-Mail gibt es bereits ein Konto. Melde dich an oder setze dein Passwort zurück.";if(m.includes("password")&&m.includes("least"))return "Das Passwort erfüllt die Mindestlänge nicht.";if(m.includes("email address")&&m.includes("already"))return "Diese E-Mail-Adresse wird bereits verwendet.";if(/duplicate|unique|username_taken/i.test(message))return "Dieser Benutzername ist bereits vergeben. Bitte wähle einen anderen.";return message;}
 
@@ -513,10 +506,10 @@ function Onboarding(){const [message,setMessage]=useState("");const [pending,set
   async function save(e:FormEvent<HTMLFormElement>){e.preventDefault();setPending(true);setMessage("");const name=String(new FormData(e.currentTarget).get("username")??"").trim();
     try{if(!validUsername(name))throw new Error("Verwende 2–24 Zeichen: Buchstaben, Zahlen, Leerzeichen, _ oder -.");await api.claimUsername(name);if(isDemo)localStorage.setItem("atlas-demo-onboarded","yes");nav("/home",{replace:true});}
     catch(err){const m=(err as Error).message;setMessage(/duplicate|unique|username_taken/i.test(m)?"Dieser Benutzername ist bereits vergeben. Bitte wähle einen anderen.":m)}finally{setPending(false)}}
-  return <section className="card max-w-lg mx-auto"><h1 className="heading">Wähle deinen Benutzernamen</h1><p className="muted mt-3">Dein Name ist für alle Spielkonten eindeutig.</p><form onSubmit={save} className="mt-5 space-y-4"><label>Benutzername<input name="username" minLength={2} maxLength={24} pattern="[A-Za-z0-9 _\-]+" required autoComplete="nickname"/></label><button className="primary">{pending?"Speichern…":"Weiter"}</button><p role="alert">{message}</p></form></section>}
-function AccountActions(){const [user,setUser]=useState<{isAnonymous:boolean;email:string|null}|null>(null);useEffect(()=>{api.currentUser().then(setUser).catch(()=>setUser(null))},[]);const[theme,setTheme]=useState(localStorage.getItem("atlas-theme")??"system");
- return <div className="mt-5 space-y-4"><p className="muted">{user?.isAnonymous?"Gastkonto · Spielstand nur auf diesem Gerät gesichert.":`Konto · ${user?.email??""}`}</p>{user?.isAnonymous&&<Link className="primary" to="/auth?mode=link">Konto erstellen und Spielstand sichern</Link>}
- <label>Darstellung<select value={theme} onChange={e=>{const v=e.target.value;setTheme(v);if(v==="system")localStorage.removeItem("atlas-theme");else localStorage.setItem("atlas-theme",v);applyTheme(v)}}><option value="system">System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label></div>}
+  return <section className="auth-panel onboarding-panel max-w-lg mx-auto"><p className="eyebrow">ONE LAST STEP</p><h1 tabIndex={-1} className="heading mt-2">Choose your explorer name</h1><p className="muted mt-3">Your name is unique across all players and can be changed later.</p><form onSubmit={save} className="mt-5 space-y-4"><label>Username<input name="username" minLength={2} maxLength={24} pattern="[A-Za-z0-9 _\-]+" required autoComplete="nickname"/></label><p className="field-hint muted">2–24 characters · letters, numbers, spaces, _ or -</p><button className="primary w-full" disabled={pending}>{pending?"Saving your name…":"Continue to Atlas Arena →"}</button><p role="alert">{message}</p></form></section>}
+function ThemeControl(){const [theme,setTheme]=useState(localStorage.getItem("atlas-theme")??"system");return <label className="theme-control">Appearance<select className="theme-select" value={theme} onChange={e=>{const value=e.target.value;setTheme(value);if(value==="system")localStorage.removeItem("atlas-theme");else localStorage.setItem("atlas-theme",value);applyTheme(value)}}><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>}
+function AccountActions(){const [user,setUser]=useState<{isAnonymous:boolean;email:string|null}|null>(null);useEffect(()=>{api.currentUser().then(setUser).catch(()=>setUser(null))},[]);
+ return <div className="account-actions mt-5"><p className="muted">{user?.isAnonymous?"Guest account · progress stays on this device.":`Account · ${user?.email??""}`}</p>{user?.isAnonymous&&<Link className="primary" to="/auth?mode=link">Create an account to save progress</Link>}<ThemeControl/></div>}
 
 function Auth() {
   const [params] = useSearchParams();
@@ -573,7 +566,7 @@ function Auth() {
     </div>
     <Link className="auth-back mt-5" to="/">← Zur Startseite</Link>
   </section>;
-  return <section className="card max-w-lg mx-auto">
+  return <section className="auth-panel max-w-lg mx-auto">
     <p className="eyebrow">ATLAS ARENA · {action==="signup"?"NEUES KONTO":action==="signin"?"WILLKOMMEN ZURÜCK":action==="guest"?"GASTZUGANG":"KONTO SICHERN"}</p>
     <h1 tabIndex={-1} className="heading mt-2">{action==="guest"?"Dein Abenteuer wartet.":action==="signup"?"Konto erstellen.":action==="signin"?"Schön, dass du da bist.":action==="reset"?"Passwort zurücksetzen.":action==="change"?"Neues Passwort setzen.":"Deine Entdeckungen bleiben."}</h1>
     {isDemo ? action==="guest" ? <form className="mt-5" onSubmit={submit}><button className="primary w-full" disabled={pending}>{pending?"Wird vorbereitet …":"Als Gast fortfahren"}</button></form> : <p className="muted mt-4">Kontofunktionen sind in der lokalen Demo nicht verfügbar.</p>
@@ -630,7 +623,6 @@ function Settings() {
   const [motion, setMotion] = useState(localStorage.getItem("atlas-motion") === "reduce");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
-  const [theme,setTheme] = useState(localStorage.getItem("atlas-theme") ?? "system");
   useEffect(()=>{api.currentUser().then(user=>setIsAnonymous(user.isAnonymous)).catch(()=>setIsAnonymous(null))},[]);
   async function run(task: () => Promise<unknown>) {
     setPending(true); setMessage("");
@@ -638,11 +630,11 @@ function Settings() {
     catch (e) { setMessage((e as Error).message); }
     finally { setPending(false); }
   }
-  return <div className="max-w-2xl">
-    <h1 tabIndex={-1} className="heading">Make yourself at home.</h1>
+  return <div className="settings-shell">
+    <div className="page-intro"><div><p className="eyebrow">PREFERENCES</p><h1 tabIndex={-1} className="heading mt-2">Make yourself at home.</h1></div><p className="muted">Tune the arena to the way you play.</p></div>
     <section className="card mt-6 space-y-5">
-      <h2 className="text-xl font-bold">Comfort and privacy</h2>
-      <label>Darstellung<select value={theme} onChange={e=>{const v=e.target.value;setTheme(v);if(v==="system")localStorage.removeItem("atlas-theme");else localStorage.setItem("atlas-theme",v);applyTheme(v)}}><option value="system">System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label>
+      <h2 className="text-xl font-bold">Appearance and comfort</h2>
+      <ThemeControl/>
       <label className="check"><input type="checkbox" checked={motion} onChange={e => {
         setMotion(e.target.checked);
         localStorage.setItem("atlas-motion", e.target.checked ? "reduce" : "system");

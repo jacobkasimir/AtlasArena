@@ -86,3 +86,13 @@ it("checks core foreground/background contrast pairs", () => {
   expect(contrast("0B1020", "35D0C5")).toBeGreaterThanOrEqual(4.5);
   expect(contrast("0B1020", "FB7185")).toBeGreaterThanOrEqual(4.5);
 });
+it("keeps core light and dark theme text colors above WCAG AA", () => {
+  expect(contrast("F3F6FC", "0B1020")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("A8B5CC", "141D32")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("35D0C5", "0B1020")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("141F32", "F3F7FC")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("4B5B72", "FFFFFF")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("087F78", "F3F7FC")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("B92E41", "FFFFFF")).toBeGreaterThanOrEqual(4.5);
+  expect(contrast("0B1020", "35D0C5")).toBeGreaterThanOrEqual(4.5);
+});

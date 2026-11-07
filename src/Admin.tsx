@@ -57,28 +57,29 @@ export default function Admin() {
     finally { setPending(false); }
   }
 
-  if (isDemo) return <section className="card">
+  if (isDemo) return <section className="card access-state">
     <h1 tabIndex={-1} className="heading">Content administration</h1>
     <p className="muted mt-3">Administration requires Supabase and a server-provisioned administrator.</p>
   </section>;
-  if (!access.data) return <><Loading/><ErrorBox message={access.error} retry={access.reload}/></>;
-  if (!access.data.profile.admin) return <section className="card" role="alert">
+  if (!access.data) return access.error?<ErrorBox message={access.error} retry={access.reload}/>:<Loading/>;
+  if (!access.data.profile.admin) return <section className="card access-state" role="alert">
     <h1 tabIndex={-1} className="heading">Access denied.</h1>
     <p className="mt-3">Administrative authorization is enforced independently by every backend operation.</p>
   </section>;
 
-  return <>
-    <h1 tabIndex={-1} className="heading">Content studio</h1>
-    <p className="muted mt-3">
+  return <div className="admin-shell">
+    <div className="section-heading admin-heading"><div><p className="eyebrow">ATLAS ARENA · ADMIN</p><h1 tabIndex={-1} className="heading mt-2">Content studio</h1></div><span className="pill">Secure workspace</span></div>
+    <p className="muted mt-3 max-w-3xl">
       Supported editor: JSON records. Editing creates an immutable version.
       Publishing requires an explicit source-verification and review attestation.
     </p>
-    <div className="grid lg:grid-cols-2 gap-5 mt-6">
-      <section className="card">
+    <div className="admin-layout grid lg:grid-cols-[.95fr_1.05fr] gap-5 mt-6">
+      <section className="card admin-list">
         <label>Filter stable ID or prompt<input value={search} maxLength={100}
           onChange={e => { setSearch(e.target.value); setOffset(0); }}/></label>
         <ErrorBox message={list.error} retry={list.reload}/>
-        {list.data?.items.map(q => <article className="border-b border-white/10 py-4" key={String(q.stableId)}>
+        {list.data&&list.data.items.length===0&&<div className="empty-state mt-5"><h2 className="font-bold">No questions found</h2><p className="muted text-sm mt-2">Try another stable ID or prompt.</p></div>}
+        {list.data?.items.map(q => <article className="border-b border-line/15 py-4" key={String(q.stableId)}>
           <p className="font-bold">{String(q.prompt)}</p>
           <p className="muted text-sm">{String(q.stableId)} · version {String(q.expectedVersion)} · {String(q.reviewStatus)}</p>
           <div className="flex gap-2 mt-3">
@@ -99,7 +100,7 @@ export default function Admin() {
             onClick={() => setOffset(n => n + 20)}>Next</button>
         </div>
       </section>
-      <section className="card space-y-4">
+      <section className="card admin-editor space-y-4">
         <label>Import JSON file · max 256 KiB
           <input type="file" accept=".json,application/json" onChange={async e => {
             const file = e.target.files?.[0]; if (!file) return;
@@ -121,8 +122,8 @@ export default function Admin() {
           <button className="primary" disabled={pending || preview !== signature}
             onClick={() => void perform(false)}>Commit validated import</button>
         </div>
-        <pre className="whitespace-pre-wrap break-words text-sm" role="status">{message}</pre>
+        <pre className="admin-output whitespace-pre-wrap break-words text-sm" role="status">{message}</pre>
       </section>
     </div>
-  </>;
+  </div>;
 }

@@ -3,15 +3,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#0B1020",
-        surface: "#141D32",
-        raised: "#1B2842",
-        mint: "#35D0C5",
-        violet: "#8B7CF8",
-        success: "#34D399",
-        danger: "#FB7185",
-        paper: "#F3F6FC",
-        muted: "#A8B5CC"
+        ink: "rgb(var(--c-bg) / <alpha-value>)",
+        surface: "rgb(var(--c-surface) / <alpha-value>)",
+        raised: "rgb(var(--c-raised) / <alpha-value>)",
+        mint: "rgb(var(--c-mint) / <alpha-value>)",
+        violet: "rgb(var(--c-violet) / <alpha-value>)",
+        success: "rgb(var(--c-success) / <alpha-value>)",
+        danger: "rgb(var(--c-danger) / <alpha-value>)",
+        paper: "rgb(var(--c-text) / <alpha-value>)",
+        muted: "rgb(var(--c-muted) / <alpha-value>)",
+        line: "rgb(var(--c-line) / <alpha-value>)"
       }
     }
   },

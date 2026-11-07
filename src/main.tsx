@@ -20,11 +20,15 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").then(reg => {
     function offerUpdate() {
       if (!reg.waiting) return;
+      if (document.getElementById("pwa-update")) return;
       const button = document.createElement("button");
-      button.className = "primary";
-      button.style.cssText = "position:fixed;bottom:20px;right:20px;z-index:100";
+      button.id = "pwa-update";
+      button.className = "primary pwa-update";
+      button.setAttribute("aria-label", "Reload Atlas Arena to install the ready update");
       button.textContent = "Update ready · Reload";
       button.onclick = () => {
+        button.disabled = true;
+        button.textContent = "Updating…";
         navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
         reg.waiting?.postMessage("ACTIVATE");
       };
