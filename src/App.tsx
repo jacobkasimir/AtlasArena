@@ -60,12 +60,12 @@ function Layout() {
           <img className="brand-wordmark wordmark-light" src="/icons/text_light.jpg" alt="" />
           <img className="brand-wordmark wordmark-dark" src="/icons/text_dark.png" alt="" />
         </Link>
-        <nav aria-label="Primary" className="flex flex-wrap gap-1 items-center">
+        <nav aria-label="Primary" className="topbar-nav flex flex-wrap gap-1 items-center">
           {identity && <><NavLink to="/home">Play</NavLink><NavLink to="/explorer">Explorer</NavLink>
+          <NavLink className="topbar-icon" to="/profile" aria-label="Statistiken" title="Statistiken"><ChartIcon/></NavLink>
+          <NavLink className="topbar-icon" to="/settings" aria-label="Einstellungen" title="Einstellungen"><SettingsIcon/></NavLink>
           <div className="user-menu-wrap"><button ref={menuButtonRef} className="user-menu-button" aria-label="Benutzermenü öffnen" aria-expanded={userMenu} aria-haspopup="menu" onClick={()=>setUserMenu(v=>!v)}><span aria-hidden="true">{avatars[identity.avatar] ?? avatars[0]}</span><span className="user-name">{identity.username}</span><span aria-hidden="true">⌄</span></button>
           {userMenu && <div className="user-menu" role="menu">
-            <Link role="menuitem" to="/profile" onClick={()=>setUserMenu(false)}>Profil · Statistiken</Link>
-            <Link role="menuitem" to="/settings" onClick={()=>setUserMenu(false)}>Kontoeinstellungen</Link>
             {identity.isAnonymous&&<Link role="menuitem" to="/auth?mode=link" onClick={()=>setUserMenu(false)}>Konto erstellen und Spielstand sichern</Link>}
             {menuMessage&&<p className="error" role="alert">{menuMessage}</p>}
             <button role="menuitem" onClick={async()=>{
@@ -92,6 +92,9 @@ function Layout() {
   </>;
 }
 
+function ChartIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5m0 14h16M8 16v-5m4 5V7m4 9v-7m4 7V4"/></svg>}
+function SettingsIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1 1.2.9-1.4 2.4-1.4-.6a8 8 0 0 1-1.5.9l-.2 1.5h-2.8l-.2-1.5a8 8 0 0 1-1.5-.9l-1.4.6-1.4-2.4 1.2-.9a7 7 0 0 1 0-1.8l-1.2-.9 1.4-2.4 1.4.6a8 8 0 0 1 1.5-.9l.2-1.5h2.8l.2 1.5a8 8 0 0 1 1.5.9l1.4-.6 1.4 2.4-1.2.9a7 7 0 0 1 0 1.8Z" transform="translate(-1 -1)"/></svg>}
+
 function Welcome() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -112,13 +115,13 @@ function Welcome() {
         Chase your next personal best, discover somewhere new, and turn what you know
         into your next great run.
       </p>
-      <div className="flex flex-wrap gap-3 mt-8">
-        {!isDemo && <Link className="primary" to="/auth?mode=guest">Als Gast spielen →</Link>}
-        {isDemo && <button className="primary" disabled={pending} onClick={start}>{pending ? "Preparing…" : "Als Gast spielen →"}</button>}
-        {!isDemo && <Link className="secondary" to="/auth?mode=signin">Anmelden</Link>}
+      <div className="welcome-actions mt-8">
+        {!isDemo && <Link className="primary action-card action-card-featured" to="/auth?mode=guest"><span className="action-icon" aria-hidden="true">✦</span><span><strong>Als Gast spielen</strong><small>Sofort starten, ganz ohne Konto</small></span><span className="action-arrow" aria-hidden="true">→</span></Link>}
+        {isDemo && <button className="primary action-card action-card-featured" disabled={pending} onClick={start}><span className="action-icon" aria-hidden="true">✦</span><span><strong>{pending ? "Wird vorbereitet …" : "Als Gast spielen"}</strong><small>Sofort starten, ganz ohne Konto</small></span><span className="action-arrow" aria-hidden="true">→</span></button>}
+        {!isDemo && <Link className="secondary action-card" to="/auth?mode=signin"><span className="action-icon" aria-hidden="true">↗</span><span><strong>Anmelden</strong><small>Mit deinem Konto fortfahren</small></span><span className="action-arrow" aria-hidden="true">→</span></Link>}
+        {!isDemo && <Link className="secondary action-card" to="/auth?mode=signup"><span className="action-icon" aria-hidden="true">＋</span><span><strong>Konto erstellen</strong><small>Fortschritt dauerhaft sichern</small></span><span className="action-arrow" aria-hidden="true">→</span></Link>}
       </div>
-      {!isDemo && <p className="mt-3"><Link className="text-mint underline" to="/auth?mode=signup">Konto erstellen</Link></p>}
-      <p className="text-sm muted mt-4">No account required. Your first adventure starts here.</p>
+      <p className="text-sm muted mt-4">Dein Gastzugang funktioniert ohne Registrierung.</p>
       <ErrorBox message={error} />
     </section>
     <div className="globe-card" aria-hidden="true">
@@ -520,12 +523,12 @@ function AccountActions(){const [user,setUser]=useState<{isAnonymous:boolean;ema
 function Auth() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [action, setAction] = useState(params.has("recovery") ? "change" : params.get("mode") ?? "signin");
+  const [action, setAction] = useState(params.has("recovery") ? "change" : params.get("mode") ?? "choice");
   const [checkingSession,setCheckingSession]=useState(Boolean(supabase));
   const [activeSession,setActiveSession]=useState(false);
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
-  useEffect(()=>{if(!supabase)return;let active=true;supabase.auth.getSession().then(({data,error})=>{if(!active)return;const keepFlow=params.has("recovery")||action==="change"||action==="link"||action==="reset";const hasSession=Boolean(data.session);setActiveSession(hasSession&&!keepFlow);setCheckingSession(false);if(hasSession&&!keepFlow)navigate("/home",{replace:true});}).catch(()=>{if(active)setCheckingSession(false)});return()=>{active=false}},[action,navigate,params]);
+  useEffect(()=>{if(!supabase)return;let active=true;supabase.auth.getSession().then(({data,error})=>{if(!active)return;const keepFlow=params.has("recovery")||action==="change"||action==="link"||action==="reset"||action==="guest";const hasSession=Boolean(data.session);setActiveSession(hasSession&&!keepFlow);setCheckingSession(false);if(hasSession&&!keepFlow)navigate("/home",{replace:true});}).catch(()=>{if(active)setCheckingSession(false)});return()=>{active=false}},[action,navigate,params]);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setPending(true); setMessage("");
     const form = new FormData(e.currentTarget);
@@ -558,22 +561,38 @@ function Auth() {
     finally { setPending(false); }
   }
   if(checkingSession||activeSession)return <Loading/>;
+  const choose=(next:string)=>{setAction(next);setMessage("")};
+  if(action==="choice") return <section className="auth-panel max-w-lg mx-auto">
+    <p className="eyebrow">ATLAS ARENA · ACCOUNT</p><h1 tabIndex={-1} className="heading mt-2">Wie möchtest du starten?</h1>
+    <p className="muted mt-3">Du kannst sofort losspielen oder deinen Fortschritt mit einem Konto sichern.</p>
+    <div className="auth-choices mt-6">
+      <button className="primary action-card action-card-featured" onClick={()=>choose("guest")}><span className="action-icon" aria-hidden="true">✦</span><span><strong>Als Gast spielen</strong><small>Ohne Registrierung direkt loslegen</small></span><span className="action-arrow" aria-hidden="true">→</span></button>
+      {!isDemo&&<>
+        <button className="secondary action-card" onClick={()=>choose("signin")}><span className="action-icon" aria-hidden="true">↗</span><span><strong>Anmelden</strong><small>Zu deinem Konto zurückkehren</small></span><span className="action-arrow" aria-hidden="true">→</span></button>
+        <button className="secondary action-card" onClick={()=>choose("signup")}><span className="action-icon" aria-hidden="true">＋</span><span><strong>Konto erstellen</strong><small>Spielstand und Erfolge sichern</small></span><span className="action-arrow" aria-hidden="true">→</span></button>
+      </>}
+      {isDemo&&<p className="muted text-sm">Konten sind in der lokalen Demo nicht verfügbar.</p>}
+    </div>
+    <Link className="auth-back mt-5" to="/">← Zur Startseite</Link>
+  </section>;
   return <section className="card max-w-lg mx-auto">
-    <h1 tabIndex={-1} className="heading">{action==="guest"?"Als Gast weiterspielen":"Deine Entdeckungen bleiben."}</h1>
-    {isDemo ? <p className="muted mt-4">Account features require Supabase. Local demo data is not imported into server accounts.</p>
+    <p className="eyebrow">ATLAS ARENA · {action==="signup"?"NEUES KONTO":action==="signin"?"WILLKOMMEN ZURÜCK":action==="guest"?"GASTZUGANG":"KONTO SICHERN"}</p>
+    <h1 tabIndex={-1} className="heading mt-2">{action==="guest"?"Dein Abenteuer wartet.":action==="signup"?"Konto erstellen.":action==="signin"?"Schön, dass du da bist.":action==="reset"?"Passwort zurücksetzen.":action==="change"?"Neues Passwort setzen.":"Deine Entdeckungen bleiben."}</h1>
+    {isDemo ? action==="guest" ? <form className="mt-5" onSubmit={submit}><button className="primary w-full" disabled={pending}>{pending?"Wird vorbereitet …":"Als Gast fortfahren"}</button></form> : <p className="muted mt-4">Kontofunktionen sind in der lokalen Demo nicht verfügbar.</p>
       : <form className="space-y-5 mt-5" onSubmit={submit}>
-        <label>Vorgang<select value={action} onChange={e => setAction(e.target.value)}>
-          <option value="signin">Anmelden</option><option value="signup">Registrieren</option>
-          <option value="guest">Als Gast spielen</option><option value="link">Gastkonto sichern</option>
-          <option value="reset">Passwort zurücksetzen</option>
-          {params.has("recovery") && <option value="change">Neues Passwort setzen</option>}
-        </select></label>
         {action === "signup" && <label>Benutzername<input name="username" required minLength={2} maxLength={24} pattern="[A-Za-z0-9 _\-]+" autoComplete="nickname"/></label>}
         {!["change","guest"].includes(action) && <label>E-Mail<input type="email" name="email" autoComplete="email" required/></label>}
         {! ["reset","guest"].includes(action) && <label>Passwort<input type="password" name="password" minLength={action==="signin"?undefined:12}
           autoComplete={action === "signin" ? "current-password" : "new-password"} required/></label>}
-        <button className="primary w-full" disabled={pending}>{pending ? "Bitte warten…" : action==="signin"?"Anmelden":action==="guest"?"Gastnamen sichern":action==="signup"?"Registrieren":"Weiter"}</button>
+        <button className="primary w-full" disabled={pending}>{pending ? "Bitte warten…" : action==="signin"?"Anmelden":action==="guest"?"Als Gast fortfahren":action==="signup"?"Konto erstellen":action==="reset"?"Link zum Zurücksetzen senden":action==="change"?"Passwort speichern":"Spielstand sichern"}</button>
       </form>}
+    {!isDemo&&<div className="auth-switches mt-5">
+      <button className="auth-back" onClick={()=>choose("choice")}>← Andere Möglichkeit wählen</button>
+      {action==="signin"&&<button className="auth-text-link" onClick={()=>choose("reset")}>Passwort vergessen?</button>}
+      {action==="signin"&&<button className="auth-text-link" onClick={()=>choose("signup")}>Noch kein Konto? <strong>Konto erstellen</strong></button>}
+      {action==="signup"&&<button className="auth-text-link" onClick={()=>choose("signin")}>Schon ein Konto? <strong>Anmelden</strong></button>}
+      {action!=="guest"&&<button className="auth-text-link" onClick={()=>choose("guest")}>Stattdessen als Gast fortfahren</button>}
+    </div>}
     <p className="mt-4" role="status">{message}</p>
   </section>;
 }
