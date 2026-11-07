@@ -144,7 +144,7 @@ function Home() {
       {data && <p className="pill">Level {level(data.profile.xp)} · {data.profile.xp} XP</p>}
     </div>
     <ErrorBox message={loadError} retry={reload}/>
-    {loadError && <Link to="/" className="secondary mt-3">Return to welcome</Link>}
+    {loadError.includes("AUTH_REQUIRED") && <GuestSessionRecovery retry={reload}/>}
     {data && <div className="grid grid-cols-3 gap-3 my-7">
       <Stat title="Completed" value={data.totals.games}/>
       <Stat title="Accuracy" value={accuracy(data.totals.correct, data.totals.incorrect)}/>
@@ -200,6 +200,23 @@ function Stat({ title, value }: { title: string; value: string | number }) {
   return <div className="card p-4">
     <p className="muted text-xs sm:text-sm">{title}</p>
     <p className="text-xl sm:text-3xl font-black mt-2">{value}</p>
+  </div>;
+}
+function GuestSessionRecovery({ retry }: { retry: () => void }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  async function restore() {
+    setPending(true); setError("");
+    try { await api.guest(); retry(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setPending(false); }
+  }
+  return <div className="mt-3">
+    <p className="muted">Your existing guest session is restored when available. A new guest is created only if this browser has no session.</p>
+    <button className="secondary mt-3" disabled={pending} onClick={restore}>
+      {pending ? "Restoring…" : "Continue as guest"}
+    </button>
+    <ErrorBox message={error}/>
   </div>;
 }
 function accuracy(correct: number, incorrect: number) {
@@ -386,7 +403,9 @@ function ProfilePage() {
   const { data, error, reload } = useLoad(() => api.dashboard(offset), offset);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  if (!data) return <><Loading/><ErrorBox message={error} retry={reload}/></>;
+  if (!data) return <><Loading/><ErrorBox message={error} retry={reload}/>
+    {error.includes("AUTH_REQUIRED") && <GuestSessionRecovery retry={reload}/>}
+  </>;
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault(); setSaving(true); setMessage("");
     const form = new FormData(e.currentTarget);

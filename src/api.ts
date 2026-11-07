@@ -12,19 +12,34 @@ export const supabase = url && key ? createClient(url, key) : null;
 
 async function rpc<T>(name: string, params = {}): Promise<T> {
   if (!supabase) throw new Error(configurationError ?? "Supabase is not configured.");
+  await requireSession();
   const { data, error } = await supabase.rpc(name, params);
   if (error) throw new Error(error.message);
   return data as T;
 }
 
+/** Wait for Supabase auth storage to finish restoring before any protected RPC. */
+async function requireSession() {
+  if (!supabase) throw new Error(configurationError ?? "Supabase is not configured.");
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw new Error(`Could not restore your session: ${error.message}`);
+  if (!data.session) {
+    throw new Error("AUTH_REQUIRED: No guest session is active. Continue as guest to load your progress.");
+  }
+  return data.session;
+}
+
 export const api = {
   guest: async () => {
     if (isDemo) return demo.guest();
-    const { data: { session } } = await supabase!.auth.getSession();
-    if (!session) {
-      const { error } = await supabase!.auth.signInAnonymously();
+    const { data, error: restoreError } = await supabase!.auth.getSession();
+    if (restoreError) throw new Error(`Could not restore your session: ${restoreError.message}`);
+    if (!data.session) {
+      const { data: signedIn, error } = await supabase!.auth.signInAnonymously();
       if (error) throw error;
+      if (!signedIn.session) throw new Error("Guest sign-in completed without an active session. Please retry.");
     }
+    await requireSession();
   },
   play: (mode: Mode, cats: string[], difficulty: Difficulty, country?: string, count = 10) =>
     isDemo ? demo.play(mode, cats, difficulty, country, count)
