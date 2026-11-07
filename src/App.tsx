@@ -99,7 +99,7 @@ function Welcome() {
   const [pending, setPending] = useState(false);
   async function start() {
     setPending(true); setError("");
-    try { await api.guest(); navigate("/home"); }
+    try { await api.guest(); navigate("/onboarding",{replace:true}); }
     catch (e) { setError((e as Error).message); }
     finally { setPending(false); }
   }
@@ -524,7 +524,7 @@ function Auth() {
   const [action, setAction] = useState(params.has("recovery") ? "change" : params.get("mode") ?? "choice");
   const [checkingSession,setCheckingSession]=useState(Boolean(supabase));
   const [activeSession,setActiveSession]=useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(params.get("reason")==="account_deleted"?"Dieses Konto ist nicht mehr verfügbar. Melde dich mit einem anderen Konto an oder erstelle ein neues.":"");
   const [pending, setPending] = useState(false);
   useEffect(()=>{if(!supabase)return;let active=true;supabase.auth.getSession().then(({data,error})=>{if(!active)return;const keepFlow=params.has("recovery")||action==="change"||action==="link"||action==="reset"||action==="guest";const hasSession=Boolean(data.session);setActiveSession(hasSession&&!keepFlow);setCheckingSession(false);if(hasSession&&!keepFlow)navigate("/home",{replace:true});}).catch(()=>{if(active)setCheckingSession(false)});return()=>{active=false}},[action,navigate,params]);
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -602,21 +602,23 @@ function AuthRedirect() {
   useEffect(()=>{if(state==="guest"||state==="account") navigate("/home",{replace:true})},[state,navigate]);
   return state==="error"?<ErrorBox message="Deine Sitzung konnte nicht wiederhergestellt werden. Bitte prüfe die Verbindung und lade erneut." retry={()=>window.location.reload()}/>:state==="loading"?<Loading/>:<Welcome/>;
 }
+function isDeletedAuthUser(error:unknown){return /AUTH_REQUIRED|user.*not found|user from sub claim.*does not exist/i.test((error as Error)?.message??String(error))}
 function Protected({children}:{children:JSX.Element}) {
-  const location=useLocation(), navigate=useNavigate(); const [state,setState]=useState<"loading"|"guest"|"account"|"out"|"onboarding"|"error">("loading");
+  const location=useLocation(), navigate=useNavigate(); const authClient=supabase; const deletedAccount=useRef(false); const [state,setState]=useState<"loading"|"guest"|"account"|"out"|"deleted"|"onboarding"|"error">("loading");
   useEffect(()=>{let active=true;
     if(isDemo){if(localStorage.getItem("atlas-demo-signed-out")==="yes"){setState("out");return()=>{active=false}}if(location.pathname==="/onboarding"){setState("guest");return()=>{active=false}}api.dashboard().then(d=>{if(active)setState(d.profile.username==="Traveler"&&!localStorage.getItem("atlas-demo-onboarded")?"onboarding":"guest")}).catch(()=>{if(active)setState("error")});return()=>{active=false}}
     if(!supabase)return;
-    const resolve=async(session:any)=>{if(!session){if(active)setState("out");return}const kind=session.user?.is_anonymous===false?"account":"guest";if(location.pathname==="/onboarding"){if(active)setState(kind);return}
+    const resolve=async(session:any)=>{if(!session){if(active)setState(deletedAccount.current?"deleted":"out");return}const kind=session.user?.is_anonymous===false?"account":"guest";if(location.pathname==="/onboarding"){await api.currentUser();if(active)setState(kind);return}
       try{const d=await api.dashboard();const confirmed=await api.usernameConfirmed();const requested=String(session.user?.user_metadata?.requested_username??"");
         if(!confirmed&&requested){try{await api.claimUsername(requested);if(active)setState(kind);return}catch(e){if(/duplicate|unique|username_taken/i.test((e as Error).message)){if(active)setState("onboarding");return}throw e}}
         if(active)setState(!confirmed||!validUsername(d.profile.username)?"onboarding":kind)
-      }catch{if(active)setState("error")}};
+      }catch(e){if(isDeletedAuthUser(e)){deletedAccount.current=true;try{await api.signOut()}catch{}if(active)setState("deleted")}else if(active)setState("error")}};
     supabase.auth.getSession().then(({data,error})=>{if(error){if(active)setState("error")}else void resolve(data.session)});
     const subscription=supabase.auth.onAuthStateChange?.((_e,s)=>{void resolve(s)})?.data.subscription;return()=>{active=false;subscription?.unsubscribe()};},[location.pathname]);
-  useEffect(()=>{if(state==="out")navigate(isDemo?"/":"/auth?mode=signin&next="+encodeURIComponent(location.pathname),{replace:true})},[state,location.pathname,navigate]);
+  useEffect(()=>{if(state==="out")navigate(isDemo?"/":"/auth?mode=signin&next="+encodeURIComponent(location.pathname),{replace:true});if(state==="deleted")navigate("/auth?mode=signin&reason=account_deleted",{replace:true})},[state,location.pathname,navigate]);
   useEffect(()=>{if(state==="onboarding")navigate("/onboarding",{replace:true})},[state,navigate]);
-  if(state==="loading"||state==="out"||state==="onboarding")return <Loading/>;
+  useEffect(()=>{if(isDemo||!authClient)return;let live=true;const validate=async()=>{const {error}=await authClient.auth.getUser();if(error&&isDeletedAuthUser(error)){deletedAccount.current=true;try{await api.signOut()}catch{}if(live)setState("deleted")}};const timer=window.setInterval(()=>void validate(),30000);window.addEventListener("focus",validate);return()=>{live=false;window.clearInterval(timer);window.removeEventListener("focus",validate)}},[]);
+  if(state==="loading"||state==="out"||state==="deleted"||state==="onboarding")return <Loading/>;
   if(state==="error")return <ErrorBox message="Sitzung oder Profil konnte nicht geladen werden. Bitte prüfe die Verbindung und lade erneut." retry={()=>location.pathname&&window.location.reload()}/>;
   return children;
 }

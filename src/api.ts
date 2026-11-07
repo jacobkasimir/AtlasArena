@@ -75,11 +75,11 @@ export const api = {
     if (isDemo) { await demo.deleteAccount(); localStorage.setItem("atlas-demo-signed-out", "yes"); return; }
     const { error } = await supabase!.functions.invoke("delete-account", { method: "DELETE" });
     if (error) throw error;
-    await supabase!.auth.signOut();
+    await supabase!.auth.signOut({ scope: "local" });
   },
   signOut: async () => {
     if (isDemo) { localStorage.setItem("atlas-demo-signed-out", "yes"); return demo.signOut(); }
-    const { error } = await supabase!.auth.signOut();
+    const { error } = await supabase!.auth.signOut({ scope: "local" });
     if (error) throw error;
   },
   signIn: async (email: string, password: string) => {
