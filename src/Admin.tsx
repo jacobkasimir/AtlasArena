@@ -63,6 +63,7 @@ export default function Admin() {
   const [type, setType] = useState("");
   const [countryCode, setCountryCode] = useState("");
   const [referenceYear, setReferenceYear] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const access = useLoad(() => api.dashboard());
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -89,7 +90,7 @@ export default function Admin() {
   const parseProblem = useMemo(() => jsonProblem(text), [text]);
   const current = records[selected];
   const [editorMode, setEditorMode] = useState<"visual" | "json">("visual");
-  const [policy, setPolicy] = useState<"reject" | "version">("reject");
+  const [policy, setPolicy] = useState<"reject" | "version">("version");
   const [publish, setPublish] = useState(false);
   const [preview, setPreview] = useState("");
   const [message, setMessage] = useState("");
@@ -146,6 +147,7 @@ export default function Admin() {
   </section>;
 
   const topicOptions = facets.topics.length ? facets.topics : ["capitals", "countries", "flags"];
+  const activeFilterCount = [search.trim(), category, topic, difficulty, reviewStatus, verified, type, countryCode, referenceYear].filter(Boolean).length;
   return <div className="admin-shell">
     <div className="section-heading admin-heading">
       <div><p className="eyebrow">ATLAS ARENA · ADMIN</p><h1 tabIndex={-1} className="heading mt-2">Question studio</h1></div>
@@ -154,23 +156,30 @@ export default function Admin() {
     <p className="muted mt-3 max-w-3xl">Find, inspect and revise question versions. Every change runs through validation before commit; publication still requires source verification and a dated review.</p>
 
     <section className="card admin-filters mt-6" aria-labelledby="question-filters-title">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="eyebrow">QUESTION LIBRARY</p><h2 id="question-filters-title" className="text-xl font-bold mt-1">Find a question</h2></div>
-        <button className="secondary" type="button" onClick={resetFilters}>Clear filters</button>
+        <div className="flex flex-wrap gap-2">
+          {activeFilterCount > 0 && <button className="secondary" type="button" onClick={resetFilters}>Clear filters · {activeFilterCount}</button>}
+          <button className="secondary admin-filter-toggle" type="button" aria-expanded={filtersOpen} aria-controls="admin-filter-controls" onClick={() => setFiltersOpen(open => !open)}>
+            <span aria-hidden="true">{filtersOpen ? "⌃" : "☷"}</span> {filtersOpen ? "Hide filters" : `Show filters${activeFilterCount ? ` · ${activeFilterCount} active` : ""}`}
+          </button>
+        </div>
       </div>
-      <div className="admin-filter-grid mt-4">
-        <label className="admin-search">Search ID or question text
-          <input value={search} maxLength={100} placeholder="e.g. geo-fr-capitals or Paris" onChange={e => { setSearch(e.target.value); setOffset(0); }}/>
-        </label>
-        <ChoiceButtons label="Category" value={category} options={["", ...facets.categories]} onChange={value => { setCategory(value); setOffset(0); }}/>
-        <ChoiceButtons label="Topic" value={topic} options={["", ...topicOptions]} onChange={value => { setTopic(value); setOffset(0); }}/>
-        <ChoiceButtons label="Difficulty" value={difficulty} options={["", ...(facets.difficulties.length ? facets.difficulties : [...difficulties])]} onChange={value => { setDifficulty(value); setOffset(0); }}/>
-        <ChoiceButtons label="Review status" value={reviewStatus} options={["", "draft", "reviewed"]} onChange={value => { setReviewStatus(value); setOffset(0); }}/>
-        <ChoiceButtons label="Source verification" value={verified} options={["", "true", "false"]} onChange={value => { setVerified(value as "" | "true" | "false"); setOffset(0); }}/>
-        <ChoiceButtons label="Question format" value={type} options={["", "mc", "tf"]} onChange={value => { setType(value); setOffset(0); }}/>
-        <label>Country code<input value={countryCode} maxLength={2} placeholder="Any country" onChange={e => { setCountryCode(e.target.value.replace(/[^a-z]/gi, "").toUpperCase()); setOffset(0); }}/></label>
-        <label>Reference year<input type="number" min={1900} max={2100} value={referenceYear} placeholder="Any year" onChange={e => { setReferenceYear(e.target.value); setOffset(0); }}/></label>
-      </div>
+      {filtersOpen && <div id="admin-filter-controls" className="admin-filter-controls">
+        <div className="admin-filter-grid mt-4">
+          <label className="admin-search">Search ID or question text
+            <input value={search} maxLength={100} placeholder="e.g. geo-fr-capitals or Paris" onChange={e => { setSearch(e.target.value); setOffset(0); }}/>
+          </label>
+          <ChoiceButtons label="Category" value={category} options={["", ...facets.categories]} onChange={value => { setCategory(value); setOffset(0); }}/>
+          <ChoiceButtons label="Topic" value={topic} options={["", ...topicOptions]} onChange={value => { setTopic(value); setOffset(0); }}/>
+          <ChoiceButtons label="Difficulty" value={difficulty} options={["", ...(facets.difficulties.length ? facets.difficulties : [...difficulties])]} onChange={value => { setDifficulty(value); setOffset(0); }}/>
+          <ChoiceButtons label="Review status" value={reviewStatus} options={["", "draft", "reviewed"]} onChange={value => { setReviewStatus(value); setOffset(0); }}/>
+          <ChoiceButtons label="Source verification" value={verified} options={["", "true", "false"]} onChange={value => { setVerified(value as "" | "true" | "false"); setOffset(0); }}/>
+          <ChoiceButtons label="Question format" value={type} options={["", "mc", "tf"]} onChange={value => { setType(value); setOffset(0); }}/>
+          <label>Country code<input value={countryCode} maxLength={2} placeholder="Any country" onChange={e => { setCountryCode(e.target.value.replace(/[^a-z]/gi, "").toUpperCase()); setOffset(0); }}/></label>
+          <label>Reference year<input type="number" min={1900} max={2100} value={referenceYear} placeholder="Any year" onChange={e => { setReferenceYear(e.target.value); setOffset(0); }}/></label>
+        </div>
+      </div>}
       <p className="muted text-sm mt-3" aria-live="polite">{list.data ? `${list.data.items.length} questions on this page` : "Loading matching questions…"}</p>
     </section>
 
@@ -206,7 +215,7 @@ export default function Admin() {
       <section className="card admin-editor" aria-labelledby="editor-title">
         <div className="section-heading">
           <div><p className="eyebrow">VERSIONED EDITOR</p><h2 id="editor-title" className="text-xl font-bold mt-1">Question details</h2></div>
-          <button type="button" className="primary" onClick={() => { setRecords([blankQuestion(topicOptions)], 0); setPolicy("reject"); setPublish(false); }}>New question</button>
+          <button type="button" className="primary" onClick={() => { setRecords([blankQuestion(topicOptions)], 0); setPolicy("version"); setPublish(false); }}>New question</button>
         </div>
         <div className="admin-editor-toolbar mt-4">
           <label className="admin-file">Import JSON file · max 256 KiB
@@ -217,7 +226,7 @@ export default function Admin() {
                 const imported = await file.text();
                 const parsed: unknown = JSON.parse(imported);
                 if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 100) throw new Error("The file must contain 1–100 question records.");
-                setRecords(parsed as AdminQuestion[], 0); setEditorMode("visual"); setPolicy("reject"); setPublish(false);
+                setRecords(parsed as AdminQuestion[], 0); setEditorMode("visual"); setPolicy("version"); setPublish(false);
               } catch (error) { setMessage((error as Error).message); }
               e.currentTarget.value = "";
             }}/>
@@ -286,11 +295,24 @@ export default function Admin() {
         </div> : <p className="empty-state mt-4" role={parseProblem ? "alert" : undefined}>{parseProblem ? `Visual editor needs valid JSON: ${parseProblem}` : "Import or create a question to edit its fields."}</p> : <label className="block mt-4">Question records JSON<textarea className="font-mono text-sm min-h-[32rem]" value={text} onChange={e => { setText(e.target.value); setPreview(""); }}/></label>}
 
         <div className="admin-import-controls mt-5">
-          <label>Duplicate handling<select value={policy} onChange={e => setPolicy(e.target.value as "reject" | "version")}>
-            <option value="reject">Reject existing stable IDs</option>
-            <option value="version">Create version, check expected version</option>
-          </select></label>
-          <label className="check"><input type="checkbox" checked={publish} onChange={e => setPublish(e.target.checked)}/>Publish new versions</label>
+          <fieldset className="admin-policy-select">
+            <legend className="font-semibold mb-2">Duplicate handling</legend>
+            <div className="admin-policy-options">
+              <label className={`admin-policy-card ${policy === "version" ? "is-selected" : ""}`}>
+                <input type="radio" name="duplicate-policy" value="version" checked={policy === "version"} onChange={() => setPolicy("version")}/>
+                <span><strong>Create a new version <span className="admin-default-tag">Default</span></strong><small>Keep the existing record history and add the next version. The import is accepted only if its expected version matches the latest server version; otherwise the server reports a version conflict.</small></span>
+              </label>
+              <label className={`admin-policy-card ${policy === "reject" ? "is-selected" : ""}`}>
+                <input type="radio" name="duplicate-policy" value="reject" checked={policy === "reject"} onChange={() => setPolicy("reject")}/>
+                <span><strong>Reject existing IDs</strong><small>If a stable ID already exists, the server reports an error for that record. New IDs are still imported as their first version.</small></span>
+              </label>
+            </div>
+          </fieldset>
+          <label className="admin-publish-toggle"><input type="checkbox" checked={publish} onChange={e => setPublish(e.target.checked)}/><span><strong>Publish new versions</strong><small>When enabled, the server publishes each imported version and unpublishes the previous live version with the same stable ID.</small></span></label>
+          <aside className="admin-publish-explainer">
+            <strong>What publishing does</strong>
+            <p>Publishing requires every record to be marked Reviewed, have a verified source, and include a review date that is not in the future. If this is off, the imported version stays unpublished; any current published version remains live.</p>
+          </aside>
           {publish && current && (current.reviewStatus !== "reviewed" || !current.sourceVerified || !current.lastReviewed) && <p className="admin-publish-hint" role="status">Publishing requires Reviewed status, a verified source, and a review date.</p>}
           <div className="flex gap-3 flex-wrap">
             <button className="secondary" disabled={pending} onClick={() => void perform(true)}>Validate / preview</button>
