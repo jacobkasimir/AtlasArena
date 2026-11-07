@@ -124,6 +124,14 @@ describe("authenticated dashboard loading", () => {
       .resolves.toEqual({needsConfirmation:true});
     expect(authState.signUp).toHaveBeenCalledOnce();
     expect(authState.signUp.mock.calls[0][0].options.data.requested_username).toBe("New Explorer");
+    expect(authState.signUp.mock.calls[0][0].options.data.full_name).toBe("New Explorer");
+  });
+
+  it("syncs the chosen profile username to Supabase's display name metadata", async () => {
+    authState.session={access_token:"existing-guest"};
+    authState.rpc.mockResolvedValue({data:null,error:null});
+    await api.saveProfile({username:"  New Explorer  ",avatar:2,favorites:[]});
+    expect(authState.updateUser).toHaveBeenCalledWith({data:{username:"New Explorer",full_name:"New Explorer",avatar:2}});
   });
 
   it("upgrades the current anonymous identity without signing in as a second user", async () => {
