@@ -145,7 +145,36 @@ function Home() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const { data, error: loadError, reload } = useLoad(() => api.dashboard());
+  const leaderboard = useLoad(() => api.leaderboard());
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const leaderboardButtonRef = useRef<HTMLButtonElement>(null);
+  const leaderboardCloseRef = useRef<HTMLButtonElement>(null);
+  const leaderboardDialogRef = useRef<HTMLElement>(null);
   const country = params.get("country") ?? undefined;
+
+  useEffect(() => {
+    if (!leaderboardOpen) return;
+    leaderboardCloseRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleDialogKeys = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setLeaderboardOpen(false); return; }
+      if (event.key !== "Tab") return;
+      const focusable = leaderboardDialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]'
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", handleDialogKeys);
+    return () => {
+      window.removeEventListener("keydown", handleDialogKeys);
+      document.body.style.overflow = previousOverflow;
+      leaderboardButtonRef.current?.focus();
+    };
+  }, [leaderboardOpen]);
 
   async function start(e: FormEvent) {
     e.preventDefault(); setPending(true); setError("");
@@ -159,6 +188,14 @@ function Home() {
   }
 
   return <div className="home-shell">
+    {data && <section className="home-stats-bar" aria-label="Your game statistics">
+      <div className="home-stat-item"><span>Completed</span><strong>{data.totals.games}</strong></div>
+      <div className="home-stat-item"><span>Accuracy</span><strong>{accuracy(data.totals.correct, data.totals.incorrect)}</strong></div>
+      <div className="home-stat-item"><span>Classic best</span><strong>{data.best.classic ?? "—"}</strong></div>
+      <button ref={leaderboardButtonRef} className="home-stat-item home-rank-button" type="button" aria-label={leaderboard.data?.currentRank ? `Your server rank is ${leaderboard.data.currentRank}. Open top 25 players` : "Open server leaderboard"} aria-haspopup="dialog" onClick={() => setLeaderboardOpen(true)}>
+        <span>Server rank</span><strong>{leaderboard.data?.currentRank ? `#${leaderboard.data.currentRank}` : "#—"}</strong><small>Top 25 players <span aria-hidden="true">↗</span></small>
+      </button>
+    </section>}
     <div className="section-heading home-heading">
       <div>
         <p className="eyebrow">YOUR NEXT ADVENTURE</p>
@@ -168,11 +205,6 @@ function Home() {
     </div>
     <ErrorBox message={loadError} retry={reload}/>
     {loadError.includes("AUTH_REQUIRED") && <GuestSessionRecovery retry={reload}/>}
-    {data && <div className="dashboard-stats grid grid-cols-3 gap-3 my-7">
-      <Stat title="Completed" value={data.totals.games}/>
-      <Stat title="Accuracy" value={accuracy(data.totals.correct, data.totals.incorrect)}/>
-      <Stat title="Classic best" value={data.best.classic ?? "—"}/>
-    </div>}
     {data?.sessions.filter(s => s.status === "awaiting_answer" || s.status === "showing_feedback")
       .map(s => <Link className="resume-card card block mb-3" key={s.id} to={"/play/" + s.id}>
         <span><strong>Resume {names[s.mode]}</strong><small className="muted">Your run is ready when you are.</small></span><span aria-hidden="true">→</span>
@@ -216,6 +248,32 @@ function Home() {
       </p>
       <ErrorBox message={error}/>
     </form>
+    {leaderboardOpen && <div className="leaderboard-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setLeaderboardOpen(false); }}>
+      <section ref={leaderboardDialogRef} className="leaderboard-dialog" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title" aria-describedby="leaderboard-description" tabIndex={-1}>
+        <header className="leaderboard-header">
+          <div><p className="eyebrow">ATLAS ARENA · GLOBAL</p><h2 id="leaderboard-title" className="text-2xl font-black mt-1">Top 25 players</h2><p id="leaderboard-description" className="muted text-sm mt-1">Players ranked by earned XP.</p></div>
+          <button ref={leaderboardCloseRef} type="button" className="leaderboard-close secondary" aria-label="Close leaderboard" onClick={() => setLeaderboardOpen(false)}>×</button>
+        </header>
+        {leaderboard.error && <ErrorBox message={leaderboard.error} retry={leaderboard.reload}/>}
+        {!leaderboard.data && !leaderboard.error && <div className="leaderboard-loading" role="status" aria-live="polite"><span className="loading-indicator" aria-hidden="true"/>Loading leaderboard…</div>}
+        {leaderboard.data && <>
+          {isDemo ? <div className="empty-state mt-5"><span className="empty-icon" aria-hidden="true">◎</span><h3 className="font-bold mt-3">Server leaderboard unavailable</h3><p className="muted mt-2">Local demo progress is stored in this browser and isn’t ranked on the server.</p></div> : <>
+            {leaderboard.data.currentRank && leaderboard.data.currentRank > 25 && <p className="leaderboard-your-rank">Your rank: <strong>#{leaderboard.data.currentRank}</strong> · outside the top 25</p>}
+            {!leaderboard.data.currentRank && <p className="leaderboard-your-rank">Complete a scored game to join the XP leaderboard.</p>}
+            {leaderboard.data.players.length ? <div className="leaderboard-table-scroll" role="region" aria-label="Top 25 players" tabIndex={0}>
+              <table className="leaderboard-table">
+                <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">XP</th></tr></thead>
+                <tbody>{leaderboard.data.players.map(player => <tr key={`${player.rank}-${player.username}`} className={player.rank === leaderboard.data?.currentRank ? "is-you" : ""}>
+                  <td><span className="leaderboard-position">{player.rank <= 3 ? ["①", "②", "③"][player.rank - 1] : `#${player.rank}`}</span></td>
+                  <td><span className="leaderboard-player"><span aria-hidden="true">{avatars[player.avatar] ?? avatars[0]}</span><strong>{player.username}</strong>{player.rank === leaderboard.data?.currentRank && <span className="leaderboard-you-tag">You</span>}</span></td>
+                  <td className="leaderboard-xp">{player.xp.toLocaleString()} XP</td>
+                </tr>)}</tbody>
+              </table>
+            </div> : <div className="empty-state mt-5"><span className="empty-icon" aria-hidden="true">◎</span><h3 className="font-bold mt-3">No ranked players yet</h3><p className="muted mt-2">Be the first to earn XP in a scored game.</p></div>}
+          </>}
+        </>}
+      </section>
+    </div>}
   </div>;
 }
 

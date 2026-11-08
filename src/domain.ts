@@ -104,6 +104,17 @@ export type Dashboard = {
   sessions: Summary[];
 };
 
+export type LeaderboardPlayer = {
+  rank: number;
+  username: string;
+  avatar: number;
+  xp: number;
+};
+export type Leaderboard = {
+  currentRank: number | null;
+  players: LeaderboardPlayer[];
+};
+
 export type Country = {
   code: string;
   name: string;

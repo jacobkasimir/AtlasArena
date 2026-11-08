@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { demo } from "./demo";
-import { Country, Dashboard, Difficulty, Mode, Profile, View } from "./domain";
+import { Country, Dashboard, Difficulty, Leaderboard, Mode, Profile, View } from "./domain";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -57,6 +57,9 @@ export const api = {
     isDemo ? demo.abandon(id) : rpc<void>("arena_abandon", { p_id: id }),
   dashboard: (offset = 0) =>
     isDemo ? demo.dashboard(offset) : rpc<Dashboard>("arena_dashboard", { p_offset: offset }),
+  leaderboard: (): Promise<Leaderboard> => isDemo
+    ? Promise.resolve({ currentRank: null, players: [] })
+    : rpc<Leaderboard>("arena_leaderboard"),
   usernameConfirmed: () => rpc<boolean>("arena_username_confirmed"),
   saveProfile: async (profile: Omit<Profile, "xp" | "admin">) => {
     if (isDemo) return demo.saveProfile(profile);

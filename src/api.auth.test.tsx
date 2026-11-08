@@ -102,7 +102,7 @@ describe("authenticated dashboard loading", () => {
     render(<MemoryRouter initialEntries={["/home"]}><App/></MemoryRouter>);
 
     expect(await screen.findByText("Choose your challenge")).toBeTruthy();
-    expect(authState.rpc).toHaveBeenCalledTimes(3); // route gate (profile and onboarding status) plus home dashboard
+    expect(authState.rpc).toHaveBeenCalledTimes(4); // route gate, home dashboard, and leaderboard
   });
 
   it("redirects an unauthenticated direct private link to sign-in without a protected RPC", async () => {
