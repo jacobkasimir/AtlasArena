@@ -491,12 +491,13 @@ function Results() {
     <h1 tabIndex={-1} className="heading">This run has not completed.</h1>
     <Link className="primary mt-4" to={"/play/" + id}>Resume run</Link>
   </section>;
-  const newBest=setsNewPersonalBest(v.mode,v.stats.score,v.previousBest);
-  const setupUrl=challengeSetupUrl(v);
+  const result=v;
+  const newBest=setsNewPersonalBest(result.mode,result.stats.score,result.previousBest);
+  const setupUrl=challengeSetupUrl(result);
   async function playAgain(){
-    if(!v.contextSaved){navigate(setupUrl);return;}
+    if(!result.contextSaved){navigate(setupUrl);return;}
     setReplayPending(true);setReplayError("");
-    try{const next=await api.play(v.mode,v.categories??[],v.difficulty,v.country??undefined,v.questionCount??10);navigate(`/play/${next.id}`)}
+    try{const next=await api.play(result.mode,result.categories??[],result.difficulty,result.country??undefined,result.questionCount??10);navigate(`/play/${next.id}`)}
     catch(e){setReplayError((e as Error).message)}
     finally{setReplayPending(false)}
   }
