@@ -52,24 +52,30 @@ function ChoiceButtons({ label, value, options, onChange }: {
   </fieldset>;
 }
 
-function QuestionPager({ offset, total, pending, onOffsetChange }: {
+function QuestionPager({ offset, total, pending, onOffsetChange, placement }: {
   offset: number; total: number; pending: boolean; onOffsetChange: (offset: number) => void;
+  placement: "top" | "bottom";
 }) {
   const pageCount = Math.ceil(total / PAGE_SIZE);
   const currentPage = total ? Math.floor(offset / PAGE_SIZE) + 1 : 0;
   const first = total ? offset + 1 : 0;
   const last = Math.min(offset + PAGE_SIZE, total);
   const lastOffset = Math.max(0, (pageCount - 1) * PAGE_SIZE);
-  return <nav className="admin-pager" aria-label="Question pages">
-    <p className="muted text-sm">
-      {total ? `Showing ${first}–${last} of ${total} questions · page ${currentPage} of ${pageCount}` : "0 questions · page 0 of 0"}
-    </p>
-    <div className="admin-pager-buttons">
-      <button type="button" className="secondary" aria-label="First page" disabled={pending || offset === 0} onClick={() => onOffsetChange(0)}>First</button>
-      <button type="button" className="secondary" aria-label="Previous page" disabled={pending || offset === 0} onClick={() => onOffsetChange(Math.max(0, offset - PAGE_SIZE))}>Previous</button>
-      <span className="admin-page-indicator" aria-hidden="true">{currentPage}/{pageCount}</span>
-      <button type="button" className="secondary" aria-label="Next page" disabled={pending || lastOffset === offset || total === 0} onClick={() => onOffsetChange(Math.min(lastOffset, offset + PAGE_SIZE))}>Next</button>
-      <button type="button" className="secondary" aria-label="Last page" disabled={pending || lastOffset === offset || total === 0} onClick={() => onOffsetChange(lastOffset)}>Last</button>
+  return <nav className={`admin-pager ${placement === "top" ? "is-top" : "is-bottom"}`} aria-label="Question pages">
+    <div className="admin-pager-summary" aria-live={placement === "top" ? "polite" : undefined}>
+      <div className="admin-total-block"><strong>{total.toLocaleString()}</strong><span>{total === 1 ? "question total" : "questions total"}</span></div>
+      <p>Showing <strong>{first}–{last}</strong> of the filtered results</p>
+    </div>
+    <div className="admin-pager-controls">
+      <div className="admin-pager-buttons" role="group" aria-label="Navigate question pages">
+        <button type="button" className="admin-page-button secondary" aria-label="First page" disabled={pending || offset === 0} onClick={() => onOffsetChange(0)}><span aria-hidden="true">«</span><span>First</span></button>
+        <button type="button" className="admin-page-button secondary" aria-label="Previous page" disabled={pending || offset === 0} onClick={() => onOffsetChange(Math.max(0, offset - PAGE_SIZE))}><span aria-hidden="true">‹</span><span>Previous</span></button>
+      </div>
+      <p className="admin-page-indicator" aria-label={`Page ${currentPage} of ${pageCount}`}><span>Page</span><strong>{currentPage}</strong><span>of</span><strong>{pageCount}</strong></p>
+      <div className="admin-pager-buttons" role="group" aria-label="Navigate question pages">
+        <button type="button" className="admin-page-button secondary" aria-label="Next page" disabled={pending || lastOffset === offset || total === 0} onClick={() => onOffsetChange(Math.min(lastOffset, offset + PAGE_SIZE))}><span>Next</span><span aria-hidden="true">›</span></button>
+        <button type="button" className="admin-page-button secondary" aria-label="Last page" disabled={pending || lastOffset === offset || total === 0} onClick={() => onOffsetChange(lastOffset)}><span>Last</span><span aria-hidden="true">»</span></button>
+      </div>
     </div>
   </nav>;
 }
@@ -215,7 +221,7 @@ export default function Admin() {
       <section className="card admin-list" aria-label="Matching questions">
         <ErrorBox message={list.error} retry={list.reload}/>
         {!list.data && !list.error && <Loading/>}
-        {list.data && <div aria-live="polite"><QuestionPager offset={offset} total={list.data.total} pending={pending} onOffsetChange={setOffset}/></div>}
+        {list.data && <QuestionPager offset={offset} total={list.data.total} pending={pending} onOffsetChange={setOffset} placement="top"/>}
         {list.data?.items.length === 0 && <div className="empty-state mt-2"><span aria-hidden="true" className="empty-icon">⌕</span><h2 className="font-bold mt-3">No questions found</h2><p className="muted text-sm mt-2">Change or clear a filter to broaden your results.</p></div>}
         {list.data?.items.map(q => <article className="admin-question-row" key={String(q.stableId)}>
           <div className="flex flex-wrap gap-2 items-center">
@@ -235,7 +241,7 @@ export default function Admin() {
             }}>Unpublish all versions</button>
           </div>
         </article>)}
-        {list.data && <QuestionPager offset={offset} total={list.data.total} pending={pending} onOffsetChange={setOffset}/>}
+        {list.data && <QuestionPager offset={offset} total={list.data.total} pending={pending} onOffsetChange={setOffset} placement="bottom"/>}
       </section>
 
       <section className="card admin-editor" aria-labelledby="editor-title">
