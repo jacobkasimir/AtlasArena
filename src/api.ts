@@ -127,7 +127,8 @@ export const api = {
   adminList: (filters: {
     search: string; offset: number; category: string; topic: string;
     difficulty: string; reviewStatus: string; sourceVerified: boolean | null;
-    type: string; countryCode: string; referenceYear: number | null
+    type: string; countryCode: string; referenceYear: number | null;
+    published: boolean | null
   }) =>
     rpc<{
       items: Record<string, unknown>[];
@@ -145,7 +146,8 @@ export const api = {
       p_source_verified: filters.sourceVerified,
       p_type: filters.type || null,
       p_country_code: filters.countryCode || null,
-      p_reference_year: filters.referenceYear
+      p_reference_year: filters.referenceYear,
+      p_published: filters.published
     }),
   adminImport: (
     records: unknown[], dryRun: boolean, policy: "reject" | "version", publish: boolean

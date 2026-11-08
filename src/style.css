@@ -290,6 +290,7 @@ html[data-theme="dark"] .logo-dark,html[data-theme="dark"] .wordmark-dark {displ
 .admin-question-row { padding:1rem 0;border-bottom:1px solid rgb(var(--c-line) / .18); }
 .admin-tag { display:inline-flex;align-items:center;min-height:26px;padding:.2rem .55rem;border:1px solid rgb(var(--c-line) / .23);border-radius:999px;background:rgb(var(--c-raised) / .7);color:rgb(var(--c-muted));font-size:.72rem;font-weight:650;text-transform:capitalize; }
 .admin-tag.is-reviewed { color:rgb(var(--c-success));border-color:rgb(var(--c-success) / .35); }
+.admin-tag.is-published { color:rgb(var(--c-mint));border-color:rgb(var(--c-mint) / .4);background:rgb(var(--c-mint) / .09); }
 .admin-editor { min-width:0; }
 .admin-editor-toolbar { display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap; }
 .admin-file { display:grid;gap:.35rem;font-size:.82rem; }

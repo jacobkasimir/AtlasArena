@@ -46,7 +46,7 @@ function ChoiceButtons({ label, value, options, onChange }: {
       {options.map(option => <button type="button" key={option}
         className={`admin-choice ${option === value ? "is-selected" : ""}`}
         aria-pressed={option === value} onClick={() => onChange(option)}>
-        {option === "" ? "All" : option === "true" ? "Verified" : option === "false" ? "Unverified" : option === "mc" ? "Multiple choice" : option === "tf" ? "True / false" : option.replaceAll("_", " ")}
+        {option === "" ? "All" : label === "Publication status" ? option === "true" ? "Published" : "Unpublished" : option === "true" ? "Verified" : option === "false" ? "Unverified" : option === "mc" ? "Multiple choice" : option === "tf" ? "True / false" : option.replaceAll("_", " ")}
       </button>)}
     </div>
   </fieldset>;
@@ -89,6 +89,7 @@ export default function Admin() {
   const [type, setType] = useState("");
   const [countryCode, setCountryCode] = useState("");
   const [referenceYear, setReferenceYear] = useState("");
+  const [published, setPublished] = useState<"" | "true" | "false">("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const access = useLoad(() => api.dashboard());
   useEffect(() => {
@@ -101,9 +102,10 @@ export default function Admin() {
       search: debouncedSearch, offset, category, topic, difficulty, reviewStatus,
       sourceVerified: verified === "" ? null : verified === "true",
       type, countryCode: countryCode.trim().toUpperCase(),
-      referenceYear: referenceYear ? Number(referenceYear) : null
+      referenceYear: referenceYear ? Number(referenceYear) : null,
+      published: published === "" ? null : published === "true"
     }) : Promise.resolve({ items: [] as Record<string, unknown>[], total: 0, topics: [], categories: [], difficulties: [] }),
-    `${Boolean(access.data?.profile.admin)}:${debouncedSearch}:${offset}:${category}:${topic}:${difficulty}:${reviewStatus}:${verified}:${type}:${countryCode}:${referenceYear}`
+    `${Boolean(access.data?.profile.admin)}:${debouncedSearch}:${offset}:${category}:${topic}:${difficulty}:${reviewStatus}:${verified}:${type}:${countryCode}:${referenceYear}:${published}`
   );
   const [facets, setFacets] = useState<Facets>({ topics: [], categories: [], difficulties: [...difficulties] });
   useEffect(() => {
@@ -120,6 +122,7 @@ export default function Admin() {
   const [fromFile, setFromFile] = useState(false);
   const [expandedRecord, setExpandedRecord] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorSectionRef = useRef<HTMLElement>(null);
   const records = useMemo(() => safeRecords(text), [text]);
   const parseProblem = useMemo(() => jsonProblem(text), [text]);
   const current = records[selected];
@@ -149,10 +152,19 @@ export default function Admin() {
     setRecords([q as AdminQuestion], 0);
     setPolicy("version"); setPublish(false); setEditorMode("visual");
     setFromFile(false); setExpandedRecord(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    window.requestAnimationFrame(() => {
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+      editorSectionRef.current?.scrollIntoView({ behavior, block: "start" });
+    });
+  }
+  function selectForPublishing(q: Record<string, unknown>) {
+    selectQuestion(q);
+    setPublish(true);
   }
   function resetFilters() {
     setSearch(""); setDebouncedSearch(""); setCategory(""); setTopic("");
-    setDifficulty(""); setReviewStatus(""); setVerified(""); setType("");
+    setDifficulty(""); setReviewStatus(""); setVerified(""); setPublished(""); setType("");
     setCountryCode(""); setReferenceYear(""); setOffset(0);
   }
 
@@ -189,7 +201,7 @@ export default function Admin() {
   </section>;
 
   const topicOptions = facets.topics.length ? facets.topics : ["capitals", "countries", "flags"];
-  const activeFilterCount = [search.trim(), category, topic, difficulty, reviewStatus, verified, type, countryCode, referenceYear].filter(Boolean).length;
+  const activeFilterCount = [search.trim(), category, topic, difficulty, reviewStatus, verified, published, type, countryCode, referenceYear].filter(Boolean).length;
   return <div className="admin-shell">
     <div className="section-heading admin-heading">
       <div><p className="eyebrow">ATLAS ARENA · ADMIN</p><h1 tabIndex={-1} className="heading mt-2">Question studio</h1></div>
@@ -216,6 +228,7 @@ export default function Admin() {
           <ChoiceButtons label="Topic" value={topic} options={["", ...topicOptions]} onChange={value => { setTopic(value); setOffset(0); }}/>
           <ChoiceButtons label="Difficulty" value={difficulty} options={["", ...(facets.difficulties.length ? facets.difficulties : [...difficulties])]} onChange={value => { setDifficulty(value); setOffset(0); }}/>
           <ChoiceButtons label="Review status" value={reviewStatus} options={["", "draft", "reviewed"]} onChange={value => { setReviewStatus(value); setOffset(0); }}/>
+          <ChoiceButtons label="Publication status" value={published} options={["", "true", "false"]} onChange={value => { setPublished(value as "" | "true" | "false"); setOffset(0); }}/>
           <ChoiceButtons label="Source verification" value={verified} options={["", "true", "false"]} onChange={value => { setVerified(value as "" | "true" | "false"); setOffset(0); }}/>
           <ChoiceButtons label="Question format" value={type} options={["", "mc", "tf"]} onChange={value => { setType(value); setOffset(0); }}/>
           <label>Country code<input value={countryCode} maxLength={2} placeholder="Any country" onChange={e => { setCountryCode(e.target.value.replace(/[^a-z]/gi, "").toUpperCase()); setOffset(0); }}/></label>
@@ -236,23 +249,25 @@ export default function Admin() {
             <span className="admin-tag">{String(q.subcategory)}</span><span className="admin-tag">{String(q.difficulty)}</span>
             <span className={`admin-tag ${q.reviewStatus === "reviewed" ? "is-reviewed" : ""}`}>{String(q.reviewStatus)}</span>
             <span className="admin-tag">{q.sourceVerified ? "Source verified" : "Source unverified"}</span>
+            <span className={`admin-tag ${q.hasPublishedVersion ? "is-published" : ""}`}>{q.hasPublishedVersion ? `Live · version ${String(q.publishedVersion)}` : "Unpublished"}</span>
           </div>
           <h3 className="font-bold mt-3 leading-snug">{String(q.prompt)}</h3>
           <p className="muted text-xs mt-2 break-all">{String(q.stableId)} · version {String(q.expectedVersion)}</p>
           <div className="flex flex-wrap gap-2 mt-3">
             <button className="secondary" type="button" onClick={() => selectQuestion(q)}>Inspect &amp; edit</button>
-            <button className="secondary" type="button" disabled={pending} onClick={async () => {
+            {!q.versionPublished && <button className="primary" type="button" onClick={() => selectForPublishing(q)}>Review &amp; publish</button>}
+            {Boolean(q.hasPublishedVersion) && <button className="secondary" type="button" disabled={pending} onClick={async () => {
               setPending(true);
-              try { await api.unpublish(String(q.stableId)); list.reload(); setMessage(`All versions of ${String(q.stableId)} were unpublished.`); }
-              catch (e) { setMessage((e as Error).message); }
+              try { await api.unpublish(String(q.stableId)); list.reload(); setMessage(`The live version of ${String(q.stableId)} was unpublished.`); }
+              catch (e) { setMessage((e as Error).message.includes("QUESTION_NOT_PUBLISHED") ? "This question no longer has a published version. Refresh the list and try again." : (e as Error).message); }
               finally { setPending(false); }
-            }}>Unpublish all versions</button>
+            }}>Unpublish live version</button>}
           </div>
         </article>)}
         {list.data && <QuestionPager offset={offset} total={list.data.total} pending={pending} onOffsetChange={setOffset} placement="bottom"/>}
       </section>
 
-      <section className="card admin-editor" aria-labelledby="editor-title">
+      <section ref={editorSectionRef} className="card admin-editor" aria-labelledby="editor-title">
         <div className="section-heading">
           <div><p className="eyebrow">VERSIONED EDITOR</p><h2 id="editor-title" className="text-xl font-bold mt-1">Question details</h2></div>
           <button type="button" className="primary" onClick={() => {
