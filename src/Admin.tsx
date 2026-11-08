@@ -12,6 +12,7 @@ type AdminQuestion = {
   [key: string]: unknown;
 };
 type Facets = { topics: string[]; categories: string[]; difficulties: string[] };
+const PAGE_SIZE = 20;
 const today = () => {
   const date = new Date();
   date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
@@ -51,6 +52,28 @@ function ChoiceButtons({ label, value, options, onChange }: {
   </fieldset>;
 }
 
+function QuestionPager({ offset, total, pending, onOffsetChange }: {
+  offset: number; total: number; pending: boolean; onOffsetChange: (offset: number) => void;
+}) {
+  const pageCount = Math.ceil(total / PAGE_SIZE);
+  const currentPage = total ? Math.floor(offset / PAGE_SIZE) + 1 : 0;
+  const first = total ? offset + 1 : 0;
+  const last = Math.min(offset + PAGE_SIZE, total);
+  const lastOffset = Math.max(0, (pageCount - 1) * PAGE_SIZE);
+  return <nav className="admin-pager" aria-label="Question pages">
+    <p className="muted text-sm">
+      {total ? `Showing ${first}–${last} of ${total} questions · page ${currentPage} of ${pageCount}` : "0 questions · page 0 of 0"}
+    </p>
+    <div className="admin-pager-buttons">
+      <button type="button" className="secondary" aria-label="First page" disabled={pending || offset === 0} onClick={() => onOffsetChange(0)}>First</button>
+      <button type="button" className="secondary" aria-label="Previous page" disabled={pending || offset === 0} onClick={() => onOffsetChange(Math.max(0, offset - PAGE_SIZE))}>Previous</button>
+      <span className="admin-page-indicator" aria-hidden="true">{currentPage}/{pageCount}</span>
+      <button type="button" className="secondary" aria-label="Next page" disabled={pending || lastOffset === offset || total === 0} onClick={() => onOffsetChange(Math.min(lastOffset, offset + PAGE_SIZE))}>Next</button>
+      <button type="button" className="secondary" aria-label="Last page" disabled={pending || lastOffset === offset || total === 0} onClick={() => onOffsetChange(lastOffset)}>Last</button>
+    </div>
+  </nav>;
+}
+
 export default function Admin() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -76,13 +99,18 @@ export default function Admin() {
       sourceVerified: verified === "" ? null : verified === "true",
       type, countryCode: countryCode.trim().toUpperCase(),
       referenceYear: referenceYear ? Number(referenceYear) : null
-    }) : Promise.resolve({ items: [] as Record<string, unknown>[], topics: [], categories: [], difficulties: [] }),
+    }) : Promise.resolve({ items: [] as Record<string, unknown>[], total: 0, topics: [], categories: [], difficulties: [] }),
     `${Boolean(access.data?.profile.admin)}:${debouncedSearch}:${offset}:${category}:${topic}:${difficulty}:${reviewStatus}:${verified}:${type}:${countryCode}:${referenceYear}`
   );
   const [facets, setFacets] = useState<Facets>({ topics: [], categories: [], difficulties: [...difficulties] });
   useEffect(() => {
     if (list.data) setFacets(list.data);
   }, [list.data]);
+  useEffect(() => {
+    if (!list.data) return;
+    const lastOffset = Math.max(0, (Math.ceil(list.data.total / PAGE_SIZE) - 1) * PAGE_SIZE);
+    if (offset > lastOffset) setOffset(lastOffset);
+  }, [list.data?.total, offset]);
 
   const [text, setText] = useState(() => JSON.stringify([blankQuestion()], null, 2));
   const [selected, setSelected] = useState(0);
@@ -180,13 +208,14 @@ export default function Admin() {
           <label>Reference year<input type="number" min={1900} max={2100} value={referenceYear} placeholder="Any year" onChange={e => { setReferenceYear(e.target.value); setOffset(0); }}/></label>
         </div>
       </div>}
-      <p className="muted text-sm mt-3" aria-live="polite">{list.data ? `${list.data.items.length} questions on this page` : "Loading matching questions…"}</p>
+      <p className="muted text-sm mt-3">Showing at most {PAGE_SIZE} questions per page.</p>
     </section>
 
     <div className="admin-layout grid lg:grid-cols-[.88fr_1.12fr] gap-5 mt-5">
       <section className="card admin-list" aria-label="Matching questions">
         <ErrorBox message={list.error} retry={list.reload}/>
         {!list.data && !list.error && <Loading/>}
+        {list.data && <div aria-live="polite"><QuestionPager offset={offset} total={list.data.total} pending={pending} onOffsetChange={setOffset}/></div>}
         {list.data?.items.length === 0 && <div className="empty-state mt-2"><span aria-hidden="true" className="empty-icon">⌕</span><h2 className="font-bold mt-3">No questions found</h2><p className="muted text-sm mt-2">Change or clear a filter to broaden your results.</p></div>}
         {list.data?.items.map(q => <article className="admin-question-row" key={String(q.stableId)}>
           <div className="flex flex-wrap gap-2 items-center">
@@ -206,10 +235,7 @@ export default function Admin() {
             }}>Unpublish all versions</button>
           </div>
         </article>)}
-        <div className="flex gap-3 mt-4">
-          <button className="secondary" disabled={!offset || pending} onClick={() => setOffset(n => Math.max(0, n - 20))}>Previous</button>
-          <button className="secondary" disabled={(list.data?.items.length ?? 0) < 20 || pending} onClick={() => setOffset(n => n + 20)}>Next</button>
-        </div>
+        {list.data && <QuestionPager offset={offset} total={list.data.total} pending={pending} onOffsetChange={setOffset}/>}
       </section>
 
       <section className="card admin-editor" aria-labelledby="editor-title">

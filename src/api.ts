@@ -131,6 +131,7 @@ export const api = {
   }) =>
     rpc<{
       items: Record<string, unknown>[];
+      total: number;
       topics: string[];
       categories: string[];
       difficulties: string[];
