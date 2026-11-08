@@ -165,6 +165,9 @@ function Home() {
     (difficulties as readonly string[]).includes(params.get("difficulty") ?? "")
       ? params.get("difficulty") as Difficulty : "easy");
   const [category, setCategory] = useState("all");
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const categoryPickerRef = useRef<HTMLDivElement>(null);
+  const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const { data, error: loadError, reload } = useLoad(() => api.dashboard());
@@ -174,6 +177,14 @@ function Home() {
   const leaderboardCloseRef = useRef<HTMLButtonElement>(null);
   const leaderboardDialogRef = useRef<HTMLElement>(null);
   const country = params.get("country") ?? undefined;
+
+  useEffect(()=>{
+    if(!categoryOpen)return;
+    const outside=(event:MouseEvent)=>{if(!categoryPickerRef.current?.contains(event.target as Node))setCategoryOpen(false)};
+    const key=(event:KeyboardEvent)=>{if(event.key==="Escape"){setCategoryOpen(false);categoryTriggerRef.current?.focus()}};
+    document.addEventListener("mousedown",outside);window.addEventListener("keydown",key);
+    return()=>{document.removeEventListener("mousedown",outside);window.removeEventListener("keydown",key)};
+  },[categoryOpen]);
 
   useEffect(() => {
     if (!leaderboardOpen) return;
@@ -246,12 +257,9 @@ function Home() {
         </div>
       </fieldset>
       <div className="challenge-filters card mt-5 grid md:grid-cols-[1fr_1.4fr_auto] gap-5 items-end">
-        <label className="challenge-select-wrap"><span className="challenge-label">Question category</span>
-          <select className="challenge-select" value={category} onChange={e => setCategory(e.target.value)}>
-            <option value="all">All available geography</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </label>
+        <div className="category-picker" ref={categoryPickerRef}><span className="challenge-label">Question category</span><button ref={categoryTriggerRef} type="button" className="category-picker-trigger" aria-haspopup="listbox" aria-expanded={categoryOpen} aria-controls="category-picker-options" onClick={()=>setCategoryOpen(value=>!value)}><span><small>Choose category</small><strong>{category==="all"?"All available geography":category}</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+          {categoryOpen&&<div className="category-picker-menu" id="category-picker-options" role="listbox" aria-label="Question category">{[{id:"all",label:"All available geography"},...categories.map(value=>({id:value,label:value}))].map(option=><button key={option.id} type="button" role="option" aria-selected={category===option.id} className={`category-picker-option ${category===option.id?"is-selected":""}`} onClick={()=>{setCategory(option.id);setCategoryOpen(false);categoryTriggerRef.current?.focus()}}><span>{option.label}</span>{category===option.id&&<span className="category-picker-check" aria-hidden="true">✓</span>}</button>)}</div>}
+        </div>
         <fieldset className="difficulty-picker"><legend className="challenge-label">{mode === "endless" ? "Starting difficulty" : "Difficulty"}</legend><div className="difficulty-options">{difficulties.map((d,i)=><label key={d} className={`difficulty-option ${d==="expert"?"is-expert":""} ${difficulty===d?"is-selected":""}`}><input className="sr-only" type="radio" name="difficulty" value={d} checked={difficulty===d} onChange={()=>setDifficulty(d)}/><span className="difficulty-mark" aria-hidden="true">{["◌","◉","◆","✦"][i]}</span><span>{d}</span></label>)}</div></fieldset>
         <button className="primary" disabled={pending || !!loadError}>
           {pending ? "Creating session…" : "Start adventure →"}
