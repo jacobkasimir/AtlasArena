@@ -1,7 +1,7 @@
 import bank from "./demo-content.json";
 import countryData from "./demo-countries.json";
 import {
-  Dashboard, Difficulty, Mode, PlayableQuestion, Profile, Review, State,
+  Dashboard, Difficulty, Mode, PlayableQuestion, Profile, Review, ResultView, State,
   Summary, View, Country, eligibleDifficulty, eligibleXP, expired, rank,
   score, shuffle, validateOption
 } from "./domain";
@@ -21,6 +21,9 @@ type Session = {
   createdAt: string;
   deadline: number | null;
   started: number;
+  categories?: string[];
+  country?: string | null;
+  questionCount?: number;
   pool: Question[];
   currentId: string | null;
   reviews: Review[];
@@ -129,6 +132,7 @@ export const demo = {
 
     const s: Session = {
       id: crypto.randomUUID(), mode, difficulty,
+      categories: [...selected], country: country ?? null, questionCount: count,
       status: "awaiting_answer", version: 0,
       createdAt: new Date().toISOString(),
       deadline: mode === "timed" ? Date.now() + 60_000 : null,
@@ -143,6 +147,14 @@ export const demo = {
     if (expired(s.deadline, Date.now())) finish(s);
     write(data);
     return render(s);
+  },
+  async result(id: string): Promise<ResultView> {
+    const data=read(),s=find(data,id);
+    const previous=data.sessions
+      .filter(other=>other.id!==s.id&&other.mode===s.mode&&other.status==="completed"&&other.createdAt<s.createdAt)
+      .reduce<number|null>((best,other)=>Math.max(best??-Infinity,stats(other).score),null);
+    return {...render(s),categories:s.categories??null,country:s.country??null,
+      questionCount:s.questionCount??null,contextSaved:s.categories!==undefined,previousBest:previous};
   },
   async answer(id: string, questionId: string, optionId: string) {
     const data = read(), s = find(data, id);
@@ -185,6 +197,14 @@ export const demo = {
     if (s.status !== "completed" && s.status !== "abandoned") {
       s.status = "abandoned"; s.version++;
     }
+    write(data);
+  },
+  async deleteRun(id: string) {
+    const data = read();
+    const session = find(data, id);
+    if (session.status === "completed" || session.status === "abandoned")
+      throw new Error("This run can no longer be deleted.");
+    data.sessions = data.sessions.filter(item => item.id !== id);
     write(data);
   },
   async dashboard(offset = 0): Promise<Dashboard> {

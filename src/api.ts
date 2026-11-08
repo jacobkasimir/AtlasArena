@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { demo } from "./demo";
-import { Country, Dashboard, Difficulty, Leaderboard, Mode, Profile, View } from "./domain";
+import { Country, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -43,11 +43,12 @@ export const api = {
   },
   play: (mode: Mode, cats: string[], difficulty: Difficulty, country?: string, count = 10) =>
     isDemo ? demo.play(mode, cats, difficulty, country, count)
-      : rpc<View>("arena_start", {
+      : rpc<View>("arena_start_saved", {
         p_mode: mode, p_categories: cats, p_difficulty: difficulty,
         p_country: country ?? null, p_count: count
       }),
   view: (id: string) => isDemo ? demo.view(id) : rpc<View>("arena_view", { p_id: id }),
+  result: (id: string) => isDemo ? demo.result(id) : rpc<ResultView>("arena_result", { p_id: id }),
   answer: (id: string, questionId: string, optionId: string) =>
     isDemo ? demo.answer(id, questionId, optionId)
       : rpc<View>("arena_answer", { p_id: id, p_question: questionId, p_option: optionId }),
@@ -55,6 +56,8 @@ export const api = {
     isDemo ? demo.next(id) : rpc<View>("arena_next", { p_id: id }),
   abandon: (id: string) =>
     isDemo ? demo.abandon(id) : rpc<void>("arena_abandon", { p_id: id }),
+  deleteRun: (id: string) =>
+    isDemo ? demo.deleteRun(id) : rpc<void>("arena_delete_run", { p_id: id }),
   dashboard: (offset = 0) =>
     isDemo ? demo.dashboard(offset) : rpc<Dashboard>("arena_dashboard", { p_offset: offset }),
   leaderboard: (): Promise<Leaderboard> => isDemo

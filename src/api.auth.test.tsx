@@ -75,6 +75,26 @@ describe("authenticated dashboard loading", () => {
     expect(authState.rpc).toHaveBeenCalledOnce();
   });
 
+  it("refreshes a result through its read-only result RPC without starting a session", async()=>{
+    authState.session={access_token:"restored-session"};
+    authState.rpc.mockResolvedValue({data:{id:"finished-run",status:"completed",categories:["countries"],previousBest:420},error:null});
+    await api.result("finished-run");
+    await api.result("finished-run");
+    expect(authState.rpc).toHaveBeenNthCalledWith(1,"arena_result",{p_id:"finished-run"});
+    expect(authState.rpc).toHaveBeenNthCalledWith(2,"arena_result",{p_id:"finished-run"});
+    expect(authState.rpc).not.toHaveBeenCalledWith("arena_start_saved",expect.anything());
+  });
+
+  it("starts a new run with the same saved filters for replay",async()=>{
+    authState.session={access_token:"restored-session"};
+    authState.rpc.mockResolvedValue({data:{id:"new-run",status:"awaiting_answer"},error:null});
+    const created=await api.play("classic",["countries"],"hard","DEU",10);
+    expect(created.id).toBe("new-run");
+    expect(authState.rpc).toHaveBeenCalledWith("arena_start_saved",{
+      p_mode:"classic",p_categories:["countries"],p_difficulty:"hard",p_country:"DEU",p_count:10
+    });
+  });
+
   it("loads /profile directly with a restored guest session", async () => {
     authState.session = { access_token: "restored-session" };
     authState.rpc.mockResolvedValue({ data: {

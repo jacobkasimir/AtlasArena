@@ -5,7 +5,8 @@ import {
 } from "react-router-dom";
 import { api, configurationError, isDemo, supabase } from "./api";
 import {
-  avatars, categories, difficulties, level, Mode, modes, Difficulty, View, validUsername
+  avatars, categories, difficulties, level, Mode, modes, Difficulty, ResultView, View,
+  challengeSetupUrl, setsNewPersonalBest, validUsername
 } from "./domain";
 import { ErrorBox, Feedback, Loading, OfflineBanner, download, useLoad } from "./components";
 import { analyticsEnabled, readEvents, setAnalytics, track } from "./analytics";
@@ -164,7 +165,7 @@ function Home() {
   const [difficulty, setDifficulty] = useState<Difficulty>(
     (difficulties as readonly string[]).includes(params.get("difficulty") ?? "")
       ? params.get("difficulty") as Difficulty : "easy");
-  const [category, setCategory] = useState("all");
+  const [category, setCategory] = useState(()=>categories.includes(params.get("category")??"")?params.get("category")!:"all");
   const [categoryOpen, setCategoryOpen] = useState(false);
   const categoryPickerRef = useRef<HTMLDivElement>(null);
   const categoryTriggerRef = useRef<HTMLButtonElement>(null);
@@ -177,6 +178,8 @@ function Home() {
   const leaderboardCloseRef = useRef<HTMLButtonElement>(null);
   const leaderboardDialogRef = useRef<HTMLElement>(null);
   const country = params.get("country") ?? undefined;
+  const countParam=Number(params.get("count"));
+  const questionCount=Number.isInteger(countParam)&&countParam>=1&&countParam<=10?countParam:(country&&mode==="practice"?4:10);
 
   useEffect(()=>{
     if(!categoryOpen)return;
@@ -214,7 +217,7 @@ function Home() {
     e.preventDefault(); setPending(true); setError("");
     try {
       const s = await api.play(mode, category === "all" ? [] : [category],
-        difficulty, country, country && mode === "practice" ? 4 : 10);
+        difficulty, country, questionCount);
       track("game_started", { mode, category, difficulty });
       navigate("/play/" + s.id);
     } catch (e) { setError((e as Error).message); }
@@ -244,7 +247,7 @@ function Home() {
         <span><strong>Resume {names[s.mode]}</strong><small className="muted">Your run is ready when you are.</small></span><span aria-hidden="true">→</span>
       </Link>)}
     <form onSubmit={start} className="challenge-form mt-8">
-      <fieldset className="challenge-fieldset">
+      <fieldset id="challenge-mode-picker" className="challenge-fieldset">
         <legend className="text-xl font-bold mb-4">Choose your challenge</legend>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {modes.map((m, i) => <label key={m} className={`mode-card ${mode === m ? "selected" : ""}`}>
@@ -260,7 +263,7 @@ function Home() {
         <div className="category-picker" ref={categoryPickerRef}><span className="challenge-label">Question category</span><button ref={categoryTriggerRef} type="button" className="category-picker-trigger" aria-haspopup="listbox" aria-expanded={categoryOpen} aria-controls="category-picker-options" onClick={()=>setCategoryOpen(value=>!value)}><span><small>Choose category</small><strong>{category==="all"?"All available geography":category}</strong></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
           {categoryOpen&&<div className="category-picker-menu"><div className="category-picker-menu-heading"><span>Choose a topic</span><small>{categories.length} topics</small></div><div id="category-picker-options" role="listbox" aria-label="Question category">{[{id:"all",label:"All available geography"},...categories.map(value=>({id:value,label:value}))].map(option=><button key={option.id} type="button" role="option" aria-selected={category===option.id} className={`category-picker-option ${category===option.id?"is-selected":""}`} onClick={()=>{setCategory(option.id);setCategoryOpen(false);categoryTriggerRef.current?.focus()}}><span className="category-option-label">{option.id==="all"&&<span className="category-option-glyph" aria-hidden="true">✦</span>}{option.label}</span>{category===option.id&&<span className="category-picker-check" aria-hidden="true">✓</span>}</button>)}</div></div>}
         </div>
-        <fieldset className="difficulty-picker"><legend className="challenge-label">{mode === "endless" ? "Starting difficulty" : "Difficulty"}</legend><div className="difficulty-options">{difficulties.map((d,i)=><label key={d} className={`difficulty-option ${d==="expert"?"is-expert":""} ${difficulty===d?"is-selected":""}`}><input className="sr-only" type="radio" name="difficulty" value={d} checked={difficulty===d} onChange={()=>setDifficulty(d)}/><span className="difficulty-mark" aria-hidden="true">{["◌","◉","◆","✦"][i]}</span><span>{d}</span></label>)}</div></fieldset>
+        <fieldset id="difficulty-picker" className="difficulty-picker"><legend className="challenge-label">{mode === "endless" ? "Starting difficulty" : "Difficulty"}</legend><div className="difficulty-options">{difficulties.map((d,i)=><label key={d} className={`difficulty-option ${d==="easy"?"is-easy":""} ${d==="expert"?"is-expert":""} ${difficulty===d?"is-selected":""}`}><input className="sr-only" type="radio" name="difficulty" value={d} checked={difficulty===d} onChange={()=>setDifficulty(d)}/><span className="difficulty-mark" aria-hidden="true">{["◌","◉","◆","✦"][i]}</span><span>{d}</span></label>)}</div></fieldset>
         <button className="primary" disabled={pending || !!loadError}>
           {pending ? "Creating session…" : "Start adventure →"}
         </button>
@@ -337,6 +340,9 @@ function Game() {
   const [view, setView] = useState<View>();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [leaveDialogOpen,setLeaveDialogOpen]=useState(false);
+  const [deletePending,setDeletePending]=useState(false);
+  const leaveDialogRef=useRef<HTMLElement>(null);
   const pendingRef = useRef(false);
   const offset = useRef(0);
   const [now, setNow] = useState(Date.now());
@@ -362,6 +368,14 @@ function Game() {
     const timer = setInterval(() => setNow(Date.now()), 200);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(()=>{
+    if(!leaveDialogOpen)return;
+    leaveDialogRef.current?.querySelector<HTMLElement>(".leave-run-cancel")?.focus();
+    const oldOverflow=document.body.style.overflow;document.body.style.overflow="hidden";
+    const onKey=(event:KeyboardEvent)=>{if(event.key==="Escape"){setLeaveDialogOpen(false);return}if(event.key!=="Tab")return;const nodes=leaveDialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled)');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}};
+    window.addEventListener("keydown",onKey);return()=>{window.removeEventListener("keydown",onKey);document.body.style.overflow=oldOverflow};
+  },[leaveDialogOpen]);
 
   // Timed runs pause at accepted answers while the player reads feedback.
   const remaining = view?.deadline && view.status !== "showing_feedback"
@@ -403,6 +417,13 @@ function Game() {
     } finally { pendingRef.current = false; setPending(false); }
   }
 
+  async function deleteCurrentRun(){
+    setDeletePending(true);setError("");
+    try{await api.deleteRun(id);navigate("/home",{replace:true})}
+    catch(e){setError((e as Error).message)}
+    finally{setDeletePending(false)}
+  }
+
   useEffect(() => {
     function keydown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
@@ -429,11 +450,7 @@ function Game() {
   return <div className="game-shell">
     <div className="game-topline">
       <div><p className="eyebrow">{names[view.mode]} · <span className={`game-difficulty-tag ${view.current?.difficulty==="expert"?"is-expert":""}`}>{view.current?.difficulty ?? view.difficulty}</span></p><p className="muted mt-1">Question {questionNumber} of {view.total}</p></div>
-      <button className="secondary" disabled={pending} onClick={async () => {
-        if (!confirm("Abandon this run? No XP will be awarded.")) return;
-        try { await api.abandon(id); navigate("/home"); }
-        catch (e) { setError((e as Error).message); }
-      }}>Leave run</button>
+      <button className="secondary" disabled={pending} onClick={()=>setLeaveDialogOpen(true)}>Leave run</button>
     </div>
     <div className="game-layout mt-5"><div className="game-main">
     {view.current && <section className={`card game-question map-grid ${view.status==="showing_feedback"&&view.feedback?.correct?"has-correct-answer":""} ${view.status==="showing_feedback"&&view.feedback&&!view.feedback.correct?"has-incorrect-answer":""}`}>
@@ -459,29 +476,52 @@ function Game() {
       {view.feedback&&<section className="game-review"><div className="game-review-heading"><span className={`game-result-mark ${view.feedback.correct?"is-correct":"is-incorrect"}`} aria-hidden="true">{view.feedback.correct?"✓":"×"}</span><div><p className="eyebrow">ANSWER REVIEW</p><h2>{view.feedback.correct?"Correct":"Not quite"}</h2></div><strong className="game-review-points">+{view.feedback.points} <small>pts</small></strong></div><p className="game-correct-answer"><span>Correct answer</span><strong>{view.feedback.correctAnswer}</strong></p>{!view.feedback.correct&&<p className="game-chosen-answer"><span>Your answer</span>{view.feedback.chosen}</p>}<p className="game-review-explanation">{view.feedback.explanation}</p><a className="game-review-source" href={view.feedback.source} target="_blank" rel="noopener noreferrer">Source reference <span aria-hidden="true">↗</span></a><button autoFocus className="primary game-next-button mt-3" disabled={pending} onClick={()=>void action("next")}>{pending?"Loading…":"Next question →"}</button></section>}
       {!view.feedback&&<div className="game-stats-footnote"><span>Best streak</span><strong>{view.stats.bestStreak}</strong></div>}
     </aside></div>
+    {leaveDialogOpen&&<div className="leave-run-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget&&!deletePending)setLeaveDialogOpen(false)}}><section ref={leaveDialogRef} className="leave-run-dialog" role="dialog" aria-modal="true" aria-labelledby="leave-run-title" aria-describedby="leave-run-description"><span className="leave-run-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 3.5 7v5.5c0 4.2 3.6 7.3 8.5 8.5 4.9-1.2 8.5-4.3 8.5-8.5V7L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></span><p className="eyebrow">YOUR RUN · {names[view.mode]}</p><h2 id="leave-run-title">Leave this run?</h2><p id="leave-run-description" className="muted">Save your progress to resume from Home later, or delete this run and its progress.</p>{view.deadline&&<p className="leave-run-timer-note">This timed challenge keeps running while you are away.</p>}{error&&<ErrorBox message={error}/>}<div className="leave-run-actions"><button type="button" className="secondary leave-run-cancel" disabled={deletePending} onClick={()=>setLeaveDialogOpen(false)}>Continue playing</button><button type="button" className="primary leave-run-save" disabled={deletePending} onClick={()=>navigate("/home")}>Save for later <span aria-hidden="true">↗</span></button><button type="button" className="leave-run-delete" disabled={deletePending} onClick={()=>void deleteCurrentRun()}>{deletePending?<><span className="loading-indicator" aria-hidden="true"/>Deleting…</>:<>Delete run <span aria-hidden="true">⌫</span></>}</button></div></section></div>}
   </div>;
 }
 
 function Results() {
   const { id = "" } = useParams();
-  const { data: v, error, reload } = useLoad(() => api.view(id), id);
+  const navigate=useNavigate();
+  const { data: v, error, reload } = useLoad(() => api.result(id), id);
+  const [replayPending,setReplayPending]=useState(false);
+  const [replayError,setReplayError]=useState("");
   if (!v) return error?<ErrorBox message={error} retry={reload}/>:<Loading/>;
   if (v.status !== "completed") return <section className="card">
     <h1 tabIndex={-1} className="heading">This run has not completed.</h1>
     <Link className="primary mt-4" to={"/play/" + id}>Resume run</Link>
   </section>;
+  const newBest=setsNewPersonalBest(v.mode,v.stats.score,v.previousBest);
+  const setupUrl=challengeSetupUrl(v);
+  async function playAgain(){
+    if(!v.contextSaved){navigate(setupUrl);return;}
+    setReplayPending(true);setReplayError("");
+    try{const next=await api.play(v.mode,v.categories??[],v.difficulty,v.country??undefined,v.questionCount??10);navigate(`/play/${next.id}`)}
+    catch(e){setReplayError((e as Error).message)}
+    finally{setReplayPending(false)}
+  }
   return <div className="results-shell">
-    <section className="results-hero map-grid">
-    <p className="eyebrow">ADVENTURE COMPLETE · {names[v.mode]}</p>
-    <h1 tabIndex={-1} className="heading mt-3">A little more world. A little more you.</h1>
-    <p className="muted mt-3">Your results are in. Here’s how this run unfolded.</p>
+    <section className={`results-hero map-grid ${newBest?"has-new-best":""}`}>
+      <div className="results-hero-copy"><p className="eyebrow">ADVENTURE COMPLETE · {names[v.mode]}</p>
+      <h1 tabIndex={-1} className="heading mt-3">Run complete.</h1>
+      <p className="muted mt-3">Here’s how this adventure unfolded.</p>
+      {newBest&&<div className="new-best-badge" role="status"><span className="new-best-icon" aria-hidden="true">✦</span><span><strong>New personal best</strong><small>{v.previousBest===null?"Your first completed score in this mode.":`Previous best: ${v.previousBest.toLocaleString()} points`}</small></span></div>}</div>
+      <div className="results-selection" aria-label="Completed challenge settings"><span className="results-selection-label">Your selection</span><strong>{names[v.mode]} <i aria-hidden="true">·</i> {v.difficulty}</strong><span>{v.contextSaved?(v.categories?.length?v.categories.join(", "):"All categories"):"Original filters unavailable"}{v.country?` · ${v.country}`:""}</span></div>
     </section>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 my-7">
+    <div className="results-actions">
+      <button className="primary results-play-again" disabled={replayPending} onClick={()=>void playAgain()}>{replayPending?<><span className="loading-indicator" aria-hidden="true"/>Starting a new run…</>:<>Play again <span aria-hidden="true">→</span></>}</button>
+      <Link className="secondary" to={`${setupUrl}#difficulty-picker`}>Change difficulty</Link>
+      <Link className="secondary" to={`${setupUrl}#challenge-mode-picker`}>Change mode</Link>
+    </div>
+    {!v.contextSaved&&<p className="results-context-notice" role="status">This run predates saved filter settings. Choose its category and country again in the setup screen before starting.</p>}
+    <ErrorBox message={replayError}/>
+    <div className="results-metrics grid grid-cols-2 md:grid-cols-4 gap-3 my-6">
       <Stat title="Final score" value={v.stats.score}/>
       <Stat title="Accuracy" value={accuracy(v.stats.correct, v.stats.incorrect)}/>
       <Stat title="XP earned" value={v.stats.xp}/>
-      <Stat title="Correct / incorrect" value={`${v.stats.correct} / ${v.stats.incorrect}`}/>
-      <Stat title="Average response" value={`${(v.stats.averageMs / 1000).toFixed(1)}s`}/>
+      <Stat title="Correct answers" value={v.stats.correct}/>
+      <Stat title="Incorrect answers" value={v.stats.incorrect}/>
+      <Stat title="Average response" value={v.answered?`${(v.stats.averageMs / 1000).toFixed(1)}s`:"—"}/>
       <Stat title="Best streak" value={v.stats.bestStreak}/>
     </div>
     <p className="muted text-sm">
@@ -489,17 +529,13 @@ function Results() {
       answers. It excludes explanation screens and unanswered questions.
       Practice earns no competitive XP.
     </p>
-    <div className="flex flex-wrap gap-3 my-6">
-      <Link className="primary" to={`/home?mode=${v.mode}&difficulty=${v.difficulty}`}>Play again</Link>
-      <Link className="secondary" to="/home">Change mode</Link>
-    </div>
     <div className="section-heading mt-9 mb-4"><h2 className="text-2xl font-bold">Your answer review</h2><span className="muted text-sm">{v.reviews.length} {v.reviews.length===1?"answer":"answers"}</span></div>
     {!v.reviews.length&&<div className="empty-state"><p className="font-semibold">No answers were accepted in this run.</p></div>}
     <div className="grid gap-4">
-      {[...v.reviews].sort((a, b) => Number(a.correct) - Number(b.correct)).map(r =>
-        <article key={r.questionId}>
-          <h3 className="font-semibold mb-2">{r.prompt}</h3>
-          <Feedback review={r}/>
+      {[...v.reviews].map((review,index)=>({review,index})).sort((a,b)=>Number(a.review.correct)-Number(b.review.correct)||a.index-b.index).map(({review,index}) =>
+        <article className={`results-review-item ${review.correct?"is-correct":"is-incorrect"}`} key={review.questionId}>
+          <div className="results-review-title"><span>{String(index+1).padStart(2,"0")}</span><h3>{review.prompt}</h3><strong className={`results-review-status ${review.correct?"is-correct":"is-incorrect"}`}>{review.correct?"Correct":"Mistake"}</strong></div>
+          <Feedback review={review}/>
         </article>)}
     </div>
   </div>;

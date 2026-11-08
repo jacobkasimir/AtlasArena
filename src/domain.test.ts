@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   canTransition, eligibleDifficulty, eligibleXP, expired, level, score,
-  shuffle, validateOption, PlayableQuestion, validUsername, normalizeUsername
+  shuffle, validateOption, PlayableQuestion, validUsername, normalizeUsername,
+  challengeSetupUrl, setsNewPersonalBest
 } from "./domain";
 
 describe("username rules", () => {
@@ -30,6 +31,26 @@ describe("scoring", () => {
     expect(score(true, "easy", 1, 333, 1000)).toBe(117);
     expect(score(true, "easy", 1, 2000, 1000)).toBe(150);
     expect(score(true, "easy", 1, -1, 1000)).toBe(100);
+  });
+});
+describe("results and replay selection",()=>{
+  it("marks a strictly higher competitive score as a new personal best",()=>{
+    expect(setsNewPersonalBest("classic",501,500)).toBe(true);
+    expect(setsNewPersonalBest("classic",500,500)).toBe(false);
+    expect(setsNewPersonalBest("classic",100,null)).toBe(true);
+  });
+  it("never gives Practice a competitive personal-best badge",()=>{
+    expect(setsNewPersonalBest("practice",900,null)).toBe(false);
+    expect(setsNewPersonalBest("practice",900,100)).toBe(false);
+  });
+  it("keeps the exact saved selection in setup navigation",()=>{
+    const selection={mode:"classic" as const,difficulty:"hard" as const,categories:["countries"],country:"DEU",questionCount:10};
+    expect(challengeSetupUrl(selection)).toBe("/home?mode=classic&difficulty=hard&category=countries&country=DEU&count=10");
+  });
+  it("supports explicitly changed mode and difficulty in setup navigation",()=>{
+    const selection={mode:"classic" as const,difficulty:"easy" as const,categories:[] as string[],country:null,questionCount:10};
+    expect(challengeSetupUrl({...selection,difficulty:"expert"})).toContain("difficulty=expert");
+    expect(challengeSetupUrl({...selection,mode:"timed"})).toContain("mode=timed");
   });
 });
 it("has terminal session states", () => {

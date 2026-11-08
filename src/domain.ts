@@ -78,6 +78,26 @@ export type View = {
   answered: number;
 };
 
+export type ResultView = View & {
+  categories: string[] | null;
+  country: string | null;
+  questionCount: number | null;
+  contextSaved: boolean;
+  previousBest: number | null;
+};
+
+export function setsNewPersonalBest(mode: Mode, scoreValue: number, previousBest: number | null) {
+  return mode !== "practice" && (previousBest === null || scoreValue > previousBest);
+}
+
+export function challengeSetupUrl(selection: Pick<ResultView, "mode" | "difficulty" | "categories" | "country" | "questionCount">) {
+  const params = new URLSearchParams({ mode: selection.mode, difficulty: selection.difficulty });
+  if (selection.categories?.length) params.set("category", selection.categories[0]);
+  if (selection.country) params.set("country", selection.country);
+  if (selection.questionCount) params.set("count", String(selection.questionCount));
+  return `/home?${params.toString()}`;
+}
+
 export type Summary = {
   id: string;
   mode: Mode;
