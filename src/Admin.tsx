@@ -12,6 +12,8 @@ type AdminQuestion = {
   [key: string]: unknown;
 };
 type Facets = { topics: string[]; categories: string[]; difficulties: string[] };
+type CountryOption = { code: string; name: string };
+type AdminNotice = { kind: "success" | "error"; title: string; body: string; raw?: string };
 const PAGE_SIZE = 20;
 const today = () => {
   const date = new Date();
@@ -88,10 +90,15 @@ export default function Admin() {
   const [verified, setVerified] = useState<"" | "true" | "false">("");
   const [type, setType] = useState("");
   const [countryCode, setCountryCode] = useState("");
+  const [countrySearch, setCountrySearch] = useState("");
   const [referenceYear, setReferenceYear] = useState("");
   const [published, setPublished] = useState<"" | "true" | "false">("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const access = useLoad(() => api.dashboard());
+  const countryOptions = useLoad(
+    () => access.data?.profile.admin ? api.adminCountries() : Promise.resolve({ items: [] as CountryOption[] }),
+    String(Boolean(access.data?.profile.admin))
+  );
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -130,14 +137,14 @@ export default function Admin() {
   const [policy, setPolicy] = useState<"reject" | "version">("version");
   const [publish, setPublish] = useState(false);
   const [preview, setPreview] = useState("");
-  const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState<AdminNotice | null>(null);
   const [pending, setPending] = useState(false);
   const signature = JSON.stringify({ text, policy, publish });
 
   function setRecords(next: AdminQuestion[], nextSelected = selected) {
     setText(JSON.stringify(next, null, 2));
     setSelected(Math.min(nextSelected, Math.max(0, next.length - 1)));
-    setPreview(""); setMessage("");
+    setPreview(""); setNotice(null);
   }
   function update(field: keyof AdminQuestion, value: unknown) {
     updateMany({ [field]: value });
@@ -152,6 +159,7 @@ export default function Admin() {
     setRecords([q as AdminQuestion], 0);
     setPolicy("version"); setPublish(false); setEditorMode("visual");
     setFromFile(false); setExpandedRecord(null);
+    setCountrySearch("");
     if (fileInputRef.current) fileInputRef.current.value = "";
     window.requestAnimationFrame(() => {
       const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -169,7 +177,7 @@ export default function Admin() {
   }
 
   async function perform(dryRun: boolean) {
-    setPending(true); setMessage("");
+    setPending(true); setNotice(null);
     try {
       if (new Blob([text]).size > 262144) throw new Error("Maximum JSON size: 256 KiB.");
       const payload: unknown = JSON.parse(text);
@@ -177,16 +185,25 @@ export default function Admin() {
         throw new Error("Provide an array containing 1–100 records.");
       const result = await api.adminImport(payload, dryRun, policy, publish);
       const response = JSON.stringify(result, null, 2);
-      if (dryRun && result.ok) setPreview(signature);
-      if (!dryRun && result.ok) {
+      if (result.ok && dryRun) {
+        setPreview(signature);
+        setNotice({ kind: "success", title: "Validation passed", body: `${result.count} question${result.count === 1 ? "" : "s"} passed server validation. No changes have been committed yet.`, raw: response });
+      } else if (result.ok) {
         setText(JSON.stringify([blankQuestion(topicOptions)], null, 2));
         setSelected(0); setFromFile(false); setExpandedRecord(null);
         setEditorMode("visual"); setPolicy("version"); setPublish(false);
-        setPreview(""); setMessage(`Import committed successfully. Editor and import settings reset to defaults.\n${response}`);
+        setPreview(""); setNotice({ kind: "success", title: "Import committed", body: `${result.count} question${result.count === 1 ? "" : "s"} successfully imported. The editor and import settings have been reset to their defaults.`, raw: response });
         if (fileInputRef.current) fileInputRef.current.value = "";
         list.reload();
-      } else setMessage(response);
-    } catch (e) { setMessage((e as Error).message); setPreview(""); }
+      } else {
+        setPreview("");
+        const details = result.errors?.map(error => `Question ${error.row}: ${error.message}`).join("\n");
+        setNotice({ kind: "error", title: dryRun ? "Validation failed" : "Import was not committed", body: details || "The server rejected the import. Review its response for details.", raw: response });
+      }
+    } catch (e) {
+      setNotice({ kind: "error", title: dryRun ? "Could not validate questions" : "Import failed", body: (e as Error).message || "An unexpected error occurred." });
+      setPreview("");
+    }
     finally { setPending(false); }
   }
 
@@ -201,6 +218,8 @@ export default function Admin() {
   </section>;
 
   const topicOptions = facets.topics.length ? facets.topics : ["capitals", "countries", "flags"];
+  const availableCountries = countryOptions.data?.items ?? [];
+  const selectedCountry = availableCountries.find(country => country.code === current?.countryCode);
   const activeFilterCount = [search.trim(), category, topic, difficulty, reviewStatus, verified, published, type, countryCode, referenceYear].filter(Boolean).length;
   return <div className="admin-shell">
     <div className="section-heading admin-heading">
@@ -231,7 +250,7 @@ export default function Admin() {
           <ChoiceButtons label="Publication status" value={published} options={["", "true", "false"]} onChange={value => { setPublished(value as "" | "true" | "false"); setOffset(0); }}/>
           <ChoiceButtons label="Source verification" value={verified} options={["", "true", "false"]} onChange={value => { setVerified(value as "" | "true" | "false"); setOffset(0); }}/>
           <ChoiceButtons label="Question format" value={type} options={["", "mc", "tf"]} onChange={value => { setType(value); setOffset(0); }}/>
-          <label>Country code<input value={countryCode} maxLength={2} placeholder="Any country" onChange={e => { setCountryCode(e.target.value.replace(/[^a-z]/gi, "").toUpperCase()); setOffset(0); }}/></label>
+          <label>Country code<input value={countryCode} maxLength={3} placeholder="Any country code" onChange={e => { setCountryCode(e.target.value.replace(/[^a-z]/gi, "").toUpperCase()); setOffset(0); }}/></label>
           <label>Reference year<input type="number" min={1900} max={2100} value={referenceYear} placeholder="Any year" onChange={e => { setReferenceYear(e.target.value); setOffset(0); }}/></label>
         </div>
       </div>}
@@ -258,8 +277,8 @@ export default function Admin() {
             {!q.versionPublished && <button className="primary" type="button" onClick={() => selectForPublishing(q)}>Review &amp; publish</button>}
             {Boolean(q.hasPublishedVersion) && <button className="secondary" type="button" disabled={pending} onClick={async () => {
               setPending(true);
-              try { await api.unpublish(String(q.stableId)); list.reload(); setMessage(`The live version of ${String(q.stableId)} was unpublished.`); }
-              catch (e) { setMessage((e as Error).message.includes("QUESTION_NOT_PUBLISHED") ? "This question no longer has a published version. Refresh the list and try again." : (e as Error).message); }
+              try { await api.unpublish(String(q.stableId)); list.reload(); setNotice({ kind: "success", title: "Question unpublished", body: `The live version of ${String(q.stableId)} is no longer published.` }); }
+              catch (e) { setNotice({ kind: "error", title: "Could not unpublish question", body: (e as Error).message.includes("QUESTION_NOT_PUBLISHED") ? "This question no longer has a published version. Refresh the list and try again." : (e as Error).message }); }
               finally { setPending(false); }
             }}>Unpublish live version</button>}
           </div>
@@ -272,7 +291,7 @@ export default function Admin() {
           <div><p className="eyebrow">VERSIONED EDITOR</p><h2 id="editor-title" className="text-xl font-bold mt-1">Question details</h2></div>
           <button type="button" className="primary" onClick={() => {
             setRecords([blankQuestion(topicOptions)], 0); setPolicy("version"); setPublish(false);
-            setFromFile(false); setExpandedRecord(null);
+            setFromFile(false); setExpandedRecord(null); setCountrySearch("");
             if (fileInputRef.current) fileInputRef.current.value = "";
           }}>New question</button>
         </div>
@@ -280,14 +299,14 @@ export default function Admin() {
           <label className="admin-file">Import JSON file · max 256 KiB
             <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={async e => {
               const file = e.target.files?.[0]; if (!file) return;
-              if (file.size > 262144) { setMessage("Maximum file size: 256 KiB."); return; }
+              if (file.size > 262144) { setNotice({ kind: "error", title: "File is too large", body: "Choose a JSON file that is no larger than 256 KiB." }); return; }
               try {
                 const imported = await file.text();
                 const parsed: unknown = JSON.parse(imported);
                 if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 100) throw new Error("The file must contain 1–100 question records.");
                 setRecords(parsed as AdminQuestion[], 0); setEditorMode("visual"); setPolicy("version"); setPublish(false);
-                setFromFile(true); setExpandedRecord(0);
-              } catch (error) { setMessage((error as Error).message); }
+                setFromFile(true); setExpandedRecord(0); setCountrySearch("");
+              } catch (error) { setNotice({ kind: "error", title: "Could not read question file", body: (error as Error).message }); }
               e.currentTarget.value = "";
             }}/>
           </label>
@@ -302,7 +321,7 @@ export default function Admin() {
             {records.map((record, index) => <article className={`admin-import-question ${expandedRecord === index ? "is-expanded" : ""}`} key={`${record.stableId}-${index}`}>
               <button type="button" className="admin-import-question-toggle" aria-expanded={expandedRecord === index} aria-controls={`import-question-detail-${index}`} onClick={() => {
                 if (expandedRecord === index) setExpandedRecord(null);
-                else { setSelected(index); setExpandedRecord(index); }
+                else { setSelected(index); setExpandedRecord(index); setCountrySearch(""); }
               }}>
                 <span className="admin-import-question-number">{String(index + 1).padStart(2, "0")}</span>
                 <span className="admin-import-question-title"><strong>{record.prompt || "Untitled question"}</strong><small>{record.stableId || "Missing stable ID"} · {record.subcategory || "No topic"} · {record.difficulty || "No difficulty"}</small></span>
@@ -368,7 +387,28 @@ export default function Admin() {
             <div className="admin-date-action"><span className="text-sm font-semibold">Review date shortcut</span><button className="secondary" type="button" onClick={() => update("lastReviewed", today())}>Use today · {today()}</button></div>
             <label>Reference year<input type="number" min={1900} max={2100} value={current.referenceYear ?? ""} placeholder="Optional" onChange={e => update("referenceYear", e.target.value ? Number(e.target.value) : null)}/></label>
           </div>
-          <label>Country code<input value={current.countryCode ?? ""} maxLength={2} placeholder="Optional, e.g. FR" onChange={e => update("countryCode", e.target.value.toUpperCase() || null)}/></label>
+          <div className="admin-country-picker">
+            <label htmlFor="admin-country-search">Country <span className="muted font-normal">· optional</span></label>
+            <input id="admin-country-search" type="search" list="admin-country-options" autoComplete="off"
+              value={countrySearch || availableCountries.find(country => country.code === current.countryCode)?.name || current.countryCode || ""}
+              placeholder="Search by country name or code…"
+              onChange={e => {
+                const value = e.target.value;
+                const normalized = value.trim().toLocaleLowerCase();
+                const match = availableCountries.find(country => country.name.toLocaleLowerCase() === normalized || country.code.toLocaleLowerCase() === normalized);
+                if (match) { update("countryCode", match.code); setCountrySearch(""); }
+                else if (!value) { update("countryCode", null); setCountrySearch(""); }
+                else setCountrySearch(value);
+              }}/>
+            <datalist id="admin-country-options">
+              {availableCountries.flatMap(country => [
+                <option key={`${country.code}-name`} value={country.name} label={country.code}/>,
+                <option key={`${country.code}-code`} value={country.code} label={country.name}/>
+              ])}
+            </datalist>
+            {countryOptions.error ? <p className="error text-sm">Country list unavailable: {countryOptions.error}</p>
+              : <p className="muted text-xs mt-2">{countrySearch ? "Select a matching suggestion to apply it." : selectedCountry ? `Selected code: ${selectedCountry.code}` : current.countryCode ? `Current code: ${current.countryCode}` : "Choose a country to set its database code."}</p>}
+          </div>
         </div> : <p className="empty-state mt-4" role={parseProblem ? "alert" : undefined}>{fromFile && expandedRecord === null ? "Choose a question above to expand it and edit its fields." : parseProblem ? `Visual editor needs valid JSON: ${parseProblem}` : "Import or create a question to edit its fields."}</p> : <label className="block mt-4">Question records JSON<textarea className="font-mono text-sm min-h-[32rem]" value={text} onChange={e => { setText(e.target.value); setPreview(""); }}/></label>}
 
         <div className="admin-import-controls mt-5">
@@ -395,7 +435,10 @@ export default function Admin() {
             <button className="secondary" disabled={pending} onClick={() => void perform(true)}>Validate / preview</button>
             <button className="primary" disabled={pending || preview !== signature} onClick={() => void perform(false)}>Commit validated import</button>
           </div>
-          <pre className="admin-output whitespace-pre-wrap break-words text-sm" role="status" aria-live="polite">{message}</pre>
+          {notice && <section className={`admin-notice is-${notice.kind}`} role={notice.kind === "error" ? "alert" : "status"} aria-live={notice.kind === "error" ? "assertive" : "polite"}>
+            <div className="admin-notice-heading"><span className="admin-notice-icon" aria-hidden="true">{notice.kind === "success" ? "✓" : "!"}</span><div><h3>{notice.title}</h3><p>{notice.body}</p></div></div>
+            {notice.raw && <details className="admin-raw-response"><summary>Inspect server response JSON</summary><pre>{notice.raw}</pre></details>}
+          </section>}
         </div>
       </section>
     </div>

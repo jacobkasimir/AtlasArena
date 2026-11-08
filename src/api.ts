@@ -149,6 +149,8 @@ export const api = {
       p_reference_year: filters.referenceYear,
       p_published: filters.published
     }),
+  adminCountries: () =>
+    rpc<{ items: { code: string; name: string }[] }>("arena_admin_countries"),
   adminImport: (
     records: unknown[], dryRun: boolean, policy: "reject" | "version", publish: boolean
   ) => rpc<{ ok: boolean; errors: { row: number; message: string }[]; count: number }>(

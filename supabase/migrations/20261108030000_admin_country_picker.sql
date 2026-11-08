@@ -1,0 +1,219 @@
+begin;
+
+create or replace function public.arena_admin_list_filtered(
+  p_search text,
+  p_offset integer,
+  p_category text,
+  p_subcategory text,
+  p_difficulty text,
+  p_review_status text,
+  p_source_verified boolean,
+  p_type text,
+  p_country_code text,
+  p_reference_year integer,
+  p_published boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_total bigint;
+begin
+  perform private.require_admin();
+  perform private.rate('admin_list', 60);
+
+  if p_search is null
+    or length(p_search) > 100
+    or p_offset is null
+    or p_offset < 0
+    or p_offset > 100000
+    or (p_category is not null and p_category <> 'geography')
+    or (p_subcategory is not null and not exists (
+      select 1 from public.categories as category
+      where category.id = p_subcategory
+        and category.parent_id = 'geography'
+    ))
+    or (p_difficulty is not null and private.drank(p_difficulty) < 0)
+    or (p_review_status is not null
+      and p_review_status not in ('draft', 'reviewed'))
+    or (p_type is not null and p_type not in ('mc', 'tf'))
+    or (p_country_code is not null
+      and p_country_code !~ '^[A-Z]{2,3}$')
+    or (p_reference_year is not null
+      and p_reference_year not between 1900 and 2100)
+  then
+    raise exception 'INVALID_FILTER';
+  end if;
+
+  with latest as (
+    select distinct on (question.stable_id) question.*
+    from private.questions as question
+    order by question.stable_id, question.version desc
+  )
+  select count(*) into v_total
+  from latest as question
+  where (p_search = ''
+      or question.stable_id ilike '%' || p_search || '%'
+      or question.prompt ilike '%' || p_search || '%')
+    and (p_category is null or p_category = 'geography')
+    and (p_subcategory is null or question.subcategory = p_subcategory)
+    and (p_difficulty is null or question.difficulty = p_difficulty)
+    and (p_review_status is null or question.review_status = p_review_status)
+    and (p_source_verified is null or question.source_verified = p_source_verified)
+    and (p_type is null or question.kind = p_type)
+    and (p_country_code is null or question.country_code = p_country_code)
+    and (p_reference_year is null or question.reference_year = p_reference_year)
+    and (p_published is null or exists (
+      select 1 from private.questions as published_question
+      where published_question.stable_id = question.stable_id
+        and published_question.published
+    ) = p_published);
+
+  return jsonb_build_object(
+    'total', v_total,
+    'items', coalesce((
+      with latest as (
+        select distinct on (question.stable_id) question.*
+        from private.questions as question
+        order by question.stable_id, question.version desc
+      ), page as (
+        select question.id, question.stable_id
+        from latest as question
+        where (p_search = ''
+            or question.stable_id ilike '%' || p_search || '%'
+            or question.prompt ilike '%' || p_search || '%')
+          and (p_category is null or p_category = 'geography')
+          and (p_subcategory is null
+            or question.subcategory = p_subcategory)
+          and (p_difficulty is null
+            or question.difficulty = p_difficulty)
+          and (p_review_status is null
+            or question.review_status = p_review_status)
+          and (p_source_verified is null
+            or question.source_verified = p_source_verified)
+          and (p_type is null or question.kind = p_type)
+          and (p_country_code is null
+            or question.country_code = p_country_code)
+          and (p_reference_year is null
+            or question.reference_year = p_reference_year)
+          and (p_published is null or exists (
+            select 1 from private.questions as published_question
+            where published_question.stable_id = question.stable_id
+              and published_question.published
+          ) = p_published)
+        order by question.stable_id
+        limit 20 offset p_offset
+      )
+      select jsonb_agg(
+        private.admin_record(question) || jsonb_build_object(
+          'versionPublished', question.published,
+          'hasPublishedVersion', exists (
+            select 1 from private.questions as published_question
+            where published_question.stable_id = question.stable_id
+              and published_question.published
+          ),
+          'publishedVersion', (
+            select max(published_question.version)
+            from private.questions as published_question
+            where published_question.stable_id = question.stable_id
+              and published_question.published
+          )
+        )
+        order by page.stable_id
+      )
+      from page
+      join private.questions as question on question.id = page.id
+    ), '[]'::jsonb),
+    'categories', jsonb_build_array('geography'),
+    'topics', coalesce((
+      select jsonb_agg(category.id order by category.id)
+      from public.categories as category
+      where category.parent_id = 'geography'
+    ), '[]'::jsonb),
+    'difficulties', coalesce((
+      select jsonb_agg(option.value order by option.rank)
+      from (values
+        ('easy', 1), ('medium', 2), ('hard', 3), ('expert', 4)
+      ) as option(value, rank)
+      where exists (
+        select 1 from private.questions as question
+        where question.difficulty = option.value
+      )
+    ), '[]'::jsonb)
+  );
+end;
+$function$;
+
+revoke all on function public.arena_admin_list_filtered(
+  text, integer, text, text, text, text, boolean, text, text, integer, boolean
+) from public, anon, authenticated;
+grant execute on function public.arena_admin_list_filtered(
+  text, integer, text, text, text, text, boolean, text, text, integer, boolean
+) to authenticated;
+
+create or replace function public.arena_admin_unpublish(
+  p_stable_id text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  perform private.require_admin();
+  perform private.rate('admin_unpublish', 30);
+
+  if p_stable_id is null
+    or p_stable_id !~ '^[a-zA-Z0-9_-]{3,80}$'
+  then
+    raise exception 'INVALID_STABLE_ID';
+  end if;
+
+  perform pg_advisory_xact_lock(724182001);
+
+  if not exists (
+    select 1 from private.questions as question
+    where question.stable_id = p_stable_id
+      and question.published
+  ) then
+    raise exception 'QUESTION_NOT_PUBLISHED';
+  end if;
+
+  update private.questions
+  set published = false
+  where stable_id = p_stable_id
+    and published;
+end;
+$function$;
+
+create or replace function public.arena_admin_countries()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  perform private.require_admin();
+  perform private.rate('admin_countries', 60);
+
+  return jsonb_build_object(
+    'items', coalesce((
+      select jsonb_agg(
+        jsonb_build_object('code', country.code, 'name', country.name)
+        order by country.name
+      )
+      from private.countries as country
+    ), '[]'::jsonb)
+  );
+end;
+$function$;
+
+revoke all on function public.arena_admin_countries()
+  from public, anon, authenticated;
+grant execute on function public.arena_admin_countries()
+  to authenticated;
+
+notify pgrst, 'reload schema';
+commit;
