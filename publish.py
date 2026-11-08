@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 source = Path("sdn.json")
@@ -17,12 +17,12 @@ confirmation = input("Quellen tatsächlich geprüft? Tippe PUBLISH zur Bestätig
 if confirmation != "PUBLISH":
     raise SystemExit("Abgebrochen; es wurde keine Veröffentlichungsdatei erzeugt.")
 
-today = date.today().isoformat()
+yesterday = (date.today() - timedelta(days=1)).isoformat()
 
 for question in questions:
     question["sourceVerified"] = True
     question["reviewStatus"] = "reviewed"
-    question["lastReviewed"] = today
+    question["lastReviewed"] = yesterday
     question["referenceYear"] = 2025
 
 target.write_text(
@@ -30,4 +30,4 @@ target.write_text(
     encoding="utf-8",
 )
 
-print(f"Erstellt: {target} mit lastReviewed={today}")
+print(f"Erstellt: {target} mit lastReviewed={yesterday}")

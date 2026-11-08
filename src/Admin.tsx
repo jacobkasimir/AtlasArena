@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api, isDemo } from "./api";
 import { difficulties } from "./domain";
 import { ErrorBox, Loading, useLoad } from "./components";
@@ -58,13 +58,10 @@ function QuestionPager({ offset, total, pending, onOffsetChange, placement }: {
 }) {
   const pageCount = Math.ceil(total / PAGE_SIZE);
   const currentPage = total ? Math.floor(offset / PAGE_SIZE) + 1 : 0;
-  const first = total ? offset + 1 : 0;
-  const last = Math.min(offset + PAGE_SIZE, total);
   const lastOffset = Math.max(0, (pageCount - 1) * PAGE_SIZE);
   return <nav className={`admin-pager ${placement === "top" ? "is-top" : "is-bottom"}`} aria-label="Question pages">
     <div className="admin-pager-summary" aria-live={placement === "top" ? "polite" : undefined}>
       <div className="admin-total-block"><strong>{total.toLocaleString()}</strong><span>{total === 1 ? "question total" : "questions total"}</span></div>
-      <p>Showing <strong>{first}–{last}</strong> of the filtered results</p>
     </div>
     <div className="admin-pager-controls">
       <div className="admin-pager-buttons" role="group" aria-label="Navigate question pages">
@@ -120,6 +117,9 @@ export default function Admin() {
 
   const [text, setText] = useState(() => JSON.stringify([blankQuestion()], null, 2));
   const [selected, setSelected] = useState(0);
+  const [fromFile, setFromFile] = useState(false);
+  const [expandedRecord, setExpandedRecord] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const records = useMemo(() => safeRecords(text), [text]);
   const parseProblem = useMemo(() => jsonProblem(text), [text]);
   const current = records[selected];
@@ -148,6 +148,7 @@ export default function Admin() {
   function selectQuestion(q: Record<string, unknown>) {
     setRecords([q as AdminQuestion], 0);
     setPolicy("version"); setPublish(false); setEditorMode("visual");
+    setFromFile(false); setExpandedRecord(null);
   }
   function resetFilters() {
     setSearch(""); setDebouncedSearch(""); setCategory(""); setTopic("");
@@ -163,9 +164,16 @@ export default function Admin() {
       if (!Array.isArray(payload) || payload.length < 1 || payload.length > 100)
         throw new Error("Provide an array containing 1–100 records.");
       const result = await api.adminImport(payload, dryRun, policy, publish);
-      setMessage(JSON.stringify(result, null, 2));
+      const response = JSON.stringify(result, null, 2);
       if (dryRun && result.ok) setPreview(signature);
-      if (!dryRun && result.ok) { setPreview(""); list.reload(); }
+      if (!dryRun && result.ok) {
+        setText(JSON.stringify([blankQuestion(topicOptions)], null, 2));
+        setSelected(0); setFromFile(false); setExpandedRecord(null);
+        setEditorMode("visual"); setPolicy("version"); setPublish(false);
+        setPreview(""); setMessage(`Import committed successfully. Editor and import settings reset to defaults.\n${response}`);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        list.reload();
+      } else setMessage(response);
     } catch (e) { setMessage((e as Error).message); setPreview(""); }
     finally { setPending(false); }
   }
@@ -247,11 +255,15 @@ export default function Admin() {
       <section className="card admin-editor" aria-labelledby="editor-title">
         <div className="section-heading">
           <div><p className="eyebrow">VERSIONED EDITOR</p><h2 id="editor-title" className="text-xl font-bold mt-1">Question details</h2></div>
-          <button type="button" className="primary" onClick={() => { setRecords([blankQuestion(topicOptions)], 0); setPolicy("version"); setPublish(false); }}>New question</button>
+          <button type="button" className="primary" onClick={() => {
+            setRecords([blankQuestion(topicOptions)], 0); setPolicy("version"); setPublish(false);
+            setFromFile(false); setExpandedRecord(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}>New question</button>
         </div>
         <div className="admin-editor-toolbar mt-4">
           <label className="admin-file">Import JSON file · max 256 KiB
-            <input type="file" accept=".json,application/json" onChange={async e => {
+            <input ref={fileInputRef} type="file" accept=".json,application/json" onChange={async e => {
               const file = e.target.files?.[0]; if (!file) return;
               if (file.size > 262144) { setMessage("Maximum file size: 256 KiB."); return; }
               try {
@@ -259,6 +271,7 @@ export default function Admin() {
                 const parsed: unknown = JSON.parse(imported);
                 if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 100) throw new Error("The file must contain 1–100 question records.");
                 setRecords(parsed as AdminQuestion[], 0); setEditorMode("visual"); setPolicy("version"); setPublish(false);
+                setFromFile(true); setExpandedRecord(0);
               } catch (error) { setMessage((error as Error).message); }
               e.currentTarget.value = "";
             }}/>
@@ -268,13 +281,30 @@ export default function Admin() {
             <button type="button" aria-pressed={editorMode === "json"} className={editorMode === "json" ? "is-active" : ""} onClick={() => setEditorMode("json")}>JSON</button>
           </div>
         </div>
-        {records.length > 1 && <label className="admin-record-select mt-4">Record in this import
-          <select value={selected} onChange={e => setSelected(Number(e.target.value))}>
-            {records.map((record, index) => <option value={index} key={`${record.stableId}-${index}`}>{index + 1}. {record.stableId} — {record.prompt || "Untitled question"}</option>)}
-          </select>
-        </label>}
+        {fromFile && editorMode === "visual" && records.length > 0 && <section className="admin-import-questions mt-4" aria-labelledby="import-question-list-title">
+          <div className="flex items-center justify-between gap-3 mb-2"><h3 id="import-question-list-title" className="font-bold">Questions in this file</h3><span className="admin-tag">{records.length} {records.length === 1 ? "question" : "questions"}</span></div>
+          <div className="admin-import-question-list">
+            {records.map((record, index) => <article className={`admin-import-question ${expandedRecord === index ? "is-expanded" : ""}`} key={`${record.stableId}-${index}`}>
+              <button type="button" className="admin-import-question-toggle" aria-expanded={expandedRecord === index} aria-controls={`import-question-detail-${index}`} onClick={() => {
+                if (expandedRecord === index) setExpandedRecord(null);
+                else { setSelected(index); setExpandedRecord(index); }
+              }}>
+                <span className="admin-import-question-number">{String(index + 1).padStart(2, "0")}</span>
+                <span className="admin-import-question-title"><strong>{record.prompt || "Untitled question"}</strong><small>{record.stableId || "Missing stable ID"} · {record.subcategory || "No topic"} · {record.difficulty || "No difficulty"}</small></span>
+                <span className="admin-import-question-chevron" aria-hidden="true">{expandedRecord === index ? "−" : "+"}</span>
+              </button>
+              {expandedRecord === index && <div id={`import-question-detail-${index}`} className="admin-import-question-detail" role="region" aria-label={`Question ${index + 1} details`}>
+                <div className="flex flex-wrap gap-2"><span className="admin-tag">{record.type === "tf" ? "True / false" : "Multiple choice"}</span><span className="admin-tag">{record.reviewStatus || "draft"}</span><span className="admin-tag">{record.sourceVerified ? "Source verified" : "Source unverified"}</span></div>
+                <ul className="admin-import-options mt-3">{record.options?.map(option => <li key={option.id} className={option.id === record.correct ? "is-correct" : ""}><span>{option.label || "Empty answer option"}</span>{option.id === record.correct && <strong>Correct answer</strong>}</li>)}</ul>
+                {record.explanation && <p className="muted text-sm mt-3">{record.explanation}</p>}
+                <p className="muted text-xs mt-2">{record.lastReviewed ? `Last reviewed ${record.lastReviewed}` : "No review date"} · Version {record.expectedVersion ?? 0}</p>
+                <p className="admin-edit-hint mt-3">The visual editor below is editing this question.</p>
+              </div>}
+            </article>)}
+          </div>
+        </section>}
 
-        {editorMode === "visual" ? current ? <div className="admin-visual-editor mt-4">
+        {editorMode === "visual" ? current && (!fromFile || expandedRecord === selected) ? <div id="admin-selected-question-editor" className="admin-visual-editor mt-4">
           <div className="admin-preview" aria-label="Live question preview">
             <div className="flex flex-wrap gap-2"><span className="admin-tag">{current.subcategory || "Choose topic"}</span><span className="admin-tag">{current.difficulty}</span><span className="admin-tag">{current.type === "tf" ? "True / false" : "Multiple choice"}</span></div>
             <p className="font-bold text-lg mt-3">{current.prompt || "Your question will appear here"}</p>
@@ -324,7 +354,7 @@ export default function Admin() {
             <label>Reference year<input type="number" min={1900} max={2100} value={current.referenceYear ?? ""} placeholder="Optional" onChange={e => update("referenceYear", e.target.value ? Number(e.target.value) : null)}/></label>
           </div>
           <label>Country code<input value={current.countryCode ?? ""} maxLength={2} placeholder="Optional, e.g. FR" onChange={e => update("countryCode", e.target.value.toUpperCase() || null)}/></label>
-        </div> : <p className="empty-state mt-4" role={parseProblem ? "alert" : undefined}>{parseProblem ? `Visual editor needs valid JSON: ${parseProblem}` : "Import or create a question to edit its fields."}</p> : <label className="block mt-4">Question records JSON<textarea className="font-mono text-sm min-h-[32rem]" value={text} onChange={e => { setText(e.target.value); setPreview(""); }}/></label>}
+        </div> : <p className="empty-state mt-4" role={parseProblem ? "alert" : undefined}>{fromFile && expandedRecord === null ? "Choose a question above to expand it and edit its fields." : parseProblem ? `Visual editor needs valid JSON: ${parseProblem}` : "Import or create a question to edit its fields."}</p> : <label className="block mt-4">Question records JSON<textarea className="font-mono text-sm min-h-[32rem]" value={text} onChange={e => { setText(e.target.value); setPreview(""); }}/></label>}
 
         <div className="admin-import-controls mt-5">
           <fieldset className="admin-policy-select">

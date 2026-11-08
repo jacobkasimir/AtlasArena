@@ -314,6 +314,23 @@ html[data-theme="dark"] .logo-dark,html[data-theme="dark"] .wordmark-dark {displ
 .admin-date-action { display:grid;gap:.45rem;align-content:end; }
 .admin-publish-hint { padding:.75rem;border:1px solid rgb(var(--c-warning) / .35);border-radius:.75rem;background:rgb(var(--c-warning) / .1);font-size:.85rem; }
 .admin-import-controls { display:grid;gap:1rem;padding-top:1rem;border-top:1px solid rgb(var(--c-line) / .2); }
+.admin-import-questions { padding:.9rem;border:1px solid rgb(var(--c-line) / .22);border-radius:1rem;background:rgb(var(--c-bg) / .38); }
+.admin-import-question-list { display:grid;gap:.55rem;max-height:28rem;overflow:auto;overscroll-behavior:contain; }
+.admin-import-question { border:1px solid rgb(var(--c-line) / .2);border-radius:.85rem;background:rgb(var(--c-surface) / .72);overflow:hidden; }
+.admin-import-question.is-expanded { border-color:rgb(var(--c-mint) / .54);box-shadow:0 0 0 1px rgb(var(--c-mint) / .12); }
+.admin-import-question-toggle { display:grid;grid-template-columns:2.5rem minmax(0,1fr) 2rem;align-items:center;gap:.75rem;width:100%;min-height:68px;padding:.7rem .8rem;text-align:left;border:0;background:transparent;color:rgb(var(--c-text)); }
+.admin-import-question-toggle:hover { background:rgb(var(--c-raised) / .62); }
+.admin-import-question-number { display:grid;place-items:center;width:2.25rem;height:2.25rem;border-radius:.7rem;background:rgb(var(--c-mint) / .12);color:rgb(var(--c-mint));font-size:.78rem;font-weight:800;font-variant-numeric:tabular-nums; }
+.admin-import-question-title { display:grid;gap:.25rem;min-width:0; }
+.admin-import-question-title strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem; }
+.admin-import-question-title small { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgb(var(--c-muted));font-size:.72rem; }
+.admin-import-question-chevron { display:grid;place-items:center;width:1.8rem;height:1.8rem;border:1px solid rgb(var(--c-line) / .24);border-radius:50%;color:rgb(var(--c-mint));font-size:1.15rem; }
+.admin-import-question-detail { padding:.85rem 1rem 1rem 4.05rem;border-top:1px solid rgb(var(--c-line) / .16); }
+.admin-import-options { display:grid;gap:.35rem;padding:0;list-style:none; }
+.admin-import-options li { display:flex;justify-content:space-between;align-items:center;gap:.7rem;min-height:38px;padding:.45rem .65rem;border:1px solid rgb(var(--c-line) / .17);border-radius:.65rem;background:rgb(var(--c-raised) / .45);font-size:.82rem; }
+.admin-import-options li.is-correct { border-color:rgb(var(--c-success) / .5); }
+.admin-import-options li strong { color:rgb(var(--c-success));font-size:.72rem;white-space:nowrap; }
+.admin-edit-hint { color:rgb(var(--c-mint));font-size:.78rem;font-weight:650; }
 .admin-policy-select { display:grid;gap:.45rem; }
 .admin-policy-options { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem; }
 .admin-policy-card { display:flex;align-items:flex-start;gap:.7rem;min-height:108px;padding:.9rem;border:1px solid rgb(var(--c-line) / .24);border-radius:1rem;background:rgb(var(--c-raised) / .55);cursor:pointer;transition:border-color .16s ease,background-color .16s ease; }
@@ -332,6 +349,7 @@ html[data-theme="dark"] .logo-dark,html[data-theme="dark"] .wordmark-dark {displ
 @media(max-width:700px){.admin-pager{align-items:flex-start}.admin-pager-summary{width:100%;justify-content:space-between}.admin-pager-controls{justify-content:flex-start;gap:.5rem}}
 @media(max-width:420px){.admin-pager-summary{align-items:flex-start;flex-direction:column;gap:.3rem}.admin-pager-buttons{gap:.4rem}.admin-page-button{padding-inline:.65rem;font-size:.8rem}}
 @media(max-width:420px){.admin-answer-row{grid-template-columns:1fr auto}.admin-answer-row .admin-option-id{grid-column:1}.admin-correct-choice{grid-column:2;grid-row:1}.admin-choice{min-height:44px;padding-inline:.72rem}.admin-preview-options li{align-items:flex-start;flex-direction:column;justify-content:center}}
+@media(max-width:420px){.admin-import-question-detail{padding-left:.8rem}.admin-import-question-toggle{grid-template-columns:2.2rem minmax(0,1fr) 1.8rem;gap:.55rem;padding-inline:.6rem}.admin-import-options li{align-items:flex-start;flex-direction:column;justify-content:center}}
 .page-intro { display:flex;align-items:flex-end;justify-content:space-between;gap:1rem; }
 .page-intro>p { max-width:24rem;margin-bottom:.25rem; }
 .explorer-shell { max-width:1360px;margin-inline:auto; }

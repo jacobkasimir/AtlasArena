@@ -1,178 +1,34 @@
 [
   {
-    "stableId": "atlas-extra-001-everest-range",
+    "stableId": "atlas-en-001-kyoto",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "In welchem Gebirge liegt der Mount Everest?",
+    "prompt": "In which country is Kyoto located?",
     "category": "geography",
-    "subcategory": "physical",
+    "subcategory": "cities",
     "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Anden"
-      },
-      {
-        "id": "b",
-        "label": "Himalaya"
-      },
-      {
-        "id": "c",
-        "label": "Alpen"
-      },
-      {
-        "id": "d",
-        "label": "Rocky Mountains"
-      }
-    ],
-    "correct": "b",
-    "explanation": "Der Mount Everest ist ein Gipfel des Himalaya.",
-    "source": "https://en.wikipedia.org/wiki/Mount_Everest",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-002-kilimanjaro-country",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "In welchem Land liegt der Kilimandscharo?",
-    "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "easy",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Kenia"
-      },
-      {
-        "id": "b",
-        "label": "Uganda"
-      },
-      {
-        "id": "c",
-        "label": "Tansania"
-      },
-      {
-        "id": "d",
-        "label": "Äthiopien"
-      }
-    ],
-    "correct": "c",
-    "explanation": "Das Kilimandscharo-Massiv liegt im Norden Tansanias.",
-    "source": "https://en.wikipedia.org/wiki/Mount_Kilimanjaro",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-003-fuji-country",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "In welchem Land liegt der Berg Fuji?",
-    "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "easy",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Japan"
-      },
-      {
-        "id": "b",
         "label": "China"
       },
       {
-        "id": "c",
-        "label": "Südkorea"
-      },
-      {
-        "id": "d",
-        "label": "Indonesien"
-      }
-    ],
-    "correct": "a",
-    "explanation": "Der Fuji ist ein Vulkan auf der japanischen Hauptinsel Honshū.",
-    "source": "https://en.wikipedia.org/wiki/Mount_Fuji",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-004-andes-continent",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "Entlang welchen Kontinents verlaufen die Anden?",
-    "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "easy",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Afrika"
-      },
-      {
         "id": "b",
-        "label": "Europa"
+        "label": "Japan"
       },
       {
         "id": "c",
-        "label": "Australien"
+        "label": "South Korea"
       },
       {
         "id": "d",
-        "label": "Südamerika"
-      }
-    ],
-    "correct": "d",
-    "explanation": "Die Anden erstrecken sich entlang der Westseite Südamerikas.",
-    "source": "https://en.wikipedia.org/wiki/Andes",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-005-sahara-continent",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "Auf welchem Kontinent liegt die Sahara?",
-    "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "easy",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Asien"
-      },
-      {
-        "id": "b",
-        "label": "Afrika"
-      },
-      {
-        "id": "c",
-        "label": "Nordamerika"
-      },
-      {
-        "id": "d",
-        "label": "Südamerika"
+        "label": "Thailand"
       }
     ],
     "correct": "b",
-    "explanation": "Die Sahara erstreckt sich über große Teile Nordafrikas.",
-    "source": "https://en.wikipedia.org/wiki/Sahara",
+    "explanation": "Kyoto is a city in Japan.",
+    "source": "https://en.wikipedia.org/wiki/Kyoto",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -180,35 +36,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-006-amazon-continent",
+    "stableId": "atlas-en-002-toronto",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "Durch welchen Kontinent fließt der Amazonas?",
+    "prompt": "In which country is Toronto located?",
     "category": "geography",
-    "subcategory": "physical",
+    "subcategory": "cities",
     "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Südamerika"
+        "label": "Canada"
       },
       {
         "id": "b",
-        "label": "Afrika"
+        "label": "United States"
       },
       {
         "id": "c",
-        "label": "Europa"
+        "label": "Australia"
       },
       {
         "id": "d",
-        "label": "Australien"
+        "label": "United Kingdom"
       }
     ],
     "correct": "a",
-    "explanation": "Der Amazonas ist ein Flusssystem Südamerikas.",
-    "source": "https://en.wikipedia.org/wiki/Amazon_River",
+    "explanation": "Toronto is a city in Canada.",
+    "source": "https://en.wikipedia.org/wiki/Toronto",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -216,35 +72,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-007-nile-continent",
+    "stableId": "atlas-en-003-barcelona",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "Auf welchem Kontinent fließt der Nil?",
+    "prompt": "In which country is Barcelona located?",
     "category": "geography",
-    "subcategory": "physical",
+    "subcategory": "cities",
     "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Europa"
+        "label": "Portugal"
       },
       {
         "id": "b",
-        "label": "Asien"
+        "label": "France"
       },
       {
         "id": "c",
-        "label": "Afrika"
+        "label": "Spain"
       },
       {
         "id": "d",
-        "label": "Südamerika"
+        "label": "Italy"
       }
     ],
     "correct": "c",
-    "explanation": "Der Nil fließt durch Nordostafrika zum Mittelmeer.",
-    "source": "https://en.wikipedia.org/wiki/Nile",
+    "explanation": "Barcelona is a city in Spain.",
+    "source": "https://en.wikipedia.org/wiki/Barcelona",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -252,35 +108,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-008-baikal-country",
+    "stableId": "atlas-en-004-munich",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "In welchem Land liegt der Baikalsee?",
+    "prompt": "In which country is Munich located?",
     "category": "geography",
-    "subcategory": "physical",
+    "subcategory": "cities",
     "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Kanada"
+        "label": "Austria"
       },
       {
         "id": "b",
-        "label": "Mongolei"
+        "label": "Switzerland"
       },
       {
         "id": "c",
-        "label": "Kasachstan"
+        "label": "Netherlands"
       },
       {
         "id": "d",
-        "label": "Russland"
+        "label": "Germany"
       }
     ],
     "correct": "d",
-    "explanation": "Der Baikalsee liegt in Sibirien, einem Teil Russlands.",
-    "source": "https://en.wikipedia.org/wiki/Lake_Baikal",
+    "explanation": "Munich is a city in Germany.",
+    "source": "https://en.wikipedia.org/wiki/Munich",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -288,35 +144,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-009-victoria-continent",
+    "stableId": "atlas-en-005-mumbai",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "Auf welchem Kontinent liegt der Victoriasee?",
+    "prompt": "In which country is Mumbai located?",
     "category": "geography",
-    "subcategory": "physical",
+    "subcategory": "cities",
     "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Nordamerika"
+        "label": "Bangladesh"
       },
       {
         "id": "b",
-        "label": "Afrika"
+        "label": "India"
       },
       {
         "id": "c",
-        "label": "Asien"
+        "label": "Nepal"
       },
       {
         "id": "d",
-        "label": "Europa"
+        "label": "Sri Lanka"
       }
     ],
     "correct": "b",
-    "explanation": "Der Victoriasee liegt in Ostafrika.",
-    "source": "https://en.wikipedia.org/wiki/Lake_Victoria",
+    "explanation": "Mumbai is a city in India.",
+    "source": "https://en.wikipedia.org/wiki/Mumbai",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -324,35 +180,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-010-reef-sea",
+    "stableId": "atlas-en-006-sydney",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "In welchem Meer liegt das Great Barrier Reef?",
+    "prompt": "In which country is Sydney located?",
     "category": "geography",
-    "subcategory": "physical",
+    "subcategory": "cities",
     "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Korallenmeer"
+        "label": "Australia"
       },
       {
         "id": "b",
-        "label": "Mittelmeer"
+        "label": "New Zealand"
       },
       {
         "id": "c",
-        "label": "Karibisches Meer"
+        "label": "Canada"
       },
       {
         "id": "d",
-        "label": "Rotes Meer"
+        "label": "South Africa"
       }
     ],
     "correct": "a",
-    "explanation": "Das Great Barrier Reef liegt vor der Nordostküste Australiens im Korallenmeer.",
-    "source": "https://en.wikipedia.org/wiki/Great_Barrier_Reef",
+    "explanation": "Sydney is a city in Australia.",
+    "source": "https://en.wikipedia.org/wiki/Sydney",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -360,179 +216,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-011-colosseum-city",
+    "stableId": "atlas-en-007-rio",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "In welcher Stadt steht das Kolosseum?",
+    "prompt": "In which country is Rio de Janeiro located?",
     "category": "geography",
-    "subcategory": "landmarks",
-    "difficulty": "medium",
+    "subcategory": "cities",
+    "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Athen"
+        "label": "Argentina"
       },
       {
         "id": "b",
-        "label": "Neapel"
+        "label": "Colombia"
       },
       {
         "id": "c",
-        "label": "Rom"
-      },
-      {
-        "id": "d",
-        "label": "Florenz"
-      }
-    ],
-    "correct": "c",
-    "explanation": "Das Kolosseum ist ein antikes Amphitheater in Rom.",
-    "source": "https://en.wikipedia.org/wiki/Colosseum",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-012-taj-mahal-city",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "In welcher Stadt steht das Taj Mahal?",
-    "category": "geography",
-    "subcategory": "landmarks",
-    "difficulty": "medium",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Jaipur"
-      },
-      {
-        "id": "b",
-        "label": "Agra"
-      },
-      {
-        "id": "c",
-        "label": "Delhi"
-      },
-      {
-        "id": "d",
-        "label": "Mumbai"
-      }
-    ],
-    "correct": "b",
-    "explanation": "Das Taj Mahal steht in Agra im indischen Bundesstaat Uttar Pradesh.",
-    "source": "https://en.wikipedia.org/wiki/Taj_Mahal",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-013-petra-country",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "In welchem Land liegt die historische Stätte Petra?",
-    "category": "geography",
-    "subcategory": "landmarks",
-    "difficulty": "medium",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Jordanien"
-      },
-      {
-        "id": "b",
-        "label": "Griechenland"
-      },
-      {
-        "id": "c",
-        "label": "Marokko"
-      },
-      {
-        "id": "d",
-        "label": "Italien"
-      }
-    ],
-    "correct": "a",
-    "explanation": "Petra ist eine historische Stätte im heutigen Jordanien.",
-    "source": "https://en.wikipedia.org/wiki/Petra",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-014-machu-picchu-country",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "In welchem Land liegt Machu Picchu?",
-    "category": "geography",
-    "subcategory": "landmarks",
-    "difficulty": "medium",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Bolivien"
-      },
-      {
-        "id": "b",
-        "label": "Chile"
-      },
-      {
-        "id": "c",
-        "label": "Kolumbien"
+        "label": "Brazil"
       },
       {
         "id": "d",
         "label": "Peru"
       }
     ],
-    "correct": "d",
-    "explanation": "Machu Picchu liegt in den peruanischen Anden.",
-    "source": "https://en.wikipedia.org/wiki/Machu_Picchu",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-015-zambezi-ocean",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "In welchen Ozean mündet der Sambesi?",
-    "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "hard",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Atlantischer Ozean"
-      },
-      {
-        "id": "b",
-        "label": "Pazifischer Ozean"
-      },
-      {
-        "id": "c",
-        "label": "Indischer Ozean"
-      },
-      {
-        "id": "d",
-        "label": "Arktischer Ozean"
-      }
-    ],
     "correct": "c",
-    "explanation": "Der Sambesi mündet an der Küste Mosambiks in den Indischen Ozean.",
-    "source": "https://en.wikipedia.org/wiki/Zambezi",
+    "explanation": "Rio de Janeiro is a city in Brazil.",
+    "source": "https://en.wikipedia.org/wiki/Rio_de_Janeiro",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -540,35 +252,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-016-aconcagua-range",
+    "stableId": "atlas-en-008-cape-town",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "Zu welchem Gebirge gehört der Aconcagua?",
+    "prompt": "In which country is Cape Town located?",
     "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "hard",
+    "subcategory": "cities",
+    "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Anden"
+        "label": "Namibia"
       },
       {
         "id": "b",
-        "label": "Himalaya"
+        "label": "Kenya"
       },
       {
         "id": "c",
-        "label": "Atlas"
+        "label": "Botswana"
       },
       {
         "id": "d",
-        "label": "Kaukasus"
+        "label": "South Africa"
       }
     ],
-    "correct": "a",
-    "explanation": "Der Aconcagua ist ein Berg der Anden in Argentinien.",
-    "source": "https://en.wikipedia.org/wiki/Aconcagua",
+    "correct": "d",
+    "explanation": "Cape Town is a city in South Africa.",
+    "source": "https://en.wikipedia.org/wiki/Cape_Town",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -576,35 +288,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-017-blue-nile-lake",
+    "stableId": "atlas-en-009-istanbul",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "Aus welchem See fließt der Blaue Nil?",
+    "prompt": "In which country is Istanbul located?",
     "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "hard",
+    "subcategory": "cities",
+    "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Baikalsee"
+        "label": "Greece"
       },
       {
         "id": "b",
-        "label": "Tanasee"
+        "label": "Turkey"
       },
       {
         "id": "c",
-        "label": "Victoriasee"
+        "label": "Bulgaria"
       },
       {
         "id": "d",
-        "label": "Tanganjikasee"
+        "label": "Cyprus"
       }
     ],
     "correct": "b",
-    "explanation": "Der Blaue Nil fließt aus dem Tanasee in Äthiopien. Seine Quellflüsse entspringen bereits oberhalb des Sees.",
-    "source": "https://en.wikipedia.org/wiki/Blue_Nile",
+    "explanation": "Istanbul is a city in Turkey.",
+    "source": "https://en.wikipedia.org/wiki/Istanbul",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -612,143 +324,35 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-018-ohrid-countries",
+    "stableId": "atlas-en-010-chicago",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "Welche beiden Länder teilen sich den Ohridsee?",
+    "prompt": "In which country is Chicago located?",
     "category": "geography",
-    "subcategory": "physical",
-    "difficulty": "hard",
+    "subcategory": "cities",
+    "difficulty": "easy",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Österreich und Deutschland"
+        "label": "United States"
       },
       {
         "id": "b",
-        "label": "Schweden und Norwegen"
+        "label": "Canada"
       },
       {
         "id": "c",
-        "label": "Griechenland und Türkei"
+        "label": "Mexico"
       },
       {
         "id": "d",
-        "label": "Albanien und Nordmazedonien"
-      }
-    ],
-    "correct": "d",
-    "explanation": "Der Ohridsee liegt an der Grenze zwischen Albanien und Nordmazedonien.",
-    "source": "https://en.wikipedia.org/wiki/Lake_Ohrid",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-019-antigua-capital",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "Welche Stadt ist die Hauptstadt von Antigua und Barbuda?",
-    "category": "geography",
-    "subcategory": "capitals",
-    "difficulty": "expert",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Roseau"
-      },
-      {
-        "id": "b",
-        "label": "St. John's"
-      },
-      {
-        "id": "c",
-        "label": "Kingstown"
-      },
-      {
-        "id": "d",
-        "label": "Castries"
-      }
-    ],
-    "correct": "b",
-    "explanation": "St. John's ist die Hauptstadt von Antigua und Barbuda.",
-    "source": "https://en.wikipedia.org/wiki/Antigua_and_Barbuda",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-020-dominica-capital",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "Welche Stadt ist die Hauptstadt von Dominica?",
-    "category": "geography",
-    "subcategory": "capitals",
-    "difficulty": "expert",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Bridgetown"
-      },
-      {
-        "id": "b",
-        "label": "Kingstown"
-      },
-      {
-        "id": "c",
-        "label": "Roseau"
-      },
-      {
-        "id": "d",
-        "label": "Basseterre"
-      }
-    ],
-    "correct": "c",
-    "explanation": "Roseau ist die Hauptstadt von Dominica. Dominica ist nicht mit der Dominikanischen Republik zu verwechseln.",
-    "source": "https://en.wikipedia.org/wiki/Dominica",
-    "sourceVerified": true,
-    "reviewStatus": "reviewed",
-    "lastReviewed": "2026-11-07",
-    "referenceYear": 2025,
-    "asset": null
-  },
-  {
-    "stableId": "atlas-extra-021-vanuatu-capital",
-    "expectedVersion": 0,
-    "type": "mc",
-    "prompt": "Welche Stadt ist die Hauptstadt von Vanuatu?",
-    "category": "geography",
-    "subcategory": "capitals",
-    "difficulty": "expert",
-    "countryCode": null,
-    "options": [
-      {
-        "id": "a",
-        "label": "Port Vila"
-      },
-      {
-        "id": "b",
-        "label": "Honiara"
-      },
-      {
-        "id": "c",
-        "label": "Suva"
-      },
-      {
-        "id": "d",
-        "label": "Apia"
+        "label": "Australia"
       }
     ],
     "correct": "a",
-    "explanation": "Port Vila ist die Hauptstadt von Vanuatu.",
-    "source": "https://en.wikipedia.org/wiki/Vanuatu",
+    "explanation": "Chicago is a city in the United States.",
+    "source": "https://en.wikipedia.org/wiki/Chicago",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
@@ -756,35 +360,359 @@
     "asset": null
   },
   {
-    "stableId": "atlas-extra-022-solomon-capital",
+    "stableId": "atlas-en-011-eiffel-tower",
     "expectedVersion": 0,
     "type": "mc",
-    "prompt": "Welche Stadt ist die Hauptstadt der Salomonen?",
+    "prompt": "Which city is home to the Eiffel Tower?",
     "category": "geography",
-    "subcategory": "capitals",
-    "difficulty": "expert",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
     "countryCode": null,
     "options": [
       {
         "id": "a",
-        "label": "Port Vila"
+        "label": "Brussels"
       },
       {
         "id": "b",
-        "label": "Nukuʻalofa"
+        "label": "Paris"
       },
       {
         "id": "c",
-        "label": "Tarawa"
+        "label": "Vienna"
       },
       {
         "id": "d",
-        "label": "Honiara"
+        "label": "Madrid"
+      }
+    ],
+    "correct": "b",
+    "explanation": "The Eiffel Tower is in Paris, France.",
+    "source": "https://en.wikipedia.org/wiki/Eiffel_Tower",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-012-statue-of-liberty",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the Statue of Liberty associated with?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Boston"
+      },
+      {
+        "id": "b",
+        "label": "Washington, D.C."
+      },
+      {
+        "id": "c",
+        "label": "New York City"
+      },
+      {
+        "id": "d",
+        "label": "Philadelphia"
+      }
+    ],
+    "correct": "c",
+    "explanation": "The Statue of Liberty stands on Liberty Island in New York Harbor.",
+    "source": "https://en.wikipedia.org/wiki/Statue_of_Liberty",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-013-angkor-wat",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "In which country is Angkor Wat located?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Laos"
+      },
+      {
+        "id": "b",
+        "label": "Thailand"
+      },
+      {
+        "id": "c",
+        "label": "Vietnam"
+      },
+      {
+        "id": "d",
+        "label": "Cambodia"
       }
     ],
     "correct": "d",
-    "explanation": "Honiara ist die Hauptstadt der Salomonen.",
-    "source": "https://en.wikipedia.org/wiki/Solomon_Islands",
+    "explanation": "Angkor Wat is a temple complex in Cambodia.",
+    "source": "https://en.wikipedia.org/wiki/Angkor_Wat",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-014-chichen-itza",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "In which country is Chichén Itzá located?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Mexico"
+      },
+      {
+        "id": "b",
+        "label": "Guatemala"
+      },
+      {
+        "id": "c",
+        "label": "Belize"
+      },
+      {
+        "id": "d",
+        "label": "Peru"
+      }
+    ],
+    "correct": "a",
+    "explanation": "Chichén Itzá is an archaeological site in Mexico.",
+    "source": "https://en.wikipedia.org/wiki/Chichen_Itza",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-015-sydney-opera-house",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is home to the Sydney Opera House?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Melbourne"
+      },
+      {
+        "id": "b",
+        "label": "Sydney"
+      },
+      {
+        "id": "c",
+        "label": "Perth"
+      },
+      {
+        "id": "d",
+        "label": "Brisbane"
+      }
+    ],
+    "correct": "b",
+    "explanation": "The Sydney Opera House stands on Sydney Harbour.",
+    "source": "https://en.wikipedia.org/wiki/Sydney_Opera_House",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-016-christ-the-redeemer",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is home to the Christ the Redeemer statue?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "São Paulo"
+      },
+      {
+        "id": "b",
+        "label": "Brasília"
+      },
+      {
+        "id": "c",
+        "label": "Rio de Janeiro"
+      },
+      {
+        "id": "d",
+        "label": "Salvador"
+      }
+    ],
+    "correct": "c",
+    "explanation": "The Christ the Redeemer statue stands above Rio de Janeiro.",
+    "source": "https://en.wikipedia.org/wiki/Christ_the_Redeemer_(statue)",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-017-burj-khalifa",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "In which city is the Burj Khalifa located?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Dubai"
+      },
+      {
+        "id": "b",
+        "label": "Doha"
+      },
+      {
+        "id": "c",
+        "label": "Abu Dhabi"
+      },
+      {
+        "id": "d",
+        "label": "Riyadh"
+      }
+    ],
+    "correct": "a",
+    "explanation": "The Burj Khalifa is in Dubai, United Arab Emirates.",
+    "source": "https://en.wikipedia.org/wiki/Burj_Khalifa",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-018-hagia-sophia",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "In which city is Hagia Sophia located?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Athens"
+      },
+      {
+        "id": "b",
+        "label": "Ankara"
+      },
+      {
+        "id": "c",
+        "label": "Thessaloniki"
+      },
+      {
+        "id": "d",
+        "label": "Istanbul"
+      }
+    ],
+    "correct": "d",
+    "explanation": "Hagia Sophia is in Istanbul, Turkey.",
+    "source": "https://en.wikipedia.org/wiki/Hagia_Sophia",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-019-golden-gate-bridge",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "Which city is the Golden Gate Bridge associated with?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Seattle"
+      },
+      {
+        "id": "b",
+        "label": "San Francisco"
+      },
+      {
+        "id": "c",
+        "label": "Los Angeles"
+      },
+      {
+        "id": "d",
+        "label": "San Diego"
+      }
+    ],
+    "correct": "b",
+    "explanation": "The Golden Gate Bridge crosses the strait at the entrance to San Francisco Bay.",
+    "source": "https://en.wikipedia.org/wiki/Golden_Gate_Bridge",
+    "sourceVerified": true,
+    "reviewStatus": "reviewed",
+    "lastReviewed": "2026-11-07",
+    "referenceYear": 2025,
+    "asset": null
+  },
+  {
+    "stableId": "atlas-en-020-alhambra",
+    "expectedVersion": 0,
+    "type": "mc",
+    "prompt": "In which Spanish city is the Alhambra located?",
+    "category": "geography",
+    "subcategory": "landmarks",
+    "difficulty": "medium",
+    "countryCode": null,
+    "options": [
+      {
+        "id": "a",
+        "label": "Seville"
+      },
+      {
+        "id": "b",
+        "label": "Córdoba"
+      },
+      {
+        "id": "c",
+        "label": "Granada"
+      },
+      {
+        "id": "d",
+        "label": "Toledo"
+      }
+    ],
+    "correct": "c",
+    "explanation": "The Alhambra is a palace and fortress complex in Granada, Spain.",
+    "source": "https://en.wikipedia.org/wiki/Alhambra",
     "sourceVerified": true,
     "reviewStatus": "reviewed",
     "lastReviewed": "2026-11-07",
