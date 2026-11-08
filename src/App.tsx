@@ -34,7 +34,9 @@ function applyTheme(theme:string){
 function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [userMenu, setUserMenu] = useState(false);
+  const [playerWindow, setPlayerWindow] = useState(false);
+  const [playerSection, setPlayerSection] = useState<"statistics"|"profile"|"appearance">("statistics");
+  const [confirmAccountAction, setConfirmAccountAction] = useState(false);
   const [menuMessage,setMenuMessage]=useState("");
   const [identity, setIdentity] = useState<{username:string; avatar:number; isAnonymous:boolean; isAdmin:boolean; userId:string} | null>(null);
   const menuButtonRef=useRef<HTMLButtonElement>(null);
@@ -44,9 +46,12 @@ function Layout() {
     }});
     return () => { live=false; };
   }, [location.pathname]);
-  useEffect(() => { if(!userMenu) return; const close=(e:KeyboardEvent)=>{if(e.key==="Escape"){setUserMenu(false);menuButtonRef.current?.focus()}};
-    window.addEventListener("keydown",close); return ()=>window.removeEventListener("keydown",close);
-  },[userMenu]);
+  async function confirmAccountChange(){
+    if(!identity)return;
+    if(identity.isAnonymous){setPlayerWindow(false);navigate("/auth?mode=link");return;}
+    try { await api.signOut(); localStorage.removeItem("atlas-view-cache"); setIdentity(null); setPlayerWindow(false); setConfirmAccountAction(false); navigate("/",{replace:true}); }
+    catch(e){setMenuMessage((e as Error).message||"Sign out failed. Your session is still active.");setConfirmAccountAction(false);}
+  }
   useEffect(() => {
     const title = document.querySelector("main h1") as HTMLElement | null;
     title?.focus({ preventScroll: true });
@@ -67,19 +72,12 @@ function Layout() {
           {identity.isAdmin && <NavLink className="admin-nav-link" to="/admin" aria-label="Admin-Bereich">Admin</NavLink>}
           <NavLink className="topbar-icon" to="/profile" aria-label="Statistiken" title="Statistiken"><ChartIcon/></NavLink>
           <NavLink className="topbar-icon" to="/settings" aria-label="Einstellungen" title="Einstellungen"><SettingsIcon/></NavLink>
-          <div className="user-menu-wrap"><button ref={menuButtonRef} className="user-menu-button" aria-label="Benutzermenü öffnen" aria-expanded={userMenu} aria-haspopup="menu" onClick={()=>setUserMenu(v=>!v)}><span aria-hidden="true">{avatars[identity.avatar] ?? avatars[0]}</span><span className="user-name">{identity.username}</span><span aria-hidden="true">⌄</span></button>
-          {userMenu && <div className="user-menu" role="menu">
-            {identity.isAnonymous&&<Link role="menuitem" to="/auth?mode=link" onClick={()=>setUserMenu(false)}>Konto erstellen und Spielstand sichern</Link>}
-            {menuMessage&&<p className="error" role="alert">{menuMessage}</p>}
-            {!identity.isAnonymous&&<button role="menuitem" onClick={async()=>{
-              try {
-                await api.signOut(); localStorage.removeItem("atlas-view-cache"); setIdentity(null); navigate("/",{replace:true});
-              } catch(e) { setMenuMessage((e as Error).message||"Abmelden fehlgeschlagen. Deine Sitzung bleibt aktiv."); }
-            }}>Abmelden</button>}
-          </div>}</div></>}
+          <div className="player-controls"><button ref={menuButtonRef} className="user-menu-button" aria-label={`Open player panel for ${identity.username}`} aria-expanded={playerWindow} aria-haspopup="dialog" onClick={()=>{setConfirmAccountAction(false);setMenuMessage("");setPlayerWindow(true)}}><span className="player-avatar" aria-hidden="true">{avatars[identity.avatar] ?? avatars[0]}</span><span className="user-name">{identity.username}</span><span aria-hidden="true">⌄</span></button>
+            {!isDemo&&<button className="account-action-icon" type="button" aria-label={identity.isAnonymous?"Sign in or link an account":"Sign out"} title={identity.isAnonymous?"Sign in or link an account":"Sign out"} onClick={()=>{setPlayerSection("profile");setMenuMessage("");setConfirmAccountAction(true);setPlayerWindow(true)}}>{identity.isAnonymous?<SignInIcon/>:<SignOutIcon/>}</button>}</div></>}
         </nav>
       </div>
     </header>
+    {identity&&playerWindow&&<PlayerWindow identity={identity} section={playerSection} setSection={setPlayerSection} confirming={confirmAccountAction} setConfirming={setConfirmAccountAction} message={menuMessage} onClose={()=>{setPlayerWindow(false);setConfirmAccountAction(false);menuButtonRef.current?.focus()}} onConfirm={confirmAccountChange}/>}
     {isDemo && <div className="demo-banner">
       LOCAL DEMO · Progress stays in this browser · Public, unverified sample questions
     </div>}
@@ -96,6 +94,31 @@ function Layout() {
 
 function ChartIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5m0 14h16M8 16v-5m4 5V7m4 9v-7m4 7V4"/></svg>}
 function SettingsIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1 1.2.9-1.4 2.4-1.4-.6a8 8 0 0 1-1.5.9l-.2 1.5h-2.8l-.2-1.5a8 8 0 0 1-1.5-.9l-1.4.6-1.4-2.4 1.2-.9a7 7 0 0 1 0-1.8l-1.2-.9 1.4-2.4 1.4.6a8 8 0 0 1 1.5-.9l.2-1.5h2.8l.2 1.5a8 8 0 0 1 1.5.9l1.4-.6 1.4 2.4-1.2.9a7 7 0 0 1 0 1.8Z" transform="translate(-1 -1)"/></svg>}
+function SignOutIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4m4-4H9"/></svg>}
+function SignInIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v14h-5M10 8l-4 4 4 4m-4-4h10"/></svg>}
+
+type PlayerIdentity = {username:string;avatar:number;isAnonymous:boolean;isAdmin:boolean;userId:string};
+function PlayerWindow({identity,section,setSection,confirming,setConfirming,message,onClose,onConfirm}:{identity:PlayerIdentity;section:"statistics"|"profile"|"appearance";setSection:(section:"statistics"|"profile"|"appearance")=>void;confirming:boolean;setConfirming:(value:boolean)=>void;message:string;onClose:()=>void;onConfirm:()=>void}){
+  const {data,error,reload}=useLoad(()=>api.dashboard());
+  const dialogRef=useRef<HTMLElement>(null);
+  const [collapsed,setCollapsed]=useState(false);
+  const [profileMessage,setProfileMessage]=useState("");
+  const [profileSaving,setProfileSaving]=useState(false);
+  async function savePlayerProfile(event:FormEvent<HTMLFormElement>){event.preventDefault();setProfileSaving(true);setProfileMessage("");const form=new FormData(event.currentTarget);try{await api.saveProfile({username:String(form.get("username")??""),avatar:Number(form.get("avatar")??0),favorites:form.getAll("favorites").map(String)});setProfileMessage("Profile saved.");reload()}catch(e){setProfileMessage(authMessage((e as Error).message))}finally{setProfileSaving(false)}}
+  useEffect(()=>{dialogRef.current?.querySelector<HTMLElement>(".player-window-close")?.focus();const old=document.body.style.overflow;document.body.style.overflow="hidden";const key=(e:KeyboardEvent)=>{if(e.key==="Escape")onClose();if(e.key==="Tab"){const nodes=dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],select,input');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};window.addEventListener("keydown",key);return()=>{window.removeEventListener("keydown",key);document.body.style.overflow=old}},[onClose]);
+  return <div className="player-window-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><section ref={dialogRef} className="player-window" role="dialog" aria-modal="true" aria-labelledby="player-window-title" tabIndex={-1}>
+    <header className="player-window-header"><div className="player-window-identity"><span className="player-window-avatar" aria-hidden="true">{avatars[identity.avatar]??avatars[0]}</span><div><p className="eyebrow">YOUR ATLAS</p><h2 id="player-window-title">{identity.username}</h2></div></div><button type="button" className="player-window-close" aria-label="Close player panel" onClick={onClose}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <div className={`player-window-layout ${collapsed?"sidebar-collapsed":""}`}><aside className="player-sidebar" aria-label="Player panel sections"><button className="player-sidebar-toggle" aria-label={collapsed?"Expand sidebar":"Collapse sidebar"} aria-expanded={!collapsed} onClick={()=>setCollapsed(v=>!v)}><span aria-hidden="true">{collapsed?"›":"‹"}</span>{!collapsed&&<span>Collapse</span>}</button>
+      {([["statistics","Statistics",<ChartIcon key="stats"/>],["profile","Profile settings",<span key="profile" className="sidebar-avatar" aria-hidden="true">{avatars[identity.avatar]??avatars[0]}</span>],["appearance","Appearance",<SettingsIcon key="appearance"/>]] as const).map(([id,label,icon])=><button key={id} className={`player-sidebar-item ${section===id?"is-active":""}`} aria-current={section===id?"page":undefined} title={collapsed?label:undefined} onClick={()=>setSection(id)}>{icon}<span>{!collapsed&&label}</span></button>)}
+    </aside><div className="player-window-content">
+      {confirming?<section className="player-confirm"><p className="eyebrow">ACCOUNT</p><h3>{identity.isAnonymous?"Continue to sign in?":"Sign out of Atlas Arena?"}</h3><p className="muted">{identity.isAnonymous?"You can link an account to keep your guest progress when you switch devices.":"You will return to the sign-in screen. Your saved progress will remain on your account."}</p>{message&&<p className="error" role="alert">{message}</p>}<div className="player-window-actions"><button className="secondary" onClick={()=>setConfirming(false)}>Cancel</button><button className="primary" onClick={onConfirm}>{identity.isAnonymous?"Continue to sign in":"Sign out"}</button></div></section>
+      :section==="statistics"?<><div className="player-section-heading"><p className="eyebrow">YOUR PROGRESS</p><h3>Statistics</h3></div>{error?<ErrorBox message={error} retry={reload}/>:!data?<Loading/>:<><div className="player-stat-grid"><div className="player-stat-card"><span>Completed</span><strong>{data.totals.games}</strong></div><div className="player-stat-card"><span>Accuracy</span><strong>{accuracy(data.totals.correct,data.totals.incorrect)}</strong></div><div className="player-stat-card"><span>Experience</span><strong>{data.profile.xp.toLocaleString()} XP</strong></div><div className="player-stat-card"><span>Level</span><strong>{level(data.profile.xp)}</strong></div></div><section className="player-best-scores"><h4>Personal bests</h4>{(["classic","timed","endless"] as Mode[]).map(mode=><p key={mode}><span>{names[mode]}</span><strong>{data.best[mode]??"—"}</strong></p>)}</section></>}</>
+      :section==="profile"?<><div className="player-section-heading"><p className="eyebrow">PLAYER DETAILS</p><h3>Profile settings</h3></div>{data?<form className="player-profile-form" onSubmit={savePlayerProfile} key={data.profile.username}><label>Username<input name="username" required minLength={2} maxLength={24} pattern="[A-Za-z0-9 _\\-]+" defaultValue={data.profile.username}/></label><label>Avatar<select name="avatar" defaultValue={data.profile.avatar}>{avatars.map((avatar,index)=><option key={index} value={index}>Avatar {index+1} {avatar}</option>)}</select></label><fieldset><legend>Favorite topics</legend><div className="player-favorite-grid">{categories.map(category=><label className="check" key={category}><input type="checkbox" name="favorites" value={category} defaultChecked={data.profile.favorites.includes(category)}/>{category}</label>)}</div></fieldset><button className="primary" disabled={profileSaving}>{profileSaving?"Saving…":"Save profile"}</button><p role="status" className="player-profile-message">{profileMessage}</p></form>:error?<ErrorBox message={error} retry={reload}/>:<Loading/>}{!isDemo&&identity.isAnonymous&&<Link className="secondary" to="/auth?mode=link" onClick={onClose}>Create an account to save progress</Link>}{data?.profile.admin&&<Link className="secondary" to="/admin" onClick={onClose}>Content administration</Link>}</>
+      :<><div className="player-section-heading"><p className="eyebrow">PERSONALIZE</p><h3>Appearance</h3></div><div className="player-appearance-card"><p className="muted">Choose how Atlas Arena looks on this device.</p><ThemeControl/></div><Link className="secondary" to="/settings" onClick={onClose}>More settings <span aria-hidden="true">→</span></Link></>}
+      {!confirming&&<div className="player-account-row">{!isDemo&&<button className="secondary player-account-button" onClick={()=>setConfirming(true)}>{identity.isAnonymous?<><SignInIcon/>Sign in or link account</>:<><SignOutIcon/>Sign out</>}</button>}{message&&<p className="error" role="alert">{message}</p>}</div>}
+    </div></div>
+  </section></div>
+}
 
 function Welcome() {
   const navigate = useNavigate();
@@ -252,7 +275,7 @@ function Home() {
       <section ref={leaderboardDialogRef} className="leaderboard-dialog" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title" aria-describedby="leaderboard-description" tabIndex={-1}>
         <header className="leaderboard-header">
           <div><p className="eyebrow">ATLAS ARENA · GLOBAL</p><h2 id="leaderboard-title" className="text-2xl font-black mt-1">Top 25 players</h2><p id="leaderboard-description" className="muted text-sm mt-1">Players ranked by earned XP.</p></div>
-          <button ref={leaderboardCloseRef} type="button" className="leaderboard-close secondary" aria-label="Close leaderboard" onClick={() => setLeaderboardOpen(false)}>×</button>
+          <button ref={leaderboardCloseRef} type="button" className="leaderboard-close secondary" aria-label="Close leaderboard" onClick={() => setLeaderboardOpen(false)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
         </header>
         {leaderboard.error && <ErrorBox message={leaderboard.error} retry={leaderboard.reload}/>}
         {!leaderboard.data && !leaderboard.error && <div className="leaderboard-loading" role="status" aria-live="polite"><span className="loading-indicator" aria-hidden="true"/>Loading leaderboard…</div>}
