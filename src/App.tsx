@@ -21,7 +21,7 @@ const descriptions: Record<Mode, string> = {
   classic: "Ten questions. Four options. One new personal best.",
   practice: "Take your time. Learn from every answer. No XP pressure.",
   timed: "One minute. How far can your knowledge take you?",
-  endless: "Three lives. Rising difficulty. Find your limit."
+  endless: "Three lives. Build a correct streak to unlock tougher tiers."
 };
 function applyTheme(theme:string){
   if(theme==="system")delete document.documentElement.dataset.theme;
@@ -46,6 +46,7 @@ function Layout() {
     }});
     return () => { live=false; };
   }, [location.pathname]);
+  function cancelAccountChange(){setConfirmAccountAction(false);setPlayerWindow(false);menuButtonRef.current?.focus()}
   async function confirmAccountChange(){
     if(!identity)return;
     if(identity.isAnonymous){setPlayerWindow(false);navigate("/auth?mode=link");return;}
@@ -68,16 +69,16 @@ function Layout() {
           <img className="brand-wordmark wordmark-dark" src="/icons/text_dark.png" alt="" />
         </Link>
         <nav aria-label="Primary" className="topbar-nav flex flex-wrap gap-1 items-center">
-          {identity && <><NavLink to="/home">Play</NavLink>
+          {identity && <><NavLink to="/home">Play</NavLink><NavLink to="/explorer">Explorer</NavLink>
           {identity.isAdmin && <NavLink className="admin-nav-link" to="/admin" aria-label="Admin-Bereich">Admin</NavLink>}
-          <NavLink className="topbar-icon" to="/profile" aria-label="Statistiken" title="Statistiken"><ChartIcon/></NavLink>
+          <NavLink className="topbar-icon" to="/profile" aria-label="Your Atlas — personal explorer and statistics" title="Your Atlas · Personal explorer"><ChartIcon/></NavLink>
           <NavLink className="topbar-icon" to="/settings" aria-label="Einstellungen" title="Einstellungen"><SettingsIcon/></NavLink>
           <div className="player-controls"><button ref={menuButtonRef} className="user-menu-button" aria-label={`Open player panel for ${identity.username}`} aria-expanded={playerWindow} aria-haspopup="dialog" onClick={()=>{setConfirmAccountAction(false);setMenuMessage("");setPlayerWindow(true)}}><span className="player-avatar" aria-hidden="true">{avatars[identity.avatar] ?? avatars[0]}</span><span className="user-name">{identity.username}</span></button>
             {!isDemo&&<button className="account-action-icon" type="button" aria-label={identity.isAnonymous?"Sign in or link an account":"Sign out"} title={identity.isAnonymous?"Sign in or link an account":"Sign out"} onClick={()=>{setPlayerSection("profile");setMenuMessage("");setConfirmAccountAction(true);setPlayerWindow(true)}}>{identity.isAnonymous?<SignInIcon/>:<SignOutIcon/>}</button>}</div></>}
         </nav>
       </div>
     </header>
-    {identity&&playerWindow&&<PlayerWindow identity={identity} section={playerSection} setSection={setPlayerSection} confirming={confirmAccountAction} setConfirming={setConfirmAccountAction} message={menuMessage} onClose={()=>{setPlayerWindow(false);setConfirmAccountAction(false);menuButtonRef.current?.focus()}} onConfirm={confirmAccountChange}/>}
+    {identity&&playerWindow&&<PlayerWindow identity={identity} section={playerSection} setSection={setPlayerSection} confirming={confirmAccountAction} setConfirming={setConfirmAccountAction} message={menuMessage} onClose={()=>{setPlayerWindow(false);setConfirmAccountAction(false);menuButtonRef.current?.focus()}} onCancelConfirm={cancelAccountChange} onConfirm={confirmAccountChange}/>}
     {isDemo && <div className="demo-banner">
       LOCAL DEMO · Progress stays in this browser · Public, unverified sample questions
     </div>}
@@ -98,14 +99,14 @@ function SignOutIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path 
 function SignInIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v14h-5M10 8l-4 4 4 4m-4-4h10"/></svg>}
 
 type PlayerIdentity = {username:string;avatar:number;isAnonymous:boolean;isAdmin:boolean;userId:string};
-function PlayerWindow({identity,section,setSection,confirming,setConfirming,message,onClose,onConfirm}:{identity:PlayerIdentity;section:"statistics"|"profile"|"appearance";setSection:(section:"statistics"|"profile"|"appearance")=>void;confirming:boolean;setConfirming:(value:boolean)=>void;message:string;onClose:()=>void;onConfirm:()=>void}){
+function PlayerWindow({identity,section,setSection,confirming,setConfirming,message,onClose,onCancelConfirm,onConfirm}:{identity:PlayerIdentity;section:"statistics"|"profile"|"appearance";setSection:(section:"statistics"|"profile"|"appearance")=>void;confirming:boolean;setConfirming:(value:boolean)=>void;message:string;onClose:()=>void;onCancelConfirm:()=>void;onConfirm:()=>void}){
   const {data,error,reload}=useLoad(()=>api.dashboard());
   const dialogRef=useRef<HTMLElement>(null);
   const [collapsed,setCollapsed]=useState(false);
   const [profileMessage,setProfileMessage]=useState("");
   const [profileSaving,setProfileSaving]=useState(false);
   async function savePlayerProfile(event:FormEvent<HTMLFormElement>){event.preventDefault();setProfileSaving(true);setProfileMessage("");const form=new FormData(event.currentTarget);try{await api.saveProfile({username:String(form.get("username")??""),avatar:Number(form.get("avatar")??0),favorites:form.getAll("favorites").map(String)});setProfileMessage("Profile saved.");reload()}catch(e){setProfileMessage(authMessage((e as Error).message))}finally{setProfileSaving(false)}}
-  useEffect(()=>{(confirming?document.querySelector<HTMLElement>(".account-confirm-dialog"):dialogRef.current?.querySelector<HTMLElement>(".player-window-close"))?.focus();const old=document.body.style.overflow;document.body.style.overflow="hidden";const key=(e:KeyboardEvent)=>{if(e.key==="Escape"){if(confirming)setConfirming(false);else onClose();return}if(e.key==="Tab"){const scope=confirming?document.querySelector<HTMLElement>(".account-confirm-dialog"):dialogRef.current;const nodes=scope?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],select,input');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};window.addEventListener("keydown",key);return()=>{window.removeEventListener("keydown",key);document.body.style.overflow=old}},[onClose,confirming,setConfirming]);
+  useEffect(()=>{(confirming?document.querySelector<HTMLElement>(".account-confirm-dialog"):dialogRef.current?.querySelector<HTMLElement>(".player-window-close"))?.focus();const old=document.body.style.overflow;document.body.style.overflow="hidden";const key=(e:KeyboardEvent)=>{if(e.key==="Escape"){if(confirming)onCancelConfirm();else onClose();return}if(e.key==="Tab"){const scope=confirming?document.querySelector<HTMLElement>(".account-confirm-dialog"):dialogRef.current;const nodes=scope?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],select,input');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};window.addEventListener("keydown",key);return()=>{window.removeEventListener("keydown",key);document.body.style.overflow=old}},[onClose,onCancelConfirm,confirming]);
   return <div className="player-window-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!confirming)onClose()}}><section ref={dialogRef} className="player-window" role="dialog" aria-modal="true" aria-labelledby="player-window-title" tabIndex={-1}>
     <header className="player-window-header"><div className="player-window-identity"><span className="player-window-avatar" aria-hidden="true">{avatars[identity.avatar]??avatars[0]}</span><div><p className="eyebrow">YOUR ATLAS</p><h2 id="player-window-title">{identity.username}</h2></div></div><button type="button" className="player-window-close" aria-label="Close player panel" onClick={onClose}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
     <div className={`player-window-layout ${collapsed?"sidebar-collapsed":""}`}><aside className="player-sidebar" aria-label="Player panel sections"><button className="player-sidebar-toggle" aria-label={collapsed?"Expand sidebar":"Collapse sidebar"} aria-expanded={!collapsed} onClick={()=>setCollapsed(v=>!v)}><span aria-hidden="true">{collapsed?"›":"‹"}</span>{!collapsed&&<span>Collapse</span>}</button>
@@ -116,7 +117,7 @@ function PlayerWindow({identity,section,setSection,confirming,setConfirming,mess
       :<><div className="player-section-heading"><p className="eyebrow">PERSONALIZE</p><h3>Appearance</h3></div><div className="player-appearance-card"><p className="muted">Choose how Atlas Arena looks on this device.</p><ThemeControl/></div><Link className="secondary" to="/settings" onClick={onClose}>More settings <span aria-hidden="true">→</span></Link></>}
       <div className="player-account-row">{!isDemo&&<button className="secondary player-account-button" onClick={()=>setConfirming(true)}>{identity.isAnonymous?<><SignInIcon/>Sign in or link account</>:<><SignOutIcon/>Sign out</>}</button>}{message&&<p className="error" role="alert">{message}</p>}</div>
     </div></div>
-  </section>{confirming&&<div className="account-confirm-backdrop"><section className="account-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="account-confirm-title" aria-describedby="account-confirm-description"><span className="account-confirm-symbol" aria-hidden="true">{identity.isAnonymous?<SignInIcon/>:<SignOutIcon/>}</span><p className="eyebrow">ACCOUNT</p><h2 id="account-confirm-title">{identity.isAnonymous?"Continue to sign in?":"Sign out of Atlas Arena?"}</h2><p id="account-confirm-description" className="muted">{identity.isAnonymous?"You can link an account to keep your guest progress when you switch devices.":"You will return to the sign-in screen. Your saved progress will remain on your account."}</p>{message&&<p className="error" role="alert">{message}</p>}<div className="player-window-actions"><button className="secondary" onClick={()=>setConfirming(false)}>Cancel</button><button className="primary" onClick={onConfirm}>{identity.isAnonymous?"Continue to sign in":"Sign out"}</button></div></section></div>}</div>
+  </section>{confirming&&<div className="account-confirm-backdrop"><section className="account-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="account-confirm-title" aria-describedby="account-confirm-description"><span className="account-confirm-symbol" aria-hidden="true">{identity.isAnonymous?<SignInIcon/>:<SignOutIcon/>}</span><p className="eyebrow">ACCOUNT</p><h2 id="account-confirm-title">{identity.isAnonymous?"Continue to sign in?":"Sign out of Atlas Arena?"}</h2><p id="account-confirm-description" className="muted">{identity.isAnonymous?"You can link an account to keep your guest progress when you switch devices.":"You will return to the sign-in screen. Your saved progress will remain on your account."}</p>{message&&<p className="error" role="alert">{message}</p>}<div className="player-window-actions"><button className="secondary" onClick={onCancelConfirm}>Cancel</button><button className="primary" onClick={onConfirm}>{identity.isAnonymous?"Continue to sign in":"Sign out"}</button></div></section></div>}</div>
 }
 
 function Welcome() {
@@ -244,18 +245,14 @@ function Home() {
           </label>)}
         </div>
       </fieldset>
-      <div className="card mt-5 grid md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-        <label>Category
-          <select value={category} onChange={e => setCategory(e.target.value)}>
+      <div className="challenge-filters card mt-5 grid md:grid-cols-[1fr_1.4fr_auto] gap-5 items-end">
+        <label className="challenge-select-wrap"><span className="challenge-label">Question category</span>
+          <select className="challenge-select" value={category} onChange={e => setCategory(e.target.value)}>
             <option value="all">All available geography</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
-        <label>{mode === "endless" ? "Starting difficulty" : "Difficulty"}
-          <select value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)}>
-            {difficulties.map(d => <option key={d}>{d}</option>)}
-          </select>
-        </label>
+        <fieldset className="difficulty-picker"><legend className="challenge-label">{mode === "endless" ? "Starting difficulty" : "Difficulty"}</legend><div className="difficulty-options">{difficulties.map((d,i)=><label key={d} className={`difficulty-option ${d==="expert"?"is-expert":""} ${difficulty===d?"is-selected":""}`}><input className="sr-only" type="radio" name="difficulty" value={d} checked={difficulty===d} onChange={()=>setDifficulty(d)}/><span className="difficulty-mark" aria-hidden="true">{["◌","◉","◆","✦"][i]}</span><span>{d}</span></label>)}</div></fieldset>
         <button className="primary" disabled={pending || !!loadError}>
           {pending ? "Creating session…" : "Start adventure →"}
         </button>
@@ -358,7 +355,8 @@ function Game() {
     return () => clearInterval(timer);
   }, []);
 
-  const remaining = view?.deadline
+  // Timed runs pause at accepted answers while the player reads feedback.
+  const remaining = view?.deadline && view.status !== "showing_feedback"
     ? Math.max(0, Date.parse(view.deadline) - now - offset.current) : null;
 
   useEffect(() => {
@@ -401,6 +399,7 @@ function Game() {
     function keydown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (target.closest("input,textarea,select,[contenteditable=true]") || e.altKey || e.ctrlKey || e.metaKey) return;
+      if(view?.status==="showing_feedback"&&(e.key==="Enter"||e.code==="Space")&&!target.closest("a")) { e.preventDefault(); if(!pending)void action("next"); return; }
       if (e.repeat || view?.status !== "awaiting_answer" || remaining === 0) return;
       const index = Number(e.key) - 1;
       const option = view.current?.options[index];
@@ -421,7 +420,7 @@ function Game() {
   const remainingLives=Math.max(0,3-view.stats.incorrect);
   return <div className="game-shell">
     <div className="game-topline">
-      <div><p className="eyebrow">{names[view.mode]} · {view.current?.difficulty ?? view.difficulty}</p><p className="muted mt-1">Question {questionNumber} of {view.total}</p></div>
+      <div><p className="eyebrow">{names[view.mode]} · <span className={`game-difficulty-tag ${view.current?.difficulty==="expert"?"is-expert":""}`}>{view.current?.difficulty ?? view.difficulty}</span></p><p className="muted mt-1">Question {questionNumber} of {view.total}</p></div>
       <button className="secondary" disabled={pending} onClick={async () => {
         if (!confirm("Abandon this run? No XP will be awarded.")) return;
         try { await api.abandon(id); navigate("/home"); }
@@ -429,12 +428,8 @@ function Game() {
       }}>Leave run</button>
     </div>
     <div className="game-layout mt-5"><div className="game-main">
-    {view.current && <section className="card game-question map-grid">
-      <div className="question-meta"><span className="pill">{view.current.subcategory}</span>{view.mode==="endless"&&<span className="muted">{remainingLives} {remainingLives===1?"life":"lives"} left</span>}</div>
+    {view.current && <section className={`card game-question map-grid ${view.status==="showing_feedback"&&view.feedback?.correct?"has-correct-answer":""}`}>
       <h1 tabIndex={-1} className="game-prompt mt-6">{view.current.prompt}</h1>
-      <div className="question-progress mt-7" role="progressbar" aria-label="Question progress" aria-valuemin={0} aria-valuemax={view.total} aria-valuenow={view.answered}>
-        <div className="game-progress"><span style={{width:`${progressPercent}%`}}/></div><span className="muted text-sm">{view.answered} answered</span>
-      </div>
       <div className="answer-grid grid gap-3 sm:grid-cols-2 mt-7">
         {view.current.options.map((o, i) =>
           <button key={o.id} className="answer text-left"
@@ -446,19 +441,15 @@ function Game() {
       <p className="keyboard-hint muted text-sm mt-5"><span className="keycap">1</span>–<span className="keycap">4</span> to answer</p>
     </section>}
     <ErrorBox message={error} retry={refresh}/>
-    {view.feedback && <div className="mt-4">
-      <Feedback review={view.feedback}/>
-      <button autoFocus className="primary w-full mt-3" disabled={pending || remaining === 0}
-        onClick={() => void action("next")}>{pending ? "Loading…" : "Next question →"}</button>
-    </div>}
+    {view.feedback && <p className="game-keyboard-hint muted text-sm mt-3">Press <kbd>Enter</kbd> or <kbd>Space</kbd> for the next question</p>}
     {remaining === 0 && view.status !== "completed" &&
       <p className="game-notice mt-4" role="status">Time is up. Confirming the final result…</p>}
-    </div><aside className="game-sidebar" aria-label="Live run statistics">
-      <div className="game-stat"><p className="muted text-sm">Score</p><p className="game-stat-value mt-2">{view.stats.score}</p><p className="muted text-xs mt-1">points</p></div>
-      {remaining!==null?<div className="game-stat timer-stat"><p className="muted text-sm">Time left</p><p className="game-stat-value mt-2">{Math.ceil(remaining/1000)}<small>s</small></p><div className="timer-track mt-3" role="progressbar" aria-label="Time remaining" aria-valuemin={0} aria-valuemax={60} aria-valuenow={Math.ceil(remaining/1000)}><span style={{width:`${Math.max(0,remaining/60000*100)}%`}}/></div></div>
-        :<div className="game-stat"><p className="muted text-sm">Current streak</p><p className="game-stat-value mt-2">{view.stats.streak}</p><p className="muted text-xs mt-1">Best {view.stats.bestStreak}</p></div>}
-      <div className="game-stat"><p className="muted text-sm">{view.mode==="endless"?"Lives remaining":"Progress"}</p><p className="game-stat-value mt-2">{view.mode==="endless"?remainingLives:`${view.answered}/${view.total}`}</p><p className="muted text-xs mt-1">{view.mode==="endless"?"Three chances":"questions answered"}</p></div>
-      {remaining!==null&&<p className="game-caption muted">60-second run. The server confirms whether each answer arrived in time.</p>}
+    </div><aside className="game-sidebar" aria-label="Live run statistics and answer review">
+      <div className="game-live-stats"><div><span>Score</span><strong>{view.stats.score.toLocaleString()}</strong></div><div><span>Streak</span><strong>{view.stats.streak}</strong></div><div><span>{view.mode==="endless"?"Lives":"Progress"}</span><strong>{view.mode==="endless"?remainingLives:`${view.answered}/${view.total}`}</strong></div></div>
+      {view.total>1&&<div className="game-progress-card"><div className="game-progress-caption"><span>Run progress</span><strong>{progressPercent}%</strong></div><div className="game-progress" role="progressbar" aria-label="Question progress" aria-valuemin={0} aria-valuemax={view.total} aria-valuenow={view.answered}><span style={{width:`${progressPercent}%`}}/></div></div>}
+      {view.deadline&&(remaining!==null?<div className="game-stat timer-stat"><div className="timer-label-row"><span>Time left</span><strong>{Math.ceil(remaining/1000)}s</strong></div><div className="timer-track mt-2" role="progressbar" aria-label="Time remaining" aria-valuemin={0} aria-valuemax={60} aria-valuenow={Math.ceil(remaining/1000)}><span style={{width:`${Math.max(0,remaining/60000*100)}%`}}/></div></div>:<div className="game-stat timer-stat is-paused"><span>Challenge timer</span><strong>Paused while you review</strong></div>)}
+      {view.feedback&&<section className="game-review"><div className="game-review-heading"><span className={`game-result-mark ${view.feedback.correct?"is-correct":"is-incorrect"}`} aria-hidden="true">{view.feedback.correct?"✓":"×"}</span><div><p className="eyebrow">ANSWER REVIEW</p><h2>{view.feedback.correct?"Correct":"Not quite"}</h2></div><strong className="game-review-points">+{view.feedback.points} <small>pts</small></strong></div><p className="game-correct-answer"><span>Correct answer</span><strong>{view.feedback.correctAnswer}</strong></p>{!view.feedback.correct&&<p className="game-chosen-answer"><span>Your answer</span>{view.feedback.chosen}</p>}<p className="game-review-explanation">{view.feedback.explanation}</p><a className="game-review-source" href={view.feedback.source} target="_blank" rel="noopener noreferrer">Source reference <span aria-hidden="true">↗</span></a><button autoFocus className="primary game-next-button mt-3" disabled={pending} onClick={()=>void action("next")}>{pending?"Loading…":"Next question →"}</button></section>}
+      {!view.feedback&&<div className="game-stats-footnote"><span>Best streak</span><strong>{view.stats.bestStreak}</strong></div>}
     </aside></div>
   </div>;
 }
@@ -533,23 +524,17 @@ function ProfilePage() {
       <form className="card profile-form space-y-5" onSubmit={save} key={data.profile.username}>
         <label>Username<input name="username" required minLength={2} maxLength={24}
           pattern="[A-Za-z0-9 _\-]+" defaultValue={data.profile.username}/></label>
-        <label>Avatar<select name="avatar" defaultValue={data.profile.avatar}>
-          {avatars.map((a, i) => <option key={i} value={i}>Avatar {i + 1} {a}</option>)}
-        </select></label>
-        <fieldset>
-          <legend className="mb-3">Favorite categories</legend>
-          <div className="grid grid-cols-2 gap-2">
-            {categories.map(c => <label className="check" key={c}>
-              <input type="checkbox" name="favorites" value={c}
-                defaultChecked={data.profile.favorites.includes(c)}/>{c}
-            </label>)}
-          </div>
-        </fieldset>
+        <fieldset><legend className="mb-3">Choose an avatar</legend><div className="player-avatar-options" role="radiogroup" aria-label="Choose an avatar">
+          {avatars.map((a, i) => <label className="player-avatar-choice" key={i}><input type="radio" name="avatar" value={i} defaultChecked={data.profile.avatar===i}/><span aria-hidden="true">{a}</span><span className="sr-only">Avatar {i+1}</span></label>)}
+        </div></fieldset>
+        <fieldset><legend className="mb-3">Favorite topics</legend><div className="player-favorite-grid">
+          {categories.map(c => <label className="player-favorite-choice" key={c}><input type="checkbox" name="favorites" value={c} defaultChecked={data.profile.favorites.includes(c)}/><span>{c}</span></label>)}
+        </div></fieldset>
         <button className="primary" disabled={saving}>Save profile</button>
         <p role="status">{message}</p>
       </form>
       <section className="card profile-summary">
-        <p className="text-5xl" aria-label={`Avatar ${data.profile.avatar + 1}`}>{avatars[data.profile.avatar]}</p>
+        <div className="profile-avatar-display"><span aria-hidden="true">{avatars[data.profile.avatar]}</span><div><p className="eyebrow">PERSONAL EXPLORER</p><strong>{data.profile.username}</strong></div></div>
         <h2 className="text-2xl font-bold mt-4">Level {level(data.profile.xp)}</h2>
         <p className="muted">{data.profile.xp} XP · {500 - data.profile.xp % 500} XP to next level</p>
         <progress className="w-full my-5" max={500} value={data.profile.xp % 500} aria-label="Level progress"/>
@@ -559,6 +544,7 @@ function ProfilePage() {
           <p key={m} className="flex justify-between py-2 border-b border-line/15">
             <span>{names[m]}</span><strong>{data.best[m] ?? "—"}</strong>
           </p>)}
+        <h3 className="font-bold mt-6 mb-2">Favorite topics</h3><div className="profile-favorite-tags">{data.profile.favorites.length?data.profile.favorites.map(category=><span key={category}>{category}</span>):<span className="muted">No favorite topics selected</span>}</div>
         {!isDemo && <AccountActions/>}
         {data.profile.admin && <Link className="secondary mt-3" to="/admin">Content administration</Link>}
       </section>
