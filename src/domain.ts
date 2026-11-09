@@ -255,7 +255,9 @@ export type FlagsEntry = {
   flagDescription: string | null; correctChoiceId: string | null;
   choices?: FlagsChoice[] | null;
 };
-export type FlagsChoice = Pick<FlagsEntry, "id" | "flagSvgUrl" | "flagPngUrl" | "flagDescription">;
+export type FlagsChoice = Pick<FlagsEntry, "id" | "flagSvgUrl" | "flagPngUrl" | "flagDescription"> & {
+  choicePosition?: number;
+};
 export type FlagsRegion = {
   id: string; name: string; easyCount: number; allCount: number;
   easyMissingAssets: number; allMissingAssets: number; easyTierExcluded: number;

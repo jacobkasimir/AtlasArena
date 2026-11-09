@@ -1143,19 +1143,26 @@ html[data-theme="light"] .text-mint { color:#087f78; }
 .flags-question { min-width: 0; }
 .flags-target-name { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; margin: .25rem 0 1.2rem; }
 .flags-option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: .6rem; max-height: 68vh; overflow: auto; padding: .2rem; }
-.flags-option { min-height: 64px; border: 1px solid rgb(var(--c-line) / .23); border-radius: .65rem; background: rgb(var(--c-panel)); display: grid; place-items: center; position: relative; cursor: pointer; padding: .4rem; }
+.flags-option { min-height: 76px; border: 1px solid rgb(var(--c-line) / .23); border-radius: .65rem; background: rgb(var(--c-panel)); display: grid; place-items: center; position: relative; cursor: pointer; padding: .45rem; }
 .flags-option:hover:not(:disabled) { transform: translateY(-1px); border-color: rgb(var(--c-mint)); }
 .flags-option:disabled { cursor: default; opacity: .83; }
 .flags-option.wrong { border: 2px solid #df675d; background: rgb(223 103 93 / .16); }
-.flags-option.right { border: 2px solid #24a87c; background: rgb(36 168 124 / .24); }
-.flags-option.right.attempt-2 { border-color: #d98913; background: rgb(232 154 39 / .3); }
-.flags-option.right.attempt-3 { border-color: #c93838; background: rgb(215 60 60 / .3); }
-.flags-option.unresolved { border: 2px solid #651515; background: #7f1d1d; box-shadow: inset 0 0 0 2px rgb(255 255 255 / .12); }
+.flags-option.right { border: 2px solid #16834b; background: #86efac; box-shadow: inset 0 0 0 3px rgb(255 255 255 / .3); }
+.flags-option.right::after, .flags-option.unresolved::after { content: ""; position: absolute; inset: auto 0 0; height: 6px; border-radius: 0 0 .55rem .55rem; pointer-events: none; }
+.flags-option.right::after { background: #166534; }
+.flags-option.right.attempt-2 { border-color: #b45309; background: #fdba74; box-shadow: inset 0 0 0 3px rgb(255 255 255 / .3); }
+.flags-option.right.attempt-2::after { background: #9a3412; }
+.flags-option.right.attempt-3 { border-color: #b91c1c; background: #fca5a5; box-shadow: inset 0 0 0 3px rgb(255 255 255 / .3); }
+.flags-option.right.attempt-3::after { background: #7f1d1d; }
+.flags-option.unresolved { border: 2px solid #450a0a; background: #7f1d1d; box-shadow: inset 0 0 0 2px rgb(255 255 255 / .12); }
+.flags-option.unresolved::after { background: #fecaca; }
+.flags-option.right .flags-image.small, .flags-option.unresolved .flags-image.small { width: min(100%, 84px); height: 44px; }
+.flags-option.right .flags-image.small img, .flags-option.unresolved .flags-image.small img { width: 100%; height: 100%; object-fit: contain; }
 .flags-option.unresolved .flags-image img { filter: saturate(.72); }
 .flags-option:disabled.right, .flags-option:disabled.unresolved { opacity: 1; }
 .flags-image { position: relative; display: inline-grid; place-items: center; width: 100%; height: 100%; min-height: 42px; overflow: hidden; border-radius: .28rem; }
 .flags-image img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.flags-image.small { width: min(100%, 112px); height: 52px; }
+.flags-image.small { width: min(100%, 112px); aspect-ratio: 2 / 1; height: auto; min-height: 42px; }
 .flags-image.small img { width: 100%; height: 100%; object-fit: contain; }
 .flags-image.small > span.flags-image-fallback { font-size: .65rem; text-align: center; }
 .flags-image.large { width: min(100%, 580px); height: clamp(170px, 32vw, 340px); margin: 0 auto 1rem; background: rgb(var(--c-panel)); border: 1px solid rgb(var(--c-line) / .16); }
@@ -1239,7 +1246,7 @@ html[data-theme="light"] .text-mint { color:#087f78; }
   .flags-game-actions .secondary { padding: .45rem .6rem; font-size: .82rem; }
   .flags-game-actions .flags-abandon { font-size: .8rem; }
   .flags-option-grid { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: .4rem; max-height: none; }
-  .flags-option { min-height: 56px; padding: .25rem; }
+  .flags-option { min-height: 68px; padding: .35rem; }
   .flags-image.small { height: 44px; }
   .flags-image.large { height: clamp(150px, 48vw, 240px); }
 }

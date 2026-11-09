@@ -7,7 +7,7 @@ async function walk(dir) {
     e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]
   ))).flat();
 }
-const files = (await walk("dist")).filter(f => !f.endsWith("/sw.js"));
+const files = (await walk("dist")).filter(f => !f.endsWith("/sw.js") && !f.startsWith("dist/flags/"));
 const urls = files.map(f => "/" + f.slice(5));
 const hash = createHash("sha256");
 for (const f of files.sort()) hash.update(await readFile(f));
