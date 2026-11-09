@@ -215,5 +215,16 @@ describe.skipIf(!configured)("isolated Supabase integration project", () => {
     expect(skipped.error).toBeNull();
     expect(skipped.data.skipped).toBe(1);
     expect(skipped.data.score).toBe(0);
+    const pauseId = crypto.randomUUID();
+    const paused = await a.rpc("arena_flags_pause", { p_session_id: textId, p_request_id: pauseId });
+    expect(paused.error).toBeNull();
+    expect(paused.data.state).toBe("paused");
+    expect(paused.data.paused).toBe(true);
+    const resumed = await a.rpc("arena_flags_resume", { p_session_id: textId, p_request_id: crypto.randomUUID() });
+    expect(resumed.error).toBeNull();
+    expect(resumed.data.state).toBe("active");
+    const deleted = await a.rpc("arena_flags_delete", { p_session_id: textId, p_request_id: crypto.randomUUID() });
+    expect(deleted.data.deleted).toBe(true);
+    expect((await a.rpc("arena_flags_view", { p_session_id: textId })).error).not.toBeNull();
   }, 30000);
 });

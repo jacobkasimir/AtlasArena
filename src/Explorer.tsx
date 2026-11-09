@@ -63,8 +63,9 @@ function CountryFlag({ country, eager = false, priority = false }: { country: Ex
   );
 }
 
-function CountryCard({ country, eagerFlag = false, priorityFlag = false }: {
+function CountryCard({ country, countriesByAlpha3, eagerFlag = false, priorityFlag = false }: {
   country: ExplorerCountry;
+  countriesByAlpha3: Map<string, ExplorerCountry>;
   eagerFlag?: boolean;
   priorityFlag?: boolean;
 }) {
@@ -78,7 +79,7 @@ function CountryCard({ country, eagerFlag = false, priorityFlag = false }: {
   const translations = Object.entries(country.translations ?? {}).filter(([, name]) => name.trim());
   const hasMembershipData = Boolean(country.memberships?.length);
   const memberships = (country.memberships ?? []).filter(item => item.member);
-  const neighbors = country.neighbors ?? [];
+  const borders = country.borders;
 
   return (
     <details className="card country-card explorer-country-details">
@@ -88,7 +89,7 @@ function CountryCard({ country, eagerFlag = false, priorityFlag = false }: {
           <span className="min-w-0">
             <span className="eyebrow">{displayText(country.region)}</span>
             <span role="heading" aria-level={2} className="text-lg font-bold mt-1 explorer-country-name">{country.name}</span>
-            {country.catalogKind === "iso_alpha2" && <span className="muted text-xs mt-1 explorer-code-line">ISO alpha-2 · {country.code}</span>}
+            {country.catalogKind === "iso_alpha2" && <span className="muted text-xs mt-1 explorer-code-line">{country.code}</span>}
             {nonIsoEntry && <span className="muted text-xs mt-1 explorer-code-line">Non-ISO catalog entry</span>}
           </span>
         </span>
@@ -116,10 +117,12 @@ function CountryCard({ country, eagerFlag = false, priorityFlag = false }: {
               <div><dt>Calling codes</dt><dd>{country.callingCodes?.length ? country.callingCodes.join(", ") : "Not available"}</dd></div>
               <div><dt>Internet domains</dt><dd>{country.topLevelDomains?.length ? country.topLevelDomains.join(", ") : "Not available"}</dd></div>
               <div className="explorer-neighbor-field">
-                <dt>Neighboring catalog entries</dt>
-                <dd>{neighbors.length ? <ul className="explorer-neighbors">{neighbors.map(neighbor => {
-                  return <li key={neighbor.alpha3}>{neighbor.name && neighbor.code ? <Link to={`/explorer?q=${encodeURIComponent(neighbor.code)}`} aria-label={`Find ${neighbor.name} in the catalog`}>{neighbor.name}</Link> : <span>{neighbor.alpha3} · not in this catalog</span>}</li>;
-                })}</ul> : "Not available"}</dd>
+                <dt>Neighboring countries</dt>
+                <dd>{borders == null ? "Border data not available" : borders.length === 0 ? "No land borders" : <ul className="explorer-neighbors">{borders.map((rawCode, index) => {
+                  const code = rawCode.trim().toUpperCase();
+                  const neighbor = countriesByAlpha3.get(code);
+                  return <li key={`${code}-${index}`}>{neighbor ? <Link to={`/explorer?q=${encodeURIComponent(neighbor.code)}`} aria-label={`Find ${neighbor.name} in the catalog (${code})`}>{neighbor.name}</Link> : <span>{rawCode} · Not in this catalog</span>}</li>;
+                })}</ul>}</dd>
               </div>
             </dl>
           </section>
@@ -154,25 +157,43 @@ function CountryCard({ country, eagerFlag = false, priorityFlag = false }: {
 export default function Explorer() {
   const { data, error, reload } = useLoad<ExplorerCountry[]>(() => api.explore() as Promise<ExplorerCountry[]>);
   const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const queryParam = searchParams.get("q") ?? "";
+  const [search, setSearch] = useState(queryParam);
   const [region, setRegion] = useState("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("name");
   const [page, setPage] = useState(1);
   const collectionRef = useRef<HTMLDivElement>(null);
+  const lastQueryParam = useRef(queryParam);
 
   useEffect(() => {
-    const query = searchParams.get("q") ?? "";
-    setSearch(query);
+    if (queryParam === lastQueryParam.current) return;
+    lastQueryParam.current = queryParam;
+    setSearch(queryParam);
     setRegion("all");
     setPage(1);
-  }, [searchParams]);
+  }, [queryParam]);
+
+  const countriesByAlpha3 = useMemo(() => {
+    const entries = new Map<string, ExplorerCountry>();
+    for (const country of data ?? []) {
+      const code = country.codeAlpha3?.trim().toUpperCase();
+      if (code) entries.set(code, country);
+    }
+    return entries;
+  }, [data]);
 
   const regions = useMemo(() => [...new Set((data ?? []).map(country => country.region).filter(Boolean))].sort(collator.compare), [data]);
   const filtered = useMemo(() => {
     const query = normalize(search);
-    return (data ?? []).filter(country => {
+    const countries = data ?? [];
+    const exactCodeMatches = query ? countries.filter(country =>
+      normalize(country.code) === query || normalize(country.codeAlpha3 ?? "") === query
+    ) : [];
+    const searchPool = exactCodeMatches.length ? exactCodeMatches : countries;
+    return searchPool.filter(country => {
       const searchable = normalize([
         country.name, country.officialName, country.capital, country.code,
+        country.codeAlpha3 ?? "",
         ...(country.languages ?? []), ...Object.values(country.translations ?? {}),
         ...(country.currencies ?? []).flatMap(currency => [currency.name, currency.code ?? ""]),
       ].filter(Boolean).join(" "));
@@ -235,7 +256,7 @@ export default function Explorer() {
     {!filtered.length && <div className="empty-state"><span className="empty-icon" aria-hidden="true">⌕</span><h2 className="text-lg font-bold mt-3">{data.length ? "No places match those filters" : "The catalog is empty"}</h2><p className="muted mt-2">{data.length ? "Try another name or choose a different region." : "No catalog entries were returned by the backend."}</p>{hasFilters && <button type="button" className="secondary mt-4" onClick={clearFilters}>Show all places</button>}</div>}
 
     <div className="country-grid explorer-country-grid">
-      {visible.map((country, index) => <CountryCard key={country.code} country={country} eagerFlag={index === 0} priorityFlag={index === 0} />)}
+      {visible.map((country, index) => <CountryCard key={country.code} country={country} countriesByAlpha3={countriesByAlpha3} eagerFlag={index === 0} priorityFlag={index === 0} />)}
     </div>
 
     {pageCount > 1 && <nav className="explorer-pagination mt-8" aria-label="Country catalog pages">

@@ -93,6 +93,12 @@ export const api = {
     ? flagsDemo.skip(id, entryId, requestId) : rpc<FlagsSession>("arena_flags_skip", { p_session_id: id, p_entry_id: entryId, p_request_id: requestId }),
   flagsNext: (id: string, requestId: string) => isDemo
     ? flagsDemo.next(id, requestId) : rpc<FlagsSession>("arena_flags_next", { p_session_id: id, p_request_id: requestId }),
+  flagsPause: (id: string, requestId: string) => isDemo
+    ? flagsDemo.pause(id, requestId) : rpc<FlagsSession>("arena_flags_pause", { p_session_id: id, p_request_id: requestId }),
+  flagsResume: (id: string, requestId: string) => isDemo
+    ? flagsDemo.resume(id, requestId) : rpc<FlagsSession>("arena_flags_resume", { p_session_id: id, p_request_id: requestId }),
+  flagsDelete: (id: string, requestId: string) => isDemo
+    ? flagsDemo.delete(id, requestId) : rpc<{deleted:boolean}>("arena_flags_delete", { p_session_id: id, p_request_id: requestId }),
   flagsAbandon: (id: string, requestId: string) => isDemo
     ? flagsDemo.abandon(id, requestId) : rpc<FlagsSession>("arena_flags_abandon", { p_session_id: id, p_request_id: requestId }),
   flagsResults: (id: string) => isDemo ? flagsDemo.results(id) : rpc<FlagsSession>("arena_flags_results", { p_session_id: id }),

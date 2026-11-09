@@ -222,6 +222,8 @@ export type ExplorerCountry = {
   flagSvgUrl?: string | null;
   flagPngUrl?: string | null;
   population?: number | null;
+  codeAlpha3?: string | null;
+  borders?: string[] | null;
   areaKm2?: number | null;
   languages?: string[];
   translations?: Record<string, string>;
@@ -250,10 +252,10 @@ export type FlagsEntry = {
   id: string; position: number; choicePosition?: number; name: string | null; region: string | null;
   outcome: FlagsOutcome; attempts: number; wrongChoiceIds: string[]; hintUsed: boolean;
   points: number; flagSvgUrl: string | null; flagPngUrl: string | null;
-  flagEmoji: string | null; flagDescription: string | null; correctChoiceId: string | null;
+  flagDescription: string | null; correctChoiceId: string | null;
   choices?: FlagsChoice[] | null;
 };
-export type FlagsChoice = Pick<FlagsEntry, "id" | "flagSvgUrl" | "flagPngUrl" | "flagEmoji" | "flagDescription">;
+export type FlagsChoice = Pick<FlagsEntry, "id" | "flagSvgUrl" | "flagPngUrl" | "flagDescription">;
 export type FlagsRegion = {
   id: string; name: string; easyCount: number; allCount: number;
   easyMissingAssets: number; allMissingAssets: number; easyTierExcluded: number;
@@ -262,12 +264,13 @@ export type FlagsRegion = {
 export type FlagsSetup = {
   regions: FlagsRegion[];
   summary: Omit<FlagsRegion, "id" | "name">;
-  activeSessions: { id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier; total: number; answered: number; score: number; createdAt: string }[];
+  activeSessions: { id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier; total: number; answered: number; score: number; createdAt: string; paused: boolean }[];
   rulesVersion: number; competitiveXp: false;
 };
 export type FlagsSession = {
   id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier;
-  poolSignature: string; rulesVersion: number; state: "active" | "completed" | "abandoned";
+  poolSignature: string; rulesVersion: number; state: "active" | "paused" | "completed" | "abandoned"; paused: boolean;
+  pausedAt?: string | null; pausedTotalMs?: number;
   createdAt: string; completedAt: string | null; elapsedMs: number | null; serverNow: string;
   total: number; maxScore: number; currentPosition?: number; answered: number; score: number; correct: number; incorrect: number;
   skipped: number; hintsUsed: number; current: FlagsEntry | null; entries: FlagsEntry[];

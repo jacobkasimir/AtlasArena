@@ -15,6 +15,14 @@ describe("Flags local learning flow",()=>{
     expect(europe.entries.every(e=>e.region==="Europe")).toBe(true);
   });
 
+  it("creates separate randomized question and answer orders for new sessions",async()=>{
+    const first=await flagsDemo.start("country_to_flag",null,"all",uuid());
+    const second=await flagsDemo.start("country_to_flag",null,"all",uuid());
+    const order=(session:{entries:{id:string;position:number;choicePosition?:number}[]},field:"position"|"choicePosition")=>session.entries.slice().sort((a,b)=>(a[field]??0)-(b[field]??0)).map(entry=>entry.id).join(",");
+    expect(order(first,"position")).not.toBe(order(second,"position"));
+    expect(order(first,"position")).not.toBe(order(first,"choicePosition"));
+  });
+
   it.each([[0,100],[1,60],[2,30]])("awards the correct %i attempt value",async(wrongs,points)=>{
     const s=await flagsDemo.start("country_to_flag",null,"easy",uuid());
     const e=s.current!;const distractors=e.choices!.filter(c=>c.id!==e.id);
@@ -89,5 +97,24 @@ describe("Flags local learning flow",()=>{
     expect(tie.topFive).toHaveLength(2);
     const differentDirection=await finish("country_to_flag");
     expect(differentDirection.finalBadge).toBe("first_run");
+  });
+
+  it("stops elapsed time while a round is paused and deletes only the selected saved run",async()=>{
+    vi.useFakeTimers();vi.setSystemTime(new Date("2026-11-09T12:00:00.000Z"));
+    const s=await flagsDemo.start("country_to_flag",null,"easy",uuid());
+    vi.setSystemTime(new Date(Date.now()+1500));
+    const paused=await flagsDemo.pause(s.id,uuid());
+    expect(paused.state).toBe("paused");expect(paused.paused).toBe(true);expect(paused.elapsedMs).toBe(1500);
+    vi.setSystemTime(new Date(Date.now()+5000));
+    const unchanged=await flagsDemo.view(s.id);
+    expect(unchanged.elapsedMs).toBe(1500);
+    const resumed=await flagsDemo.resume(s.id,uuid());
+    expect(resumed.state).toBe("active");expect(resumed.paused).toBe(false);
+    vi.setSystemTime(new Date(Date.now()+500));
+    const continued=await flagsDemo.view(s.id);
+    expect(continued.elapsedMs).toBe(2000);
+    await flagsDemo.pause(s.id,uuid());
+    expect((await flagsDemo.delete(s.id,uuid())).deleted).toBe(true);
+    expect((await flagsDemo.setup()).activeSessions).toHaveLength(0);
   });
 });

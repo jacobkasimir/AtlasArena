@@ -98,7 +98,17 @@ test("Flags keeps its option grid and feedback stable across a reload", async ({
   await startGuest(page);
   await page.getByRole("link", { name: "Flags", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Flags", exact: true })).toBeVisible();
-  await expect(page.getByText("12 eligible flags", { exact: true })).toBeVisible();
+  await expect(page.locator(".flags-pool-summary strong")).toHaveText("12 eligible flags");
+  const regionMenu=page.getByRole("button",{name:"Region All regions"});
+  await regionMenu.focus();await page.keyboard.press("Enter");await page.keyboard.press("ArrowDown");await page.keyboard.press("ArrowDown");await page.keyboard.press("Enter");
+  await expect(page.locator(".flags-pool-summary strong")).toHaveText("2 eligible flags");
+  await page.getByRole("button",{name:"Region Asia"}).click();
+  await page.getByRole("option",{name:/All regions/}).click();
+  await page.getByRole("button",{name:/Difficulty Easy flags/}).click();
+  await page.getByRole("option",{name:/All flags/}).click();
+  await expect(page.getByRole("button",{name:/Difficulty All flags/})).toBeVisible();
+  await page.getByRole("button",{name:/Difficulty All flags/}).click();
+  await page.getByRole("option",{name:/Easy flags/}).click();
   await page.getByRole("button", { name: "Start full round" }).click();
   await expect(page.getByText("FIND THIS COUNTRY’S FLAG")).toBeVisible();
   const target = await page.evaluate(() => {
@@ -127,6 +137,25 @@ test("Flags keeps its option grid and feedback stable across a reload", async ({
   }
   await page.setViewportSize({ width: 320, height: 780 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("Save and leave pauses the clock and saved rounds can be deleted", async ({ page }) => {
+  await startGuest(page);
+  await page.getByRole("link", { name: "Flags", exact: true }).click();
+  await page.getByRole("button", { name: "Start full round" }).click();
+  await expect(page.getByRole("button",{name:"Save and leave"})).toBeVisible();
+  await page.waitForTimeout(1100);
+  await page.getByRole("button",{name:"Save and leave"}).click();
+  await expect(page.getByRole("heading",{name:"Resume a saved round"})).toBeVisible();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem("atlas-flags-demo-v1")||"{}").sessions.at(-1));
+  expect(saved.state).toBe("paused");
+  const elapsed=saved.elapsedMs;
+  await page.waitForTimeout(1000);
+  const stillPaused=await page.evaluate(()=>JSON.parse(localStorage.getItem("atlas-flags-demo-v1")||"{}").sessions.at(-1));
+  expect(stillPaused.elapsedMs).toBe(elapsed);
+  await page.getByRole("button",{name:"Delete",exact:true}).click();
+  await page.getByRole("button",{name:"Delete round",exact:true}).click();
+  await expect(page.getByText("Your saved rounds will appear here.")).toBeVisible();
 });
 
 test("Flag to Country supports hints, skip, and result review without XP", async ({ page }) => {
