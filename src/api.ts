@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
+import { FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
+import { flagsDemo } from "./flags-demo";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -75,6 +77,25 @@ export const api = {
   },
   explore: () =>
     isDemo ? demo.explore() : rpc<ExplorerCountry[]>("arena_explore"),
+  flagsSetup: () => isDemo ? flagsDemo.setup() : rpc<FlagsSetup>("arena_flags_setup"),
+  flagsStart: (direction: FlagsDirection, region: string | null, poolTier: FlagsPoolTier, requestId: string) =>
+    isDemo ? flagsDemo.start(direction, region, poolTier, requestId) : rpc<FlagsSession>("arena_flags_start", {
+      p_direction: direction, p_region: region, p_pool_tier: poolTier, p_request_id: requestId
+    }),
+  flagsView: (id: string) => isDemo ? flagsDemo.view(id) : rpc<FlagsSession>("arena_flags_view", { p_session_id: id }),
+  flagsAnswer: (id: string, entryId: string, choiceId: string | null, answer: string | null, requestId: string) =>
+    isDemo ? flagsDemo.answer(id, entryId, choiceId, answer, requestId) : rpc<FlagsSession>("arena_flags_answer", {
+      p_session_id: id, p_entry_id: entryId, p_choice_id: choiceId, p_answer: answer, p_request_id: requestId
+    }),
+  flagsHint: (id: string, entryId: string, requestId: string) => isDemo
+    ? flagsDemo.hint(id, entryId, requestId) : rpc<FlagsSession>("arena_flags_hint", { p_session_id: id, p_entry_id: entryId, p_request_id: requestId }),
+  flagsSkip: (id: string, entryId: string, requestId: string) => isDemo
+    ? flagsDemo.skip(id, entryId, requestId) : rpc<FlagsSession>("arena_flags_skip", { p_session_id: id, p_entry_id: entryId, p_request_id: requestId }),
+  flagsNext: (id: string, requestId: string) => isDemo
+    ? flagsDemo.next(id, requestId) : rpc<FlagsSession>("arena_flags_next", { p_session_id: id, p_request_id: requestId }),
+  flagsAbandon: (id: string, requestId: string) => isDemo
+    ? flagsDemo.abandon(id, requestId) : rpc<FlagsSession>("arena_flags_abandon", { p_session_id: id, p_request_id: requestId }),
+  flagsResults: (id: string) => isDemo ? flagsDemo.results(id) : rpc<FlagsSession>("arena_flags_results", { p_session_id: id }),
   exportData: () =>
     isDemo ? demo.exportData() : rpc<unknown>("arena_export"),
   deleteAccount: async () => {

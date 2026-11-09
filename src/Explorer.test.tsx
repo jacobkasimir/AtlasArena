@@ -34,9 +34,16 @@ it("shows compact cards, grouped catalog details and navigable neighbors", async
 
   expect(await screen.findByText("Showing 1–2 of 2 places")).toBeInTheDocument();
   expect(screen.getByText("Ottawa")).toBeInTheDocument();
-  expect(screen.queryByText(/ISO alpha-2/)).not.toBeInTheDocument();
+  expect(screen.getByText("ISO alpha-2 · CA")).toBeInTheDocument();
+  const summary = document.querySelector("details summary")!;
+  const countryBlock = document.querySelector("details.country-card")!;
+  expect(screen.queryByText(/^Details for/)).not.toBeInTheDocument();
+  fireEvent.click(summary);
+  expect(countryBlock).toHaveAttribute("open");
+  fireEvent.click(summary);
+  expect(countryBlock).not.toHaveAttribute("open");
+  fireEvent.click(summary);
   expect(screen.getByText("Practice this place")).toBeInTheDocument();
-  fireEvent.click(document.querySelector("details summary")!);
 
   expect(screen.getAllByText("People and place")).toHaveLength(2);
   expect(screen.getByText("9,984,670 km²")).toBeInTheDocument();
@@ -45,6 +52,9 @@ it("shows compact cards, grouped catalog details and navigable neighbors", async
   expect(screen.queryByRole("link", { name: /Imported data source/ })).not.toBeInTheDocument();
   expect(screen.getAllByText(/not been independently verified/)).toHaveLength(2);
   expect(screen.getByText(/Practice needs 4 published questions/)).toBeInTheDocument();
+  const sortRegion = screen.getByRole("button", { name: "Sort by region, then name" });
+  fireEvent.click(sortRegion);
+  expect(sortRegion).toHaveAttribute("aria-pressed", "true");
 });
 
 it("keeps every catalog entry searchable and gives only the first visible flag high priority", async () => {

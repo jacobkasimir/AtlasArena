@@ -79,7 +79,7 @@ test("Explorer filters, opens details, and stays usable in both themes on a phon
   await page.keyboard.press("Escape");
   await region.selectOption({ index: 1 });
   await expect(page.getByRole("status")).toContainText("of");
-  await page.getByRole("combobox", { name: "Sort by" }).selectOption("region");
+  await page.getByRole("button", { name: "Sort by region, then name" }).click();
   await page.locator("details summary").first().click();
   await expect(page.locator("details[open]").first()).toBeVisible();
 
@@ -92,4 +92,62 @@ test("Explorer filters, opens details, and stays usable in both themes on a phon
   await page.setViewportSize({ width: 320, height: 780 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/atlas-explorer-mobile-${test.info().project.name}.png` });
+});
+
+test("Flags keeps its option grid and feedback stable across a reload", async ({ page }) => {
+  await startGuest(page);
+  await page.getByRole("link", { name: "Flags", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Flags", exact: true })).toBeVisible();
+  await expect(page.getByText("12 eligible flags", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Start full round" }).click();
+  await expect(page.getByText("FIND THIS COUNTRY’S FLAG")).toBeVisible();
+  const target = await page.evaluate(() => {
+    const store = JSON.parse(localStorage.getItem("atlas-flags-demo-v1") || "{}");
+    const session = store.sessions.at(-1);
+    const target = session.current.id;
+    const options = [...session.entries].sort((a, b) => a.choicePosition - b.choicePosition);
+    return { target, wrongPosition: options.findIndex(entry => entry.id !== target) + 1,
+      rightPosition: options.findIndex(entry => entry.id === target) + 1 };
+  });
+  await page.getByRole("button", { name: "Flag option 1", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("button", { name: "Flag option 2", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: `Flag option ${target.wrongPosition}`, exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("2 attempts remaining");
+  await expect(page.getByRole("button", { name: new RegExp(`^Flag option ${target.wrongPosition}, incorrect selection$`) })).toBeDisabled();
+  await page.reload();
+  await expect(page.getByRole("status")).toContainText("2 attempts remaining");
+  await page.getByRole("button", { name: `Flag option ${target.rightPosition}`, exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Correct · second try · 60 points");
+  await page.getByRole("button", { name: "Next flag" }).click();
+  await expect(page.getByText("2 of 12")).toBeVisible();
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+  }
+  await page.setViewportSize({ width: 320, height: 780 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("Flag to Country supports hints, skip, and result review without XP", async ({ page }) => {
+  await startGuest(page);
+  await page.getByRole("link", { name: "Flags", exact: true }).click();
+  await page.getByLabel(/Flag → Country/).check();
+  await page.getByRole("button", { name: "Start full round" }).click();
+  await expect(page.getByRole("button", { name: /Show region hint/ })).toBeVisible();
+  await page.getByRole("button", { name: /Show region hint/ }).click();
+  await expect(page.getByText(/^Region:/)).toBeVisible();
+  await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await expect(page.locator(".flags-feedback[role=status]")).toContainText("Skipped · 0 points");
+  for (let i = 1; i < 12; i++) {
+    await page.getByRole("button", { name: "Next flag" }).click();
+    await page.getByRole("button", { name: "Skip", exact: true }).click();
+  }
+  await page.getByRole("button", { name: "View results" }).click();
+  await expect(page.getByRole("heading", { name: "Your results" })).toBeVisible();
+  await expect(page.getByText("First completed run")).toBeVisible();
+  await expect(page.locator(".flags-result-score strong")).toContainText("/ 1160");
+  await expect(page.getByText("Region hints used: 1.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Question review" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

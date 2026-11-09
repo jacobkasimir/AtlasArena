@@ -242,3 +242,37 @@ export type ExplorerNeighbor = {
   code: string | null;
   name: string | null;
 };
+
+export type FlagsDirection = "country_to_flag" | "flag_to_country";
+export type FlagsPoolTier = "easy" | "all";
+export type FlagsOutcome = "pending" | "correct" | "incorrect" | "skipped";
+export type FlagsEntry = {
+  id: string; position: number; choicePosition?: number; name: string | null; region: string | null;
+  outcome: FlagsOutcome; attempts: number; wrongChoiceIds: string[]; hintUsed: boolean;
+  points: number; flagSvgUrl: string | null; flagPngUrl: string | null;
+  flagEmoji: string | null; flagDescription: string | null; correctChoiceId: string | null;
+  choices?: FlagsChoice[] | null;
+};
+export type FlagsChoice = Pick<FlagsEntry, "id" | "flagSvgUrl" | "flagPngUrl" | "flagEmoji" | "flagDescription">;
+export type FlagsRegion = {
+  id: string; name: string; easyCount: number; allCount: number;
+  easyMissingAssets: number; allMissingAssets: number; easyTierExcluded: number;
+  unsupportedDifficulty: number;
+};
+export type FlagsSetup = {
+  regions: FlagsRegion[];
+  summary: Omit<FlagsRegion, "id" | "name">;
+  activeSessions: { id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier; total: number; answered: number; score: number; createdAt: string }[];
+  rulesVersion: number; competitiveXp: false;
+};
+export type FlagsSession = {
+  id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier;
+  poolSignature: string; rulesVersion: number; state: "active" | "completed" | "abandoned";
+  createdAt: string; completedAt: string | null; elapsedMs: number | null; serverNow: string;
+  total: number; maxScore: number; currentPosition?: number; answered: number; score: number; correct: number; incorrect: number;
+  skipped: number; hintsUsed: number; current: FlagsEntry | null; entries: FlagsEntry[];
+  finalBadge: "first_run" | "new_best" | "not_best" | null;
+  topFive: { id: string; score: number; maxScore: number; elapsedMs: number; correct: number; incorrect: number; skipped: number; completedAt: string }[];
+  choices?: FlagsChoice[] | null;
+  actionResult?: { type: string; outcome: string; remainingAttempts: number };
+};

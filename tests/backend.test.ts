@@ -143,4 +143,77 @@ describe.skipIf(!configured)("isolated Supabase integration project", () => {
     for (const r of records)
       await a.rpc("arena_admin_unpublish", { p_stable_id: r.stableId });
   }, 120000);
+
+  it("persists Flags rules server-side, scopes ownership, and makes requests idempotent", async () => {
+    const a = createClient(url!, anon!, { auth: { persistSession: false } });
+    const b = createClient(url!, anon!, { auth: { persistSession: false } });
+    for (const c of [a, b]) {
+      const signed = await c.auth.signInAnonymously();
+      expect(signed.error).toBeNull();
+      users.push(signed.data.user!.id);
+    }
+    const setup = await a.rpc("arena_flags_setup");
+    expect(setup.error).toBeNull();
+    if (!setup.data.summary.easyCount) return; // Isolated projects may not have imported country assets.
+
+    const startId = crypto.randomUUID();
+    let game = await a.rpc("arena_flags_start", {
+      p_direction: "country_to_flag", p_region: null, p_pool_tier: "easy", p_request_id: startId
+    });
+    expect(game.error).toBeNull();
+    const sessionId = game.data.id as string;
+    const target = game.data.current.id as string;
+    const choices = game.data.current.choices as { id: string }[];
+    const wrong = choices.find(option => option.id !== target);
+    expect(wrong).toBeTruthy();
+
+    const requestId = crypto.randomUUID();
+    const firstWrong = await a.rpc("arena_flags_answer", {
+      p_session_id: sessionId, p_entry_id: target, p_choice_id: wrong!.id,
+      p_answer: null, p_request_id: requestId
+    });
+    expect(firstWrong.error).toBeNull();
+    expect(firstWrong.data.current.attempts).toBe(1);
+    expect(firstWrong.data.actionResult.outcome).toBe("wrong_choice");
+    const retry = await a.rpc("arena_flags_answer", {
+      p_session_id: sessionId, p_entry_id: target, p_choice_id: wrong!.id,
+      p_answer: null, p_request_id: requestId
+    });
+    expect(retry.data.current.attempts).toBe(1);
+    const duplicateOption = await a.rpc("arena_flags_answer", {
+      p_session_id: sessionId, p_entry_id: target, p_choice_id: wrong!.id,
+      p_answer: null, p_request_id: crypto.randomUUID()
+    });
+    expect(duplicateOption.data.current.attempts).toBe(1);
+    expect(duplicateOption.data.actionResult.outcome).toBe("duplicate_choice");
+    const reusedId = await a.rpc("arena_flags_answer", {
+      p_session_id: sessionId, p_entry_id: target, p_choice_id: target,
+      p_answer: null, p_request_id: requestId
+    });
+    expect(reusedId.error).not.toBeNull();
+
+    const correct = await a.rpc("arena_flags_answer", {
+      p_session_id: sessionId, p_entry_id: target, p_choice_id: target,
+      p_answer: null, p_request_id: crypto.randomUUID()
+    });
+    expect(correct.error).toBeNull();
+    expect(correct.data.score).toBe(60);
+    expect((await b.rpc("arena_flags_view", { p_session_id: sessionId })).error).not.toBeNull();
+
+    const textStart = await a.rpc("arena_flags_start", {
+      p_direction: "flag_to_country", p_region: null, p_pool_tier: "easy", p_request_id: crypto.randomUUID()
+    });
+    expect(textStart.error).toBeNull();
+    const textId = textStart.data.id as string;
+    const entryId = textStart.data.current.id as string;
+    const hint = await a.rpc("arena_flags_hint", { p_session_id: textId, p_entry_id: entryId, p_request_id: crypto.randomUUID() });
+    expect(hint.error).toBeNull();
+    expect(hint.data.current.hintUsed).toBe(true);
+    const repeatedHint = await a.rpc("arena_flags_hint", { p_session_id: textId, p_entry_id: entryId, p_request_id: crypto.randomUUID() });
+    expect(repeatedHint.data.hintsUsed).toBe(1);
+    const skipped = await a.rpc("arena_flags_skip", { p_session_id: textId, p_entry_id: entryId, p_request_id: crypto.randomUUID() });
+    expect(skipped.error).toBeNull();
+    expect(skipped.data.skipped).toBe(1);
+    expect(skipped.data.score).toBe(0);
+  }, 30000);
 });

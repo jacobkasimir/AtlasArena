@@ -41,7 +41,7 @@ function CountryFlag({ country, eager = false, priority = false }: { country: Ex
   const url = candidates[candidateIndex];
 
   return (
-    <div className="explorer-flag">
+    <span className="explorer-flag">
       {url ? (
         <img
           src={url}
@@ -59,13 +59,12 @@ function CountryFlag({ country, eager = false, priority = false }: { country: Ex
       ) : (
         <span className="muted text-xs" aria-label={`Flag unavailable for ${country.name}`}>No flag</span>
       )}
-    </div>
+    </span>
   );
 }
 
-function CountryCard({ country, countries, eagerFlag = false, priorityFlag = false }: {
+function CountryCard({ country, eagerFlag = false, priorityFlag = false }: {
   country: ExplorerCountry;
-  countries: Map<string, ExplorerCountry>;
   eagerFlag?: boolean;
   priorityFlag?: boolean;
 }) {
@@ -82,23 +81,23 @@ function CountryCard({ country, countries, eagerFlag = false, priorityFlag = fal
   const neighbors = country.neighbors ?? [];
 
   return (
-    <article className="card country-card">
-      <header className="explorer-country-header">
-        <CountryFlag country={country} eager={eagerFlag} priority={priorityFlag} />
-        <div className="min-w-0">
-          <p className="eyebrow">{displayText(country.region)}</p>
-          <h2 className="text-lg font-bold mt-1 explorer-country-name">{country.name}</h2>
-          {nonIsoEntry && <p className="muted text-xs mt-1">Non-ISO catalog entry</p>}
-        </div>
-      </header>
+    <details className="card country-card explorer-country-details">
+      <summary className="explorer-country-summary">
+        <span className="explorer-country-header">
+          <CountryFlag country={country} eager={eagerFlag} priority={priorityFlag} />
+          <span className="min-w-0">
+            <span className="eyebrow">{displayText(country.region)}</span>
+            <span role="heading" aria-level={2} className="text-lg font-bold mt-1 explorer-country-name">{country.name}</span>
+            {country.catalogKind === "iso_alpha2" && <span className="muted text-xs mt-1 explorer-code-line">ISO alpha-2 · {country.code}</span>}
+            {nonIsoEntry && <span className="muted text-xs mt-1 explorer-code-line">Non-ISO catalog entry</span>}
+          </span>
+        </span>
+        <span className="explorer-card-facts mt-4">
+          <span><span className="explorer-card-facts-label">Capital</span><span className="explorer-card-facts-value">{displayText(country.capital)}</span></span>
+        </span>
+      </summary>
 
-      <dl className="explorer-card-facts mt-4">
-        <div><dt>Capital</dt><dd>{displayText(country.capital)}</dd></div>
-      </dl>
-
-      <details className="explorer-country-details">
-        <summary>Details <span className="muted">for {country.name}</span></summary>
-        <div className="explorer-details-body">
+      <div className="explorer-details-body">
           <section className="explorer-detail-section">
             <h3>People and place</h3>
             <dl className="explorer-detail-grid">
@@ -141,16 +140,14 @@ function CountryCard({ country, countries, eagerFlag = false, priorityFlag = fal
           </section>
 
           {nonIsoEntry && <p className="explorer-neutral-note">This entry uses an internal catalog identifier. Its inclusion does not express a position on sovereignty or international recognition.</p>}
-        </div>
-      </details>
-
-      <footer className="explorer-country-footer">
+        <footer className="explorer-country-footer">
         {canPractice ? <>
           <p className="muted text-xs mb-2">{questionCount} published questions · {country.difficulty}</p>
           <Link className="secondary country-action w-full" to={`/home?${practiceParams.toString()}`}>Practice this place <span aria-hidden="true">→</span></Link>
         </> : <p className="muted text-xs">{availabilityKnown ? `Practice needs ${PRACTICE_QUESTION_COUNT} published questions at this difficulty; ${questionCount} available.` : "Practice availability is not available."}</p>}
-      </footer>
-    </article>
+        </footer>
+      </div>
+    </details>
   );
 }
 
@@ -170,7 +167,6 @@ export default function Explorer() {
     setPage(1);
   }, [searchParams]);
 
-  const countriesByCode = useMemo(() => new Map((data ?? []).map(country => [country.code, country])), [data]);
   const regions = useMemo(() => [...new Set((data ?? []).map(country => country.region).filter(Boolean))].sort(collator.compare), [data]);
   const filtered = useMemo(() => {
     const query = normalize(search);
@@ -213,15 +209,20 @@ export default function Explorer() {
           <input type="search" value={search} placeholder="Try Canada, Ottawa, or CA…" autoComplete="off" onChange={event => { setSearch(event.target.value); setPage(1); }} />
         </label>
         <label>Region
-          <select value={region} onChange={event => { setRegion(event.target.value); setPage(1); }}>
-            <option value="all">All regions</option>{regions.map(item => <option key={item} value={item}>{item}</option>)}
-          </select>
+          <span className="explorer-select-wrap">
+            <select className="explorer-region-select" value={region} onChange={event => { setRegion(event.target.value); setPage(1); }}>
+              <option value="all">All regions</option>{regions.map(item => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <svg aria-hidden="true" viewBox="0 0 20 20"><path d="m5 7.5 5 5 5-5" /></svg>
+          </span>
         </label>
-        <label>Sort by
-          <select value={sortOrder} onChange={event => { setSortOrder(event.target.value as SortOrder); setPage(1); }}>
-            <option value="name">Name · A–Z</option><option value="region">Region, then name</option>
-          </select>
-        </label>
+        <div className="explorer-sort-field">
+          <span className="explorer-control-label">Sort by</span>
+          <div className="explorer-sort-control" role="group" aria-label="Sort places">
+            <button type="button" className={`explorer-sort-button ${sortOrder === "name" ? "is-selected" : ""}`} aria-label="Sort by name A to Z" aria-pressed={sortOrder === "name"} onClick={() => { setSortOrder("name"); setPage(1); }}>Name</button>
+            <button type="button" className={`explorer-sort-button ${sortOrder === "region" ? "is-selected" : ""}`} aria-label="Sort by region, then name" aria-pressed={sortOrder === "region"} onClick={() => { setSortOrder("region"); setPage(1); }}>Region</button>
+          </div>
+        </div>
       </div>
       {hasFilters && <button type="button" className="secondary mt-4" onClick={clearFilters}>Clear filters</button>}
     </section>
@@ -234,7 +235,7 @@ export default function Explorer() {
     {!filtered.length && <div className="empty-state"><span className="empty-icon" aria-hidden="true">⌕</span><h2 className="text-lg font-bold mt-3">{data.length ? "No places match those filters" : "The catalog is empty"}</h2><p className="muted mt-2">{data.length ? "Try another name or choose a different region." : "No catalog entries were returned by the backend."}</p>{hasFilters && <button type="button" className="secondary mt-4" onClick={clearFilters}>Show all places</button>}</div>}
 
     <div className="country-grid explorer-country-grid">
-      {visible.map((country, index) => <CountryCard key={country.code} country={country} countries={countriesByCode} eagerFlag={index === 0} priorityFlag={index === 0} />)}
+      {visible.map((country, index) => <CountryCard key={country.code} country={country} eagerFlag={index === 0} priorityFlag={index === 0} />)}
     </div>
 
     {pageCount > 1 && <nav className="explorer-pagination mt-8" aria-label="Country catalog pages">
