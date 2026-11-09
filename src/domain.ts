@@ -216,8 +216,6 @@ export type ExplorerCountry = {
   currency: string | null;
   flag: string | null;
   difficulty: Difficulty;
-  source: string;
-
   officialName?: string | null;
   catalogKind?: "iso_alpha2" | "non_iso";
   flagEmoji?: string | null;
@@ -228,13 +226,19 @@ export type ExplorerCountry = {
   languages?: string[];
   translations?: Record<string, string>;
   currencies?: { code: string | null; name: string; symbol: string | null }[];
-  borders?: string[];
+  neighbors?: ExplorerNeighbor[];
   memberships?: { name: string; member: boolean }[] | null;
   callingCodes?: string[];
   topLevelDomains?: string[];
   wikipediaUrl?: string | null;
-  sourceUrl?: string | null;
+  googleMapsUrl?: string | null;
 
   // Published questions matching the country's practice difficulty.
   practiceQuestionCount?: number;
+};
+
+export type ExplorerNeighbor = {
+  alpha3: string;
+  code: string | null;
+  name: string | null;
 };

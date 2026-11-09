@@ -10,17 +10,18 @@ vi.mock("./api", () => ({ api: { explore } }));
 const catalog: ExplorerCountry[] = [
   {
     code: "CA", name: "Canada", officialName: "Canada", capital: "Ottawa", region: "North America",
-    currency: "Canadian dollar", flag: "Maple leaf", difficulty: "easy", source: "Rest Countries",
+    currency: "Canadian dollar", flag: "Maple leaf", difficulty: "easy",
     catalogKind: "iso_alpha2", flagSvgUrl: "https://flags.restcountries.com/ca.svg", population: 40000000,
     areaKm2: 9984670, languages: ["English", "French"], translations: { fr: "Canada français" },
-    currencies: [{ code: "CAD", name: "Canadian dollar", symbol: "$" }], borders: ["US"],
+    currencies: [{ code: "CAD", name: "Canadian dollar", symbol: "$" }],
+    neighbors: [{ alpha3: "USA", code: "US", name: "United States" }],
     memberships: [{ name: "United Nations", member: true }], callingCodes: ["+1"], topLevelDomains: [".ca"],
-    wikipediaUrl: "https://en.wikipedia.org/wiki/Canada", sourceUrl: "https://restcountries.com/",
+    wikipediaUrl: "https://en.wikipedia.org/wiki/Canada", googleMapsUrl: "https://www.google.com/maps/place/Canada",
     practiceQuestionCount: 4,
   },
   {
     code: "US", name: "United States", officialName: "United States of America", capital: "Washington, D.C.", region: "North America",
-    currency: "United States dollar", flag: null, difficulty: "easy", source: "Rest Countries",
+    currency: "United States dollar", flag: null, difficulty: "easy",
     catalogKind: "iso_alpha2", flagEmoji: "🇺🇸", practiceQuestionCount: 1,
   },
 ];
@@ -33,12 +34,15 @@ it("shows compact cards, grouped catalog details and navigable neighbors", async
 
   expect(await screen.findByText("Showing 1–2 of 2 places")).toBeInTheDocument();
   expect(screen.getByText("Ottawa")).toBeInTheDocument();
+  expect(screen.queryByText(/ISO alpha-2/)).not.toBeInTheDocument();
   expect(screen.getByText("Practice this place")).toBeInTheDocument();
   fireEvent.click(document.querySelector("details summary")!);
 
   expect(screen.getAllByText("People and place")).toHaveLength(2);
   expect(screen.getByText("9,984,670 km²")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Find United States in the catalog" })).toHaveAttribute("href", "/explorer?q=US");
+  expect(screen.getByRole("link", { name: "Open in Google Maps" })).toHaveAttribute("href", "https://www.google.com/maps/place/Canada");
+  expect(screen.queryByRole("link", { name: /Imported data source/ })).not.toBeInTheDocument();
   expect(screen.getAllByText(/not been independently verified/)).toHaveLength(2);
   expect(screen.getByText(/Practice needs 4 published questions/)).toBeInTheDocument();
 });

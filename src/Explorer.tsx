@@ -73,13 +73,13 @@ function CountryCard({ country, countries, eagerFlag = false, priorityFlag = fal
   const availabilityKnown = typeof questionCount === "number" && Number.isFinite(questionCount);
   const canPractice = availabilityKnown && questionCount >= PRACTICE_QUESTION_COUNT;
   const wikipediaUrl = getHttpsUrl(country.wikipediaUrl, ["wikipedia.org"]);
-  const sourceUrl = getHttpsUrl(country.sourceUrl);
+  const googleMapsUrl = getHttpsUrl(country.googleMapsUrl, ["google.com", "goo.gl", "maps.app.goo.gl"]);
   const nonIsoEntry = country.catalogKind === "non_iso";
   const practiceParams = new URLSearchParams({ mode: "practice", country: country.code, difficulty: country.difficulty });
   const translations = Object.entries(country.translations ?? {}).filter(([, name]) => name.trim());
   const hasMembershipData = Boolean(country.memberships?.length);
   const memberships = (country.memberships ?? []).filter(item => item.member);
-  const neighbors = [...new Set(country.borders ?? [])];
+  const neighbors = country.neighbors ?? [];
 
   return (
     <article className="card country-card">
@@ -88,7 +88,7 @@ function CountryCard({ country, countries, eagerFlag = false, priorityFlag = fal
         <div className="min-w-0">
           <p className="eyebrow">{displayText(country.region)}</p>
           <h2 className="text-lg font-bold mt-1 explorer-country-name">{country.name}</h2>
-          <p className="muted text-xs mt-1">{country.catalogKind === "iso_alpha2" ? `ISO alpha-2 · ${country.code}` : nonIsoEntry ? "Non-ISO catalog entry" : `Catalog entry · ${country.code}`}</p>
+          {nonIsoEntry && <p className="muted text-xs mt-1">Non-ISO catalog entry</p>}
         </div>
       </header>
 
@@ -118,9 +118,8 @@ function CountryCard({ country, countries, eagerFlag = false, priorityFlag = fal
               <div><dt>Internet domains</dt><dd>{country.topLevelDomains?.length ? country.topLevelDomains.join(", ") : "Not available"}</dd></div>
               <div className="explorer-neighbor-field">
                 <dt>Neighboring catalog entries</dt>
-                <dd>{neighbors.length ? <ul className="explorer-neighbors">{neighbors.map(code => {
-                  const neighbor = countries.get(code);
-                  return <li key={code}>{neighbor ? <Link to={`/explorer?q=${encodeURIComponent(code)}`} aria-label={`Find ${neighbor.name} in the catalog`}>{neighbor.name}</Link> : <span>{code} · not in this catalog</span>}</li>;
+                <dd>{neighbors.length ? <ul className="explorer-neighbors">{neighbors.map(neighbor => {
+                  return <li key={neighbor.alpha3}>{neighbor.name && neighbor.code ? <Link to={`/explorer?q=${encodeURIComponent(neighbor.code)}`} aria-label={`Find ${neighbor.name} in the catalog`}>{neighbor.name}</Link> : <span>{neighbor.alpha3} · not in this catalog</span>}</li>;
                 })}</ul> : "Not available"}</dd>
               </div>
             </dl>
@@ -132,12 +131,12 @@ function CountryCard({ country, countries, eagerFlag = false, priorityFlag = fal
           </section>
 
           <section className="explorer-detail-section">
-            <h3>Flag and source</h3>
+            <h3>Flag and links</h3>
             <p>{displayText(country.flag)}</p>
             <p className="muted text-xs mt-2">Catalog values and imported links have not been independently verified. Population and membership data may refer to different source dates.</p>
             <div className="explorer-source-links">
-              {sourceUrl && <a href={sourceUrl} target="_blank" rel="noopener noreferrer">Imported data source <span aria-hidden="true">↗</span></a>}
               {wikipediaUrl && <a href={wikipediaUrl} target="_blank" rel="noopener noreferrer">Wikipedia link from source <span aria-hidden="true">↗</span></a>}
+              {googleMapsUrl && <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer">Open in Google Maps <span aria-hidden="true">↗</span></a>}
             </div>
           </section>
 

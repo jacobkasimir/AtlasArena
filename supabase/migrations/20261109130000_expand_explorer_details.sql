@@ -31,7 +31,6 @@ begin
       'currency', country.currency,
       'flag', country.flag,
       'difficulty', country.difficulty,
-      'sourceUrl', country.source,
       'officialName', country.name_official,
       'catalogKind', country.catalog_kind,
       'flagEmoji', country.flag_emoji,
@@ -40,6 +39,7 @@ begin
       'population', country.population,
       'areaKm2', country.area_km2,
       'wikipediaUrl', country.link_wikipedia,
+      'googleMapsUrl', country.link_google_maps,
       'languages', case
         when jsonb_typeof(country.languages) = 'array' then (
           select coalesce(jsonb_agg(language_name order by language_name), '[]'::jsonb)
@@ -90,7 +90,16 @@ begin
         )
         else '[]'::jsonb
       end,
-      'borders', to_jsonb(coalesce(country.borders, array[]::text[])),
+      'neighbors', (
+        select coalesce(jsonb_agg(jsonb_build_object(
+          'alpha3', border.alpha3,
+          'code', neighbor.code,
+          'name', neighbor.name
+        ) order by coalesce(neighbor.name, border.alpha3)), '[]'::jsonb)
+        from unnest(coalesce(country.borders, array[]::text[])) as border(alpha3)
+        left join private.countries as neighbor
+          on upper(neighbor.code_alpha3) = upper(border.alpha3)
+      ),
       'callingCodes', to_jsonb(coalesce(country.calling_codes, array[]::text[])),
       'topLevelDomains', to_jsonb(coalesce(country.tlds, array[]::text[])),
       'memberships', (
