@@ -10,3 +10,5 @@ test-results/
 information.txt
 .env.local
 .DS_Store
+country-import/
+.venv/

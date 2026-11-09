@@ -138,6 +138,7 @@ export type Leaderboard = {
 export type Country = {
   code: string;
   name: string;
+  officialName: string;
   capital: string;
   region: string;
   currency: string;
@@ -206,3 +207,26 @@ export function shuffle<T>(values: T[], random = Math.random): T[] {
   }
   return result;
 }
+
+export type ExplorerCountry = {
+  code: string;
+  name: string;
+  capital: string | null;
+  region: string;
+  currency: string | null;
+  flag: string | null;
+  difficulty: Difficulty;
+  source: string;
+
+  officialName?: string | null;
+  catalogKind?: "iso_alpha2" | "non_iso";
+  flagEmoji?: string | null;
+  flagSvgUrl?: string | null;
+  flagPngUrl?: string | null;
+  population?: number | null;
+  languages?: string[];
+  wikipediaUrl?: string | null;
+
+  // Published questions matching the country's practice difficulty.
+  practiceQuestionCount?: number;
+};

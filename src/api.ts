@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { demo } from "./demo";
-import { Country, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
+import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -74,7 +74,7 @@ export const api = {
     if (error) throw error;
   },
   explore: () =>
-    isDemo ? demo.explore() : rpc<Country[]>("arena_explore"),
+    isDemo ? demo.explore() : rpc<ExplorerCountry[]>("arena_explore"),
   exportData: () =>
     isDemo ? demo.exportData() : rpc<unknown>("arena_export"),
   deleteAccount: async () => {

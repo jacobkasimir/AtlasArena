@@ -688,3 +688,120 @@ html[data-theme="light"] .text-mint { color:#087f78; }
 }
 @media(max-width:360px){.brand-wordmark{display:none!important}.topbar-nav>a:not(.topbar-icon){padding-inline:.35rem;font-size:.8rem}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+/* World Explorer: shared layout for light and dark themes */
+
+.explorer-shell {
+  min-width: 0;
+}
+
+.explorer-shell .explorer-filters {
+  position: relative;
+}
+
+.explorer-shell .country-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+.explorer-country-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.explorer-country-name {
+  overflow-wrap: anywhere;
+}
+
+.explorer-flag {
+  width: 76px;
+  height: 56px;
+  flex: 0 0 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  background: transparent;
+}
+
+.explorer-flag img {
+  width: 72px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.explorer-flag-emoji {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.explorer-tag {
+  display: inline-block;
+  align-self: flex-start;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid currentColor;
+  border-radius: 0.6rem;
+}
+
+.explorer-country-facts {
+  display: grid;
+  gap: 1rem;
+}
+
+.explorer-country-facts > div {
+  min-width: 0;
+}
+
+.explorer-country-facts dd {
+  margin-top: 0.25rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.explorer-country-details {
+  min-width: 0;
+}
+
+.explorer-country-details > summary {
+  padding: 0.8rem 0;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.explorer-details-body {
+  padding: 0.5rem 0 1rem;
+}
+
+.explorer-country-footer {
+  margin-top: auto;
+  padding-top: 1.5rem;
+}
+
+.explorer-collection-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  scroll-margin-top: 6rem;
+}
+
+.explorer-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.explorer-pagination button,
+.explorer-shell .secondary {
+  min-height: 44px;
+}
