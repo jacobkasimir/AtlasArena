@@ -224,8 +224,16 @@ export type ExplorerCountry = {
   flagSvgUrl?: string | null;
   flagPngUrl?: string | null;
   population?: number | null;
+  areaKm2?: number | null;
   languages?: string[];
+  translations?: Record<string, string>;
+  currencies?: { code: string | null; name: string; symbol: string | null }[];
+  borders?: string[];
+  memberships?: { name: string; member: boolean }[] | null;
+  callingCodes?: string[];
+  topLevelDomains?: string[];
   wikipediaUrl?: string | null;
+  sourceUrl?: string | null;
 
   // Published questions matching the country's practice difficulty.
   practiceQuestionCount?: number;

@@ -1,0 +1,57 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { afterEach, expect, it, vi } from "vitest";
+import Explorer from "./Explorer";
+import type { ExplorerCountry } from "./domain";
+
+const { explore } = vi.hoisted(() => ({ explore: vi.fn() }));
+vi.mock("./api", () => ({ api: { explore } }));
+
+const catalog: ExplorerCountry[] = [
+  {
+    code: "CA", name: "Canada", officialName: "Canada", capital: "Ottawa", region: "North America",
+    currency: "Canadian dollar", flag: "Maple leaf", difficulty: "easy", source: "Rest Countries",
+    catalogKind: "iso_alpha2", flagSvgUrl: "https://flags.restcountries.com/ca.svg", population: 40000000,
+    areaKm2: 9984670, languages: ["English", "French"], translations: { fr: "Canada français" },
+    currencies: [{ code: "CAD", name: "Canadian dollar", symbol: "$" }], borders: ["US"],
+    memberships: [{ name: "United Nations", member: true }], callingCodes: ["+1"], topLevelDomains: [".ca"],
+    wikipediaUrl: "https://en.wikipedia.org/wiki/Canada", sourceUrl: "https://restcountries.com/",
+    practiceQuestionCount: 4,
+  },
+  {
+    code: "US", name: "United States", officialName: "United States of America", capital: "Washington, D.C.", region: "North America",
+    currency: "United States dollar", flag: null, difficulty: "easy", source: "Rest Countries",
+    catalogKind: "iso_alpha2", flagEmoji: "🇺🇸", practiceQuestionCount: 1,
+  },
+];
+
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+it("shows compact cards, grouped catalog details and navigable neighbors", async () => {
+  explore.mockResolvedValue(catalog);
+  render(<MemoryRouter><Explorer /></MemoryRouter>);
+
+  expect(await screen.findByText("Showing 1–2 of 2 places")).toBeInTheDocument();
+  expect(screen.getByText("Ottawa")).toBeInTheDocument();
+  expect(screen.getByText("Practice this place")).toBeInTheDocument();
+  fireEvent.click(document.querySelector("details summary")!);
+
+  expect(screen.getAllByText("People and place")).toHaveLength(2);
+  expect(screen.getByText("9,984,670 km²")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Find United States in the catalog" })).toHaveAttribute("href", "/explorer?q=US");
+  expect(screen.getAllByText(/not been independently verified/)).toHaveLength(2);
+  expect(screen.getByText(/Practice needs 4 published questions/)).toBeInTheDocument();
+});
+
+it("keeps every catalog entry searchable and gives only the first visible flag high priority", async () => {
+  explore.mockResolvedValue(catalog);
+  render(<MemoryRouter><Explorer /></MemoryRouter>);
+
+  const firstFlag = await screen.findByAltText("Flag of Canada");
+  expect(firstFlag).toHaveAttribute("loading", "eager");
+  expect(firstFlag).toHaveAttribute("fetchpriority", "high");
+  const search = screen.getByPlaceholderText("Try Canada, Ottawa, or CA…");
+  fireEvent.change(search, { target: { value: "washington" } });
+  await waitFor(() => expect(screen.getByText("Showing 1–1 of 1 places")).toBeInTheDocument());
+  expect(screen.getByText("United States")).toBeInTheDocument();
+});

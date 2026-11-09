@@ -16,6 +16,8 @@ const name = "atlas-static-" + hash.digest("hex").slice(0, 16);
 await writeFile("dist/sw.js", `
 const CACHE = ${JSON.stringify(name)};
 const ASSETS = ${JSON.stringify(urls)};
+const FLAG_CACHE = "atlas-flag-images-v1";
+const FLAG_ORIGIN = "https://flags.restcountries.com";
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
 });
@@ -32,6 +34,26 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const r = e.request;
   const u = new URL(r.url);
+  if (r.method === "GET" && r.destination === "image" && u.origin === FLAG_ORIGIN) {
+    e.respondWith((async () => {
+      const cache = await caches.open(FLAG_CACHE);
+      const cached = await cache.match(r);
+      const update = fetch(r).then(async response => {
+        if (response.ok || response.type === "opaque") {
+          await cache.put(r, response.clone());
+          const keys = await cache.keys();
+          if (keys.length > 160) await cache.delete(keys[0]);
+        }
+        return response;
+      });
+      if (cached) {
+        e.waitUntil(update.catch(() => {}));
+        return cached;
+      }
+      return update;
+    })());
+    return;
+  }
   if (r.method !== "GET" || u.origin !== self.location.origin) return;
   if (u.pathname.startsWith("/api/") || r.headers.has("authorization")) return;
   if (r.mode === "navigate") {

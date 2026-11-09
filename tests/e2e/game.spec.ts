@@ -63,5 +63,33 @@ test("number keys can select an answer", async ({ page }) => {
   await page.getByRole("button", { name: "Start adventure", exact: false }).click();
   await expect(page.locator("button.answer").first()).toBeVisible();
   await page.keyboard.press("1");
-  await expect(page.locator(".feedback-card")).toBeVisible();
+  await expect(page.locator(".game-review")).toBeVisible();
+});
+
+test("Explorer filters, opens details, and stays usable in both themes on a phone", async ({ page }) => {
+  await startGuest(page);
+  await page.getByRole("link", { name: "Explorer", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Every place has a story." })).toBeVisible();
+  await expect(page.locator(".country-card").first()).toBeVisible();
+
+  const region = page.getByRole("combobox", { name: "Region" });
+  await region.focus();
+  await page.keyboard.press("Space");
+  await page.screenshot({ path: `test-results/atlas-explorer-dropdown-${test.info().project.name}.png` });
+  await page.keyboard.press("Escape");
+  await region.selectOption({ index: 1 });
+  await expect(page.getByRole("status")).toContainText("of");
+  await page.getByRole("combobox", { name: "Sort by" }).selectOption("region");
+  await page.locator("details summary").first().click();
+  await expect(page.locator("details[open]").first()).toBeVisible();
+
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await page.screenshot({ path: `test-results/atlas-explorer-${theme}-${test.info().project.name}.png` });
+  }
+
+  await page.setViewportSize({ width: 320, height: 780 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: `test-results/atlas-explorer-mobile-${test.info().project.name}.png` });
 });
