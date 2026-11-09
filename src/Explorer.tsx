@@ -123,7 +123,7 @@ function CountryCard({ country, countriesByAlpha3, eagerFlag = false, priorityFl
                   const code = rawCode.trim().toUpperCase();
                   const neighbor = countriesByAlpha3.get(code);
                   const knownName = alpha3CountryNames[code as keyof typeof alpha3CountryNames];
-                  return <li key={`${code}-${index}`}>{neighbor ? <Link to={`/explorer?q=${encodeURIComponent(neighbor.code)}`} aria-label={`Find ${neighbor.name} in the catalog (${code})`}>{neighbor.name}</Link> : <span>{knownName ? `${knownName} (${rawCode})` : rawCode} · Not in this catalog</span>}</li>;
+                  return <li key={`${code}-${index}`}>{neighbor ? <Link to={`/explorer?q=${encodeURIComponent(neighbor.code)}`} aria-label={`Find ${neighbor.name} in the catalog (${code})`}>{neighbor.name}</Link> : <span>{knownName ? `${knownName} (${rawCode})` : rawCode}</span>}</li>;
                 })}</ul>}</dd>
               </div>
             </dl>

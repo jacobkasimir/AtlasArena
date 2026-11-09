@@ -16,7 +16,7 @@ const name = "atlas-static-" + hash.digest("hex").slice(0, 16);
 await writeFile("dist/sw.js", `
 const CACHE = ${JSON.stringify(name)};
 const ASSETS = ${JSON.stringify(urls)};
-const FLAG_CACHE = "atlas-flag-images-v1";
+const FLAG_CACHE = "atlas-flag-images-v2";
 const FLAG_ORIGIN = "https://flags.restcountries.com";
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -28,6 +28,8 @@ self.addEventListener("activate", e => {
   e.waitUntil((async () => {
     for (const k of await caches.keys())
       if (k.startsWith("atlas-static-") && k !== CACHE) await caches.delete(k);
+    for (const k of await caches.keys())
+      if (k.startsWith("atlas-flag-images-") && k !== FLAG_CACHE) await caches.delete(k);
     await self.clients.claim();
   })());
 });
@@ -39,7 +41,7 @@ self.addEventListener("fetch", e => {
       const cache = await caches.open(FLAG_CACHE);
       const cached = await cache.match(r);
       const update = fetch(r).then(async response => {
-        if (response.ok || response.type === "opaque") {
+        if (response.ok) {
           await cache.put(r, response.clone());
           const keys = await cache.keys();
           if (keys.length > 160) await cache.delete(keys[0]);

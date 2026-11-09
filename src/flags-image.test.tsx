@@ -5,6 +5,7 @@ import { FlagImage } from "./Flags";
 it("uses the Explorer SVG first and falls back to PNG without emoji",()=>{
   const onUnavailable=vi.fn();
   const {container}=render(<FlagImage value={{flagSvgUrl:"https://flags.restcountries.com/us.svg",flagPngUrl:"https://flags.restcountries.com/us.png",flagDescription:null}} label="Flag option 1" onUnavailable={onUnavailable}/>);
+  expect(container.querySelector("img")?.getAttribute("referrerpolicy")).toBe("no-referrer");
   fireEvent.error(container.querySelector("img")!);
   expect(container.querySelector("img")?.getAttribute("src")).toBe("https://flags.restcountries.com/us.png");
   fireEvent.error(container.querySelector("img")!);

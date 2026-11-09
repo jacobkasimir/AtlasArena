@@ -12,7 +12,7 @@ export function FlagImage({value,label,className="",onUnavailable}:{value:Pick<F
   useEffect(()=>{setSource(value.flagSvgUrl||value.flagPngUrl||"");setFailed(false)},[value.flagSvgUrl,value.flagPngUrl]);
   const onError=()=>{if(source&&source!==value.flagPngUrl&&value.flagPngUrl){setSource(value.flagPngUrl);return}setSource("");setFailed(true);onUnavailable?.(true)};
   return <span className={`flags-image ${className}`} role="img" aria-label={label}>
-    {source?<img ref={node=>node?.setAttribute("fetchpriority",className.includes("large")?"high":"auto")} src={source} alt="" loading={className.includes("large")?"eager":"lazy"} decoding="async" onLoad={()=>onUnavailable?.(false)} onError={onError}/>:<span className="flags-image-fallback" aria-hidden="true">{failed?"Flag unavailable":"Loading flag"}</span>}
+    {source?<img ref={node=>node?.setAttribute("fetchpriority",className.includes("large")?"high":"auto")} src={source} alt="" loading={className.includes("large")?"eager":"lazy"} decoding="async" referrerPolicy="no-referrer" onLoad={()=>onUnavailable?.(false)} onError={onError}/>:<span className="flags-image-fallback" aria-hidden="true">{failed?"Flag unavailable":"Loading flag"}</span>}
     {failed&&<button type="button" className="flags-retry" aria-label={`Retry loading ${label}`} onClick={()=>{setFailed(false);onUnavailable?.(false);setSource(value.flagSvgUrl||value.flagPngUrl||"")}}>Retry</button>}
   </span>
 }
