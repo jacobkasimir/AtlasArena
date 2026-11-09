@@ -118,3 +118,15 @@ it("uses q on direct open and distinguishes missing border data from no land bor
   fireEvent.click(canadaCard.querySelector("summary")!);
   expect(screen.getByText("Border data not available")).toBeInTheDocument();
 });
+
+it("shows recognized country names for known Alpha-3 codes missing from the catalog", async () => {
+  explore.mockResolvedValue([{
+    ...catalog[0], codeAlpha3: "AFG", borders: ["IRN", "PAK", "TKM", "UZB", "TJK", "CHN"],
+  }]);
+  render(<MemoryRouter><Explorer /></MemoryRouter>);
+  expect(await screen.findByText("Showing 1–1 of 1 places")).toBeInTheDocument();
+  fireEvent.click(document.querySelector("details.country-card summary")!);
+  for (const neighbor of ["Iran (IRN)", "Pakistan (PAK)", "Turkmenistan (TKM)", "Uzbekistan (UZB)", "Tajikistan (TJK)", "China (CHN)"]) {
+    expect(screen.getByText(`${neighbor} · Not in this catalog`)).toBeInTheDocument();
+  }
+});

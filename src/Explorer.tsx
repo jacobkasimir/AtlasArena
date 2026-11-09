@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
 import type { ExplorerCountry } from "./domain";
+import alpha3CountryNames from "./alpha3-country-names.json";
 
 const PAGE_SIZE = 24;
 const PRACTICE_QUESTION_COUNT = 4;
@@ -121,7 +122,8 @@ function CountryCard({ country, countriesByAlpha3, eagerFlag = false, priorityFl
                 <dd>{borders == null ? "Border data not available" : borders.length === 0 ? "No land borders" : <ul className="explorer-neighbors">{borders.map((rawCode, index) => {
                   const code = rawCode.trim().toUpperCase();
                   const neighbor = countriesByAlpha3.get(code);
-                  return <li key={`${code}-${index}`}>{neighbor ? <Link to={`/explorer?q=${encodeURIComponent(neighbor.code)}`} aria-label={`Find ${neighbor.name} in the catalog (${code})`}>{neighbor.name}</Link> : <span>{rawCode} · Not in this catalog</span>}</li>;
+                  const knownName = alpha3CountryNames[code as keyof typeof alpha3CountryNames];
+                  return <li key={`${code}-${index}`}>{neighbor ? <Link to={`/explorer?q=${encodeURIComponent(neighbor.code)}`} aria-label={`Find ${neighbor.name} in the catalog (${code})`}>{neighbor.name}</Link> : <span>{knownName ? `${knownName} (${rawCode})` : rawCode} · Not in this catalog</span>}</li>;
                 })}</ul>}</dd>
               </div>
             </dl>
