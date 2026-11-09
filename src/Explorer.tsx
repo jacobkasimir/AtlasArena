@@ -81,7 +81,7 @@ function getFlagUrl(country: ExplorerCountry) {
   return null;
 }
 
-function CountryFlag({ country }: { country: ExplorerCountry }) {
+function CountryFlag({ country, eager = false }: { country: ExplorerCountry, eager?: boolean }) {
   const url = getFlagUrl(country);
   const [failed, setFailed] = useState(false);
 
@@ -97,7 +97,8 @@ function CountryFlag({ country }: { country: ExplorerCountry }) {
           alt={`Flag of ${country.name}`}
           width={72}
           height={48}
-          loading="lazy"
+          loading={eager ? "eager" : "lazy"}
+          fetchPriority={eager ? "high" : "auto"}
           decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
@@ -117,7 +118,7 @@ function CountryFlag({ country }: { country: ExplorerCountry }) {
   );
 }
 
-function CountryCard({ country }: { country: ExplorerCountry }) {
+function CountryCard({ country, eagerFlag=false }: { country: ExplorerCountry, eagerFlag?: boolean }) {
   const questionCount = country.practiceQuestionCount;
   const availabilityKnown =
     typeof questionCount === "number" &&
@@ -153,7 +154,7 @@ function CountryCard({ country }: { country: ExplorerCountry }) {
   return (
     <article className="card country-card">
       <header className="explorer-country-header">
-        <CountryFlag country={country} />
+        <CountryFlag country={country} eager={eagerFlag} />
 
         <div className="min-w-0">
           <p className="eyebrow">{country.region}</p>
@@ -497,8 +498,8 @@ export default function Explorer() {
       )}
 
       <div className="country-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {visible.map(country => (
-          <CountryCard key={country.code} country={country} />
+        {visible.map((country, index) => (
+          <CountryCard key={country.code} country={country} eagerFlag={index < 6} />
         ))}
       </div>
 
