@@ -104,11 +104,8 @@ test("Flags keeps its option grid and feedback stable across a reload", async ({
   await expect(page.locator(".flags-pool-summary strong")).toHaveText("2 eligible flags");
   await page.getByRole("button",{name:"Region Asia"}).click();
   await page.getByRole("option",{name:/All regions/}).click();
-  await page.getByRole("button",{name:/Difficulty Easy flags/}).click();
-  await page.getByRole("option",{name:/All flags/}).click();
-  await expect(page.getByRole("button",{name:/Difficulty All flags/})).toBeVisible();
-  await page.getByRole("button",{name:/Difficulty All flags/}).click();
-  await page.getByRole("option",{name:/Easy flags/}).click();
+  await page.getByRole("radio",{name:/All flags/}).check();
+  await page.getByRole("radio",{name:/Easy flags/}).check();
   await page.getByRole("button", { name: "Start full round" }).click();
   await expect(page.getByText("FIND THIS COUNTRY’S FLAG")).toBeVisible();
   const target = await page.evaluate(() => {
