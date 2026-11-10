@@ -227,4 +227,79 @@ describe.skipIf(!configured)("isolated Supabase integration project", () => {
     expect(deleted.data.deleted).toBe(true);
     expect((await a.rpc("arena_flags_view", { p_session_id: textId })).error).not.toBeNull();
   }, 30000);
+
+  it("keeps Capitals snapshots private, validates on the server, and makes requests idempotent", async () => {
+    const a = createClient(url!, anon!, { auth: { persistSession: false } });
+    const b = createClient(url!, anon!, { auth: { persistSession: false } });
+    for (const client of [a, b]) {
+      const signed = await client.auth.signInAnonymously();
+      expect(signed.error).toBeNull();
+      users.push(signed.data.user!.id);
+    }
+    const setup = await a.rpc("arena_capitals_setup");
+    expect(setup.error).toBeNull();
+    expect(setup.data.countries[0]).not.toHaveProperty("capitals");
+    expect(setup.data.countries[0]).not.toHaveProperty("raw_data");
+    const france = setup.data.countries.find((country: any) => country.name === "France" && country.countryToCapitalEligible && country.capitalToCountryEligible);
+    if (!france) return; // Some isolated projects intentionally have no imported catalog.
+
+    const startRequest = crypto.randomUUID();
+    const params = {
+      p_direction: "country_to_capital",
+      p_pool_mode: "manual",
+      p_selected_codes: [france.code],
+      p_region: france.region,
+      p_request_id: startRequest
+    };
+    const started = await a.rpc("arena_capitals_start", params);
+    expect(started.error).toBeNull();
+    expect(started.data.total).toBe(1);
+    expect(started.data.current.prompt).toBe("Name a capital of France.");
+    expect(started.data.current.acceptedAnswers).toBeNull();
+    expect(started.data.current.sourceLinks).toEqual([]);
+    const retriedStart = await a.rpc("arena_capitals_start", params);
+    expect(retriedStart.data.id).toBe(started.data.id);
+    const sessionId = started.data.id as string;
+    const entryId = started.data.current.id as string;
+    expect((await b.rpc("arena_capitals_view", { p_session_id: sessionId })).error).not.toBeNull();
+
+    const answerRequest = crypto.randomUUID();
+    const answerParams = {
+      p_session_id: sessionId, p_entry_id: entryId, p_answer: "  PÁRIS ",
+      p_candidate_id: null, p_request_id: answerRequest
+    };
+    const answer = await a.rpc("arena_capitals_answer", answerParams);
+    expect(answer.error).toBeNull();
+    expect(answer.data.score).toBe(100);
+    expect(answer.data.current.outcome).toBe("correct");
+    expect(answer.data.current.acceptedAnswers.map((item: any) => item.name)).toContain("Paris");
+    const retriedAnswer = await a.rpc("arena_capitals_answer", answerParams);
+    expect(retriedAnswer.data.score).toBe(100);
+    const reused = await a.rpc("arena_capitals_answer", { ...answerParams, p_answer: "London" });
+    expect(reused.error).not.toBeNull();
+
+    const completed = await a.rpc("arena_capitals_next", { p_session_id: sessionId, p_request_id: crypto.randomUUID() });
+    expect(completed.error).toBeNull();
+    expect(completed.data.state).toBe("completed");
+    expect(completed.data.finalBadge).toBe("first_run");
+    expect(completed.data.topFive).toHaveLength(1);
+    expect((await b.rpc("arena_capitals_results", { p_session_id: sessionId })).error).not.toBeNull();
+
+    const reverse = await a.rpc("arena_capitals_start", {
+      p_direction: "capital_to_country", p_pool_mode: "manual",
+      p_selected_codes: [france.code], p_region: france.region, p_request_id: crypto.randomUUID()
+    });
+    expect(reverse.error).toBeNull();
+    expect(reverse.data.current.prompt).toBe("Paris");
+    expect(reverse.data.current.countryName).toBeNull();
+    expect(reverse.data.current.countryCode).toBeNull();
+    expect(reverse.data.current.sourceLinks).toEqual([]);
+    const reverseAnswer = await a.rpc("arena_capitals_answer", {
+      p_session_id: reverse.data.id, p_entry_id: reverse.data.current.id, p_answer: "FR",
+      p_candidate_id: null, p_request_id: crypto.randomUUID()
+    });
+    expect(reverseAnswer.error).toBeNull();
+    expect(reverseAnswer.data.score).toBe(100);
+    expect(reverseAnswer.data.current.acceptedAnswers.map((item: any) => item.name)).toContain("France");
+  }, 30000);
 });

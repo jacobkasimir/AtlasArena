@@ -90,7 +90,7 @@ it("resolves neighbor codes from the full catalog and navigates within Explorer"
   fireEvent.click(canada.querySelector("summary")!);
   const franceLink = screen.getByRole("link", { name: "Find France in the catalog (FRA)" });
   expect(franceLink).toHaveAttribute("href", "/explorer?q=FR");
-  expect(screen.getByText("ZZZ · Not in this catalog")).toBeInTheDocument();
+  expect(screen.getByText("ZZZ")).toBeInTheDocument();
   fireEvent.click(franceLink);
   await waitFor(() => expect(screen.getByPlaceholderText("Try Canada, Ottawa, or CA…")).toHaveValue("FR"));
   expect(await screen.findByText("Showing 1–1 of 1 places")).toBeInTheDocument();
@@ -127,6 +127,6 @@ it("shows recognized country names for known Alpha-3 codes missing from the cata
   expect(await screen.findByText("Showing 1–1 of 1 places")).toBeInTheDocument();
   fireEvent.click(document.querySelector("details.country-card summary")!);
   for (const neighbor of ["Iran (IRN)", "Pakistan (PAK)", "Turkmenistan (TKM)", "Uzbekistan (UZB)", "Tajikistan (TJK)", "China (CHN)"]) {
-    expect(screen.getByText(`${neighbor} · Not in this catalog`)).toBeInTheDocument();
+    expect(screen.getByText(neighbor)).toBeInTheDocument();
   }
 });

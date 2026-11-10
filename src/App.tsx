@@ -14,6 +14,7 @@ import { analyticsEnabled, readEvents, setAnalytics, track } from "./analytics";
 const Admin = lazy(() => import("./Admin"));
 const Explorer = lazy(() => import("./Explorer"));
 const Flags = lazy(() => import("./Flags"));
+const Capitals = lazy(() => import("./Capitals"));
 
 const names: Record<Mode, string> = {
   classic: "Classic Quiz", practice: "Practice",
@@ -72,7 +73,7 @@ function Layout() {
           <img className="brand-wordmark wordmark-dark" src="/icons/text_dark.png" alt="" />
         </Link>
         <nav aria-label="Primary" className="topbar-nav flex flex-wrap gap-1 items-center">
-          {identity && <><NavLink to="/home">Play</NavLink><NavLink to="/flags">Flags</NavLink><NavLink to="/explorer">Explorer</NavLink>
+          {identity && <><NavLink to="/home">Play</NavLink><NavLink to="/flags">Flags</NavLink><NavLink to="/capitals">Capitals</NavLink><NavLink to="/explorer">Explorer</NavLink>
           {identity.isAdmin && <NavLink className="admin-nav-link" to="/admin" aria-label="Admin-Bereich">Admin</NavLink>}
           <NavLink className="topbar-icon" to="/profile" aria-label="Your Atlas — personal explorer and statistics" title="Your Atlas · Personal explorer"><ChartIcon/></NavLink>
           <NavLink className="topbar-icon" to="/settings" aria-label="Einstellungen" title="Einstellungen"><SettingsIcon/></NavLink>
@@ -823,6 +824,7 @@ export default function App() {
       <Route path="auth" element={<Auth/>}/>
       <Route path="explorer" element={<Protected><Explorer/></Protected>}/>
       <Route path="flags/*" element={<Protected><Flags/></Protected>}/>
+      <Route path="capitals/*" element={<Protected><Capitals/></Protected>}/>
       <Route path="admin" element={<Protected><Admin/></Protected>}/>
       <Route path="*" element={<section className="card">
         <h1 tabIndex={-1} className="heading">Uncharted territory.</h1>

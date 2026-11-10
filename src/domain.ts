@@ -316,3 +316,43 @@ export type FlagsBestBoard = {
     completedAt: string;
   }[];
 };
+
+export type CapitalDirection = "country_to_capital" | "capital_to_country";
+export type CapitalPoolMode = "all" | "easy" | "manual";
+export type CapitalCountry = {
+  code: string;
+  name: string;
+  officialName: string | null;
+  region: string | null;
+  difficulty: string;
+  catalogKind: "iso_alpha2" | "non_iso";
+  codeAlpha2: string | null;
+  codeAlpha3: string | null;
+  flagSvgUrl: string | null;
+  countryToCapitalEligible: boolean;
+  countryToCapitalReason: string | null;
+  capitalToCountryEligible: boolean;
+  capitalToCountryReason: string | null;
+};
+export type CapitalSetup = { countries: CapitalCountry[]; regions: string[]; activeSessions: { id: string; direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null; total: number; answered: number; score: number; createdAt: string }[] };
+export type CapitalVocabularyOption = { id: string; label: string };
+export type CapitalAcceptedAnswer = { name: string; roles: string[]; primary: boolean };
+export type CapitalEntry = {
+  id: string; position: number; countryCode: string; countryName: string; region: string | null;
+  catalogKind: "iso_alpha2" | "non_iso"; codeAlpha2: string | null; codeAlpha3: string | null;
+  prompt: string; selectedCapital: string | null; acceptedAnswers: CapitalAcceptedAnswer[] | null;
+  submittedAnswer: string | null; outcome: "pending" | "correct" | "incorrect" | "skipped";
+  points: number; sourceLinks: { label: string; url: string }[];
+};
+export type CapitalSession = {
+  id: string; direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null;
+  poolSignature: string;
+  state: "active" | "completed" | "abandoned"; createdAt: string; completedAt: string | null;
+  serverNow: string; elapsedMs: number | null; total: number; answered: number; score: number;
+  currentPosition: number;
+  correct: number; incorrect: number; skipped: number; current: CapitalEntry | null;
+  entries: CapitalEntry[]; vocabulary: CapitalVocabularyOption[]; finalBadge: "first_run" | "new_best" | "not_best" | null;
+  topFive: { score: number; elapsedMs: number; completedAt: string }[];
+  selectedCodes: string[]; rulesVersion: number;
+  actionResult?: { outcome: "correct" | "incorrect" | "skipped" | "ambiguous" };
+};

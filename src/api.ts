@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
-import { FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
+import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
 import { flagsDemo } from "./flags-demo";
+import { capitalsDemo } from "./capitals-demo";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -103,6 +104,22 @@ export const api = {
   flagsAbandon: (id: string, requestId: string) => isDemo
     ? flagsDemo.abandon(id, requestId) : rpc<FlagsSession>("arena_flags_abandon", { p_session_id: id, p_request_id: requestId }),
   flagsResults: (id: string) => isDemo ? flagsDemo.results(id) : rpc<FlagsSession>("arena_flags_results", { p_session_id: id }),
+  capitalsSetup: () => isDemo ? capitalsDemo.setup() : rpc<CapitalSetup>("arena_capitals_setup"),
+  capitalsStart: (direction: CapitalDirection, poolMode: CapitalPoolMode, selectedCodes: string[], region: string | null, requestId: string) => isDemo
+    ? capitalsDemo.start(direction, poolMode, selectedCodes, region, requestId)
+    : rpc<CapitalSession>("arena_capitals_start", { p_direction: direction, p_pool_mode: poolMode, p_selected_codes: selectedCodes, p_region: region, p_request_id: requestId }),
+  capitalsView: (id: string) => isDemo ? capitalsDemo.view(id) : rpc<CapitalSession>("arena_capitals_view", { p_session_id: id }),
+  capitalsAnswer: (id: string, entryId: string, answer: string, candidateId: string | null, requestId: string) => isDemo
+    ? capitalsDemo.answer(id, entryId, answer, candidateId, requestId)
+    : rpc<CapitalSession>("arena_capitals_answer", { p_session_id: id, p_entry_id: entryId, p_answer: answer, p_candidate_id: candidateId, p_request_id: requestId }),
+  capitalsSkip: (id: string, entryId: string, requestId: string) => isDemo
+    ? capitalsDemo.skip(id, entryId, requestId)
+    : rpc<CapitalSession>("arena_capitals_skip", { p_session_id: id, p_entry_id: entryId, p_request_id: requestId }),
+  capitalsNext: (id: string, requestId: string) => isDemo ? capitalsDemo.next(id, requestId)
+    : rpc<CapitalSession>("arena_capitals_next", { p_session_id: id, p_request_id: requestId }),
+  capitalsAbandon: (id: string, requestId: string) => isDemo ? capitalsDemo.abandon(id, requestId)
+    : rpc<CapitalSession>("arena_capitals_abandon", { p_session_id: id, p_request_id: requestId }),
+  capitalsResults: (id: string) => isDemo ? capitalsDemo.results(id) : rpc<CapitalSession>("arena_capitals_results", { p_session_id: id }),
   exportData: () =>
     isDemo ? demo.exportData() : rpc<unknown>("arena_export"),
   deleteAccount: async () => {
