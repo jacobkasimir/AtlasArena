@@ -1141,21 +1141,18 @@ html[data-theme="light"] .text-mint { color:#087f78; }
 .flags-game-actions .secondary { min-height: 44px; }
 .flags-play-layout { grid-template-columns: minmax(0, 1fr) 290px; }
 .flags-question { min-width: 0; }
-.flags-target-name { font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; margin: .25rem 0 1.2rem; }
+.flags-target-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: .25rem 0 1.2rem; }
+.flags-target-name { min-width: 0; font-size: clamp(1.7rem, 4vw, 2.4rem); font-weight: 800; margin: 0; overflow-wrap: anywhere; }
+.flags-wrong-names { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
 .flags-option-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: .6rem; max-height: 68vh; overflow: auto; padding: .2rem; }
 .flags-option { min-height: 76px; border: 1px solid rgb(var(--c-line) / .23); border-radius: .65rem; background: rgb(var(--c-panel)); display: grid; place-items: center; position: relative; cursor: pointer; padding: .45rem; }
 .flags-option:hover:not(:disabled) { transform: translateY(-1px); border-color: rgb(var(--c-mint)); }
 .flags-option:disabled { cursor: default; opacity: .83; }
 .flags-option.wrong { border: 2px solid #df675d; background: rgb(223 103 93 / .16); }
-.flags-option.right { border: 2px solid #16834b; background: #86efac; box-shadow: inset 0 0 0 3px rgb(255 255 255 / .3); }
-.flags-option.right::after, .flags-option.unresolved::after { content: ""; position: absolute; inset: auto 0 0; height: 6px; border-radius: 0 0 .55rem .55rem; pointer-events: none; }
-.flags-option.right::after { background: #166534; }
-.flags-option.right.attempt-2 { border-color: #b45309; background: #fdba74; box-shadow: inset 0 0 0 3px rgb(255 255 255 / .3); }
-.flags-option.right.attempt-2::after { background: #9a3412; }
-.flags-option.right.attempt-3 { border-color: #b91c1c; background: #fca5a5; box-shadow: inset 0 0 0 3px rgb(255 255 255 / .3); }
-.flags-option.right.attempt-3::after { background: #7f1d1d; }
+.flags-option.right { border: 2px solid #16834b; background: rgb(var(--c-panel)); box-shadow: 0 0 0 1px rgb(22 131 75 / .2), 0 0 13px rgb(22 131 75 / .34); }
+.flags-option.right.attempt-2 { border-color: #c97812; box-shadow: 0 0 0 1px rgb(201 120 18 / .2), 0 0 13px rgb(201 120 18 / .34); }
+.flags-option.right.attempt-3 { border-color: #c04444; box-shadow: 0 0 0 1px rgb(192 68 68 / .2), 0 0 13px rgb(192 68 68 / .36); }
 .flags-option.unresolved { border: 2px solid #450a0a; background: #7f1d1d; box-shadow: inset 0 0 0 2px rgb(255 255 255 / .12); }
-.flags-option.unresolved::after { background: #fecaca; }
 .flags-option.unresolved .flags-image img { filter: saturate(.72); }
 .flags-option:disabled.right, .flags-option:disabled.unresolved { opacity: 1; }
 .flags-image { position: relative; display: inline-grid; place-items: center; width: 100%; height: 100%; min-height: 42px; overflow: hidden; border-radius: .28rem; }
@@ -1163,7 +1160,8 @@ html[data-theme="light"] .text-mint { color:#087f78; }
 .flags-image.small { width: min(100%, 72px); height: 48px; min-height: 48px; overflow: visible; background: transparent; border: 0; border-radius: 0; }
 .flags-image.small img { width: 72px; height: 48px; max-width: 100%; max-height: 100%; object-fit: contain; }
 .flags-image.small > span.flags-image-fallback { font-size: .65rem; text-align: center; }
-.flags-wrong-name { position: absolute; z-index: 2; top: .2rem; right: .2rem; max-width: calc(100% - .4rem); overflow: hidden; padding: .2rem .38rem; border: 1px solid #7f1d1d; border-radius: .35rem; background: #b4232f; color: #fff; font-size: .68rem; font-weight: 800; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.flags-wrong-name { max-width: min(100%, 15rem); overflow: hidden; padding: .38rem .7rem; border: 1px solid #b74742; border-radius: 999px; background: rgb(183 71 66 / .12); box-shadow: 0 0 12px rgb(183 71 66 / .22); color: #a83232; font-size: .78rem; font-weight: 750; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme="dark"] .flags-wrong-name, :root:not([data-theme="light"]) .flags-wrong-name { color: #ffaaa4; background: rgb(183 71 66 / .2); }
 .flags-image.large { width: min(100%, 580px); height: clamp(170px, 32vw, 340px); margin: 0 auto 1rem; background: rgb(var(--c-panel)); border: 1px solid rgb(var(--c-line) / .16); }
 .flags-image.large img { object-fit: contain; }
 .flags-image.large > span.flags-image-fallback { font-size: .9rem; text-align: center; }
