@@ -37,7 +37,8 @@ begin
     'flagDescription', entry.flag_description,
     'name', case
       when v_session.direction = 'country_to_flag'
-        and entry.entry_id = any(coalesce(v_current.wrong_choice_ids, array[]::uuid[]))
+        and cardinality(coalesce(v_current.wrong_choice_ids, array[]::uuid[])) > 0
+        and entry.entry_id = v_current.wrong_choice_ids[cardinality(v_current.wrong_choice_ids)]
       then entry.name else null end
   ) order by entry.choice_position), '[]'::jsonb)
   into v_choices

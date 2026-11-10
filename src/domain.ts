@@ -259,6 +259,7 @@ export type FlagsChoice = Pick<FlagsEntry, "id" | "flagSvgUrl" | "flagPngUrl" | 
   choicePosition?: number;
   name?: string | null;
 };
+export type FlagsAnswerOption = { alpha2: string | null; name: string };
 export type FlagsRegion = {
   id: string; name: string; easyCount: number; allCount: number;
   easyMissingAssets: number; allMissingAssets: number; easyTierExcluded: number;
@@ -277,6 +278,7 @@ export type FlagsSession = {
   createdAt: string; completedAt: string | null; elapsedMs: number | null; serverNow: string;
   total: number; maxScore: number; currentPosition?: number; answered: number; score: number; correct: number; incorrect: number;
   skipped: number; hintsUsed: number; current: FlagsEntry | null; entries: FlagsEntry[];
+  answerOptions?: FlagsAnswerOption[];
   finalBadge: "first_run" | "new_best" | "not_best" | null;
   topFive: { id: string; score: number; maxScore: number; elapsedMs: number; correct: number; incorrect: number; skipped: number; completedAt: string }[];
   choices?: FlagsChoice[] | null;
