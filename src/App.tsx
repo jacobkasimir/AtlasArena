@@ -1,11 +1,11 @@
 import { FormEvent, Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   Link, NavLink, Outlet, Route, Routes, useLocation, useNavigate,
-  useParams, useSearchParams
+  useOutletContext, useParams, useSearchParams
 } from "react-router-dom";
 import { api, configurationError, isDemo, supabase } from "./api";
 import {
-  avatarLabels, avatarSearchTerms, avatars, categories, countryFlagAvatarCount, difficulties, level, Mode, modes, Difficulty, ResultView, View,
+  avatarLabels, avatars, categories, countryFlagAvatarCount, difficulties, level, Mode, modes, Difficulty, ResultView, View,
   challengeSetupUrl, setsNewPersonalBest, validUsername
 } from "./domain";
 import { ErrorBox, Feedback, Loading, OfflineBanner, download, useLoad } from "./components";
@@ -60,6 +60,7 @@ function Layout() {
     title?.focus({ preventScroll: true });
   }, [location.pathname]);
   useEffect(()=>{if(typeof window.matchMedia!=="function")return;const media=window.matchMedia("(prefers-color-scheme: light)");const update=()=>{if(!localStorage.getItem("atlas-theme")){const meta=document.querySelector('meta[name="theme-color"]');meta?.setAttribute("content",media.matches?"#f5f8ff":"#0B1020")}};media.addEventListener("change",update);return()=>media.removeEventListener("change",update)},[]);
+  const updateProfileIdentity=(username:string,avatar:number)=>setIdentity(current=>current?{...current,username,avatar}:current);
   return <>
     <a className="skip" href="#main">Skip to content</a>
     <header className="app-header border-b border-line/15">
@@ -80,13 +81,13 @@ function Layout() {
         </nav>
       </div>
     </header>
-    {identity&&playerWindow&&<PlayerWindow identity={identity} section={playerSection} setSection={setPlayerSection} confirming={confirmAccountAction} setConfirming={setConfirmAccountAction} message={menuMessage} onClose={()=>{setPlayerWindow(false);setConfirmAccountAction(false);menuButtonRef.current?.focus()}} onCancelConfirm={cancelAccountChange} onConfirm={confirmAccountChange}/>}
+    {identity&&playerWindow&&<PlayerWindow identity={identity} section={playerSection} setSection={setPlayerSection} confirming={confirmAccountAction} setConfirming={setConfirmAccountAction} message={menuMessage} onProfileUpdated={updateProfileIdentity} onClose={()=>{setPlayerWindow(false);setConfirmAccountAction(false);menuButtonRef.current?.focus()}} onCancelConfirm={cancelAccountChange} onConfirm={confirmAccountChange}/>}
     {isDemo && <div className="demo-banner">
       LOCAL DEMO · Progress stays in this browser · Public, unverified sample questions
     </div>}
     <OfflineBanner/>
     <main id="main" className="shell py-8 md:py-12">
-      <Suspense fallback={<Loading />}><Outlet /></Suspense>
+      <Suspense fallback={<Loading />}><Outlet context={{onProfileUpdated:updateProfileIdentity}} /></Suspense>
     </main>
     <footer className="shell py-8 text-sm muted border-t border-line/15">
       Built for curious minds. No ads. No public chat.
@@ -102,16 +103,17 @@ function SignInIcon(){return <svg viewBox="0 0 24 24" aria-hidden="true"><path d
 
 type PlayerIdentity = {username:string;avatar:number;isAnonymous:boolean;isAdmin:boolean;userId:string};
 function AvatarPicker({value}:{value:number}){
-  const initial=Number.isInteger(value)&&value>=0&&value<avatars.length?value:0;const [selected,setSelected]=useState(initial);const [search,setSearch]=useState("");const query=search.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase().trim();const visible=avatars.map((_,index)=>index).filter(index=>!query||avatarSearchTerms[index].normalize("NFD").replace(/[\u0300-\u036f]/g,"").includes(query));
-  return <div className="avatar-picker"><input type="hidden" name="avatar" value={selected}/><label className="avatar-picker-search"><span>Find a country or ISO code</span><input type="search" value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search flags…" autoComplete="off"/></label><div className="avatar-picker-grid" role="radiogroup" aria-label="Choose an avatar">{visible.map(index=><label key={index} className="player-avatar-choice" title={avatarLabels[index]}><input type="radio" name="avatar-picker-choice" value={index} checked={selected===index} onChange={()=>setSelected(index)} aria-label={avatarLabels[index]}/><span aria-hidden="true">{avatars[index]}</span><span className="sr-only">{avatarLabels[index]}</span></label>)}</div>{visible.length===0&&<p className="avatar-picker-empty" role="status">No matching country flags.</p>}<div className="avatar-picker-footer"><span><b>Selected</b><span className="avatar-picker-preview" aria-hidden="true">{avatars[selected]}</span>{avatarLabels[selected]}</span><small>{countryFlagAvatarCount} country flags</small></div></div>
+  const initial=Number.isInteger(value)&&value>=0&&value<avatars.length?value:0;const [selected,setSelected]=useState(initial);const [open,setOpen]=useState(false);const triggerRef=useRef<HTMLButtonElement>(null);
+  function choose(index:number){setSelected(index);setOpen(false);window.setTimeout(()=>triggerRef.current?.focus(),0)}
+  return <div className="avatar-picker"><input type="hidden" name="avatar" value={selected}/><button ref={triggerRef} type="button" className="avatar-picker-trigger" aria-expanded={open} aria-controls="avatar-picker-options" aria-label={`Choose avatar. Current selection: ${avatarLabels[selected]}`} onClick={()=>setOpen(value=>!value)}><span className="avatar-picker-trigger-emoji" aria-hidden="true">{avatars[selected]}</span><span className="avatar-picker-trigger-copy"><small>Selected avatar</small><strong>{avatarLabels[selected]}</strong></span><span className="avatar-picker-trigger-count">{avatars.length} options</span><span className={`avatar-picker-chevron ${open?"is-open":""}`} aria-hidden="true"/></button>{open&&<div className="avatar-picker-panel"><p className="avatar-picker-panel-label">Choose an avatar <span>{countryFlagAvatarCount} country flags</span></p><div className="avatar-picker-grid" id="avatar-picker-options" role="radiogroup" aria-label="Choose an avatar">{avatars.map((avatar,index)=><label key={index} className="player-avatar-choice" title={avatarLabels[index]}><input type="radio" name="avatar-picker-choice" value={index} checked={selected===index} onChange={()=>choose(index)} aria-label={avatarLabels[index]}/><span aria-hidden="true">{avatar}</span><span className="sr-only">{avatarLabels[index]}</span></label>)}</div></div>}</div>
 }
-function PlayerWindow({identity,section,setSection,confirming,setConfirming,message,onClose,onCancelConfirm,onConfirm}:{identity:PlayerIdentity;section:"statistics"|"profile"|"appearance";setSection:(section:"statistics"|"profile"|"appearance")=>void;confirming:boolean;setConfirming:(value:boolean)=>void;message:string;onClose:()=>void;onCancelConfirm:()=>void;onConfirm:()=>void}){
+function PlayerWindow({identity,section,setSection,confirming,setConfirming,message,onProfileUpdated,onClose,onCancelConfirm,onConfirm}:{identity:PlayerIdentity;section:"statistics"|"profile"|"appearance";setSection:(section:"statistics"|"profile"|"appearance")=>void;confirming:boolean;setConfirming:(value:boolean)=>void;message:string;onProfileUpdated:(username:string,avatar:number)=>void;onClose:()=>void;onCancelConfirm:()=>void;onConfirm:()=>void}){
   const {data,error,reload}=useLoad(()=>api.dashboard());
   const dialogRef=useRef<HTMLElement>(null);
   const [collapsed,setCollapsed]=useState(false);
   const [profileMessage,setProfileMessage]=useState("");
   const [profileSaving,setProfileSaving]=useState(false);
-  async function savePlayerProfile(event:FormEvent<HTMLFormElement>){event.preventDefault();setProfileSaving(true);setProfileMessage("");const form=new FormData(event.currentTarget);try{await api.saveProfile({username:String(form.get("username")??""),avatar:Number(form.get("avatar")??0),favorites:form.getAll("favorites").map(String)});setProfileMessage("Profile saved.");reload()}catch(e){setProfileMessage(authMessage((e as Error).message))}finally{setProfileSaving(false)}}
+  async function savePlayerProfile(event:FormEvent<HTMLFormElement>){event.preventDefault();setProfileSaving(true);setProfileMessage("");const form=new FormData(event.currentTarget);const username=String(form.get("username")??"");const avatar=Number(form.get("avatar")??0);try{await api.saveProfile({username,avatar,favorites:form.getAll("favorites").map(String)});onProfileUpdated(username,avatar);setProfileMessage("Profile saved.");reload()}catch(e){setProfileMessage(authMessage((e as Error).message))}finally{setProfileSaving(false)}}
   useEffect(()=>{(confirming?document.querySelector<HTMLElement>(".account-confirm-dialog"):dialogRef.current?.querySelector<HTMLElement>(".player-window-close"))?.focus();const old=document.body.style.overflow;document.body.style.overflow="hidden";const key=(e:KeyboardEvent)=>{if(e.key==="Escape"){if(confirming)onCancelConfirm();else onClose();return}if(e.key==="Tab"){const scope=confirming?document.querySelector<HTMLElement>(".account-confirm-dialog"):dialogRef.current;const nodes=scope?.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],select,input');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}};window.addEventListener("keydown",key);return()=>{window.removeEventListener("keydown",key);document.body.style.overflow=old}},[onClose,onCancelConfirm,confirming]);
   return <div className="player-window-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget&&!confirming)onClose()}}><section ref={dialogRef} className="player-window" role="dialog" aria-modal="true" aria-labelledby="player-window-title" tabIndex={-1}>
     <header className="player-window-header"><div className="player-window-identity"><span className="player-window-avatar" aria-hidden="true">{avatars[identity.avatar]??avatars[0]}</span><div><p className="eyebrow">YOUR ATLAS</p><h2 id="player-window-title">{identity.username}</h2></div></div><button type="button" className="player-window-close" aria-label="Close player panel" onClick={onClose}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
@@ -548,6 +550,7 @@ function Results() {
 }
 
 function ProfilePage() {
+  const {onProfileUpdated}=useOutletContext<{onProfileUpdated:(username:string,avatar:number)=>void}>();
   const [offset, setOffset] = useState(0);
   const { data, error, reload } = useLoad(() => api.dashboard(offset), offset);
   const [message, setMessage] = useState("");
@@ -559,11 +562,13 @@ function ProfilePage() {
     e.preventDefault(); setSaving(true); setMessage("");
     const form = new FormData(e.currentTarget);
     try {
+      const username=String(form.get("username"));const avatar=Number(form.get("avatar"));
       await api.saveProfile({
-        username: String(form.get("username")),
-        avatar: Number(form.get("avatar")),
+        username,
+        avatar,
         favorites: form.getAll("favorites").map(String)
       });
+      onProfileUpdated(username,avatar);
       setMessage("Profile saved."); reload();
     } catch (e) { setMessage(authMessage((e as Error).message)); }
     finally { setSaving(false); }
@@ -615,7 +620,7 @@ function ProfilePage() {
     </div>
   </div>;
 }
-function authMessage(message:string){const m=message.toLowerCase();if(m.includes("invalid login credentials"))return "E-Mail oder Passwort ist nicht korrekt.";if(m.includes("email not confirmed"))return "Bitte bestätige zuerst deine E-Mail-Adresse.";if(m.includes("user already registered")||m.includes("already been registered"))return "Für diese E-Mail gibt es bereits ein Konto. Melde dich an oder setze dein Passwort zurück.";if(m.includes("password")&&m.includes("least"))return "Das Passwort erfüllt die Mindestlänge nicht.";if(m.includes("email address")&&m.includes("already"))return "Diese E-Mail-Adresse wird bereits verwendet.";if(/duplicate|unique|username_taken/i.test(message))return "Dieser Benutzername ist bereits vergeben. Bitte wähle einen anderen.";return message;}
+function authMessage(message:string){const m=message.toLowerCase();if(m.includes("invalid login credentials"))return "E-Mail oder Passwort ist nicht korrekt.";if(m.includes("email not confirmed"))return "Bitte bestätige zuerst deine E-Mail-Adresse.";if(m.includes("user already registered")||m.includes("already been registered"))return "Für diese E-Mail gibt es bereits ein Konto. Melde dich an oder setze dein Passwort zurück.";if(m.includes("password")&&m.includes("least"))return "Das Passwort erfüllt die Mindestlänge nicht.";if(m.includes("email address")&&m.includes("already"))return "Diese E-Mail-Adresse wird bereits verwendet.";if(/duplicate|unique|username_taken/i.test(message))return "Dieser Benutzername ist bereits vergeben. Bitte wähle einen anderen.";if(m.includes("invalid_profile"))return "Die Supabase-Datenbank unterstützt diese Avatar-Auswahl noch nicht. Bitte zuerst die neueste Migration anwenden.";return message;}
 
 function Onboarding(){const [message,setMessage]=useState("");const [pending,setPending]=useState(false);const nav=useNavigate();
   async function save(e:FormEvent<HTMLFormElement>){e.preventDefault();setPending(true);setMessage("");const name=String(new FormData(e.currentTarget).get("username")??"").trim();

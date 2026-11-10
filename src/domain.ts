@@ -1,9 +1,9 @@
+import countryFlagCodes from "./country-flag-codes.json";
+
 export const modes = ["classic", "practice", "timed", "endless"] as const;
 export type Mode = typeof modes[number];
 export const difficulties = ["easy", "medium", "hard", "expert"] as const;
 export type Difficulty = typeof difficulties[number];
-import countryFlagCodes from "./country-flag-codes.json";
-
 const starterAvatars = ["🌍", "🧭", "🚀", "🏔️", "✈️", "🗿", "📸", "🇦🇽", "🇦🇫", "🇺🇳", "🇧🇸"];
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
 const countryAvatarData = countryFlagCodes.map(code => ({
@@ -15,7 +15,6 @@ const avatarLabelsByEmoji = new Map(countryAvatarData.map(option => [option.emoj
 const genericAvatarLabels = new Map([["🌍", "World"], ["🧭", "Compass"], ["🚀", "Rocket"], ["🏔️", "Mountain"], ["✈️", "Airplane"], ["🗿", "Moai"], ["📸", "Camera"]]);
 export const avatars = [...new Set([...starterAvatars, ...countryAvatarData.map(option => option.emoji)])];
 export const avatarLabels = avatars.map(emoji => avatarLabelsByEmoji.get(emoji) ?? genericAvatarLabels.get(emoji) ?? "Avatar");
-export const avatarSearchTerms = avatars.map((emoji, index) => `${avatarLabels[index]} ${countryAvatarData.find(option => option.emoji === emoji)?.code ?? ""}`.toLocaleLowerCase());
 export const countryFlagAvatarCount = countryAvatarData.length;
 export function normalizeUsername(value: string) { return value.trim(); }
 export function validUsername(value: string) { return /^[A-Za-z0-9 _-]{2,24}$/.test(normalizeUsername(value)); }
