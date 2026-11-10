@@ -1156,13 +1156,13 @@ html[data-theme="light"] .text-mint { color:#087f78; }
 .flags-option.right.attempt-3::after { background: #7f1d1d; }
 .flags-option.unresolved { border: 2px solid #450a0a; background: #7f1d1d; box-shadow: inset 0 0 0 2px rgb(255 255 255 / .12); }
 .flags-option.unresolved::after { background: #fecaca; }
-.flags-option.right .flags-image.small, .flags-option.unresolved .flags-image.small { width: min(100%, 84px); height: 44px; }
+.flags-option.right .flags-image.small, .flags-option.unresolved .flags-image.small { width: min(100%, 72px); height: 48px; }
 .flags-option.right .flags-image.small img, .flags-option.unresolved .flags-image.small img { width: 100%; height: 100%; object-fit: contain; }
 .flags-option.unresolved .flags-image img { filter: saturate(.72); }
 .flags-option:disabled.right, .flags-option:disabled.unresolved { opacity: 1; }
 .flags-image { position: relative; display: inline-grid; place-items: center; width: 100%; height: 100%; min-height: 42px; overflow: hidden; border-radius: .28rem; }
 .flags-image img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.flags-image.small { width: min(100%, 112px); aspect-ratio: 2 / 1; height: auto; min-height: 42px; }
+.flags-image.small { width: min(100%, 72px); height: 48px; min-height: 48px; background: rgb(var(--c-raised) / .55); border: 1px solid rgb(var(--c-line) / .15); border-radius: .55rem; }
 .flags-image.small img { width: 100%; height: 100%; object-fit: contain; }
 .flags-image.small > span.flags-image-fallback { font-size: .65rem; text-align: center; }
 .flags-image.large { width: min(100%, 580px); height: clamp(170px, 32vw, 340px); margin: 0 auto 1rem; background: rgb(var(--c-panel)); border: 1px solid rgb(var(--c-line) / .16); }
@@ -1247,7 +1247,7 @@ html[data-theme="light"] .text-mint { color:#087f78; }
   .flags-game-actions .flags-abandon { font-size: .8rem; }
   .flags-option-grid { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: .4rem; max-height: none; }
   .flags-option { min-height: 68px; padding: .35rem; }
-  .flags-image.small { height: 44px; }
+  .flags-image.small { height: 48px; }
   .flags-image.large { height: clamp(150px, 48vw, 240px); }
 }
 @media (prefers-reduced-motion: reduce) { .flags-option:hover:not(:disabled) { transform: none; } }

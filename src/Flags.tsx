@@ -11,7 +11,7 @@ function localFlagFallback(svgUrl:string|null){
   try{const url=new URL(svgUrl);if(url.hostname!=="flags.restcountries.com")return null;const code=url.pathname.match(/\/([a-z]{2})\.svg$/i)?.[1];return code?`/flags/${code.toLowerCase()}.svg`:null}catch{return null}
 }
 export function FlagImage({value,label,className="",onUnavailable}:{value:Pick<FlagsChoice,"flagSvgUrl"|"flagPngUrl"|"flagDescription">;label:string;className?:string;onUnavailable?:(missing:boolean)=>void}){
-  const sources=[...new Set([localFlagFallback(value.flagSvgUrl),value.flagSvgUrl,value.flagPngUrl].filter((source):source is string=>Boolean(source)))];
+  const sources=[...new Set([value.flagSvgUrl,value.flagPngUrl,localFlagFallback(value.flagSvgUrl)].filter((source):source is string=>Boolean(source)))];
   const sourceKey=sources.join("|");
   const [sourceIndex,setSourceIndex]=useState(0);
   const [failed,setFailed]=useState(false);
