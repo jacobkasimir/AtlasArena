@@ -297,3 +297,22 @@ export type FlagsSession = {
   choices?: FlagsChoice[] | null;
   actionResult?: { type: string; outcome: string; remainingAttempts: number };
 };
+
+export type FlagsBestBoard = {
+  direction: FlagsDirection;
+  region: string | null;
+  poolTier: FlagsPoolTier;
+  poolVersion: number;
+  total: number;
+  runCount: number;
+  topFive: {
+    score: number;
+    maxScore: number;
+    elapsedMs: number;
+    correct: number;
+    incorrect: number;
+    skipped: number;
+    hintsUsed: number;
+    completedAt: string;
+  }[];
+};

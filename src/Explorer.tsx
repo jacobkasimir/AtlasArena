@@ -30,9 +30,14 @@ function getHttpsUrl(value: string | null | undefined, hosts?: string[]) {
 }
 
 function getFlagCandidates(country: ExplorerCountry) {
-  return [country.flagSvgUrl, country.flagPngUrl]
+  const code = country.code.trim().toUpperCase();
+  const localFlag = country.catalogKind === "iso_alpha2" && /^[A-Z]{2}$/.test(code)
+    ? `/flags/${code.toLowerCase()}.svg`
+    : null;
+  const remoteFlags = [country.flagSvgUrl, country.flagPngUrl]
     .map(value => getHttpsUrl(value, ["flags.restcountries.com"]))
     .filter((value): value is string => Boolean(value));
+  return [...new Set([...(localFlag ? [localFlag] : []), ...remoteFlags])];
 }
 
 function CountryFlag({ country, eager = false, priority = false }: { country: ExplorerCountry; eager?: boolean; priority?: boolean }) {
@@ -48,17 +53,15 @@ function CountryFlag({ country, eager = false, priority = false }: { country: Ex
           src={url}
           alt={`Flag of ${country.name}`}
           {...({ fetchpriority: priority ? "high" : "auto" } as Record<string, string>)}
-          width={72}
-          height={48}
+          width={88}
+          height={64}
           loading={eager ? "eager" : "lazy"}
           decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setCandidateIndex(index => index + 1)}
         />
-      ) : country.flagEmoji ? (
-        <span className="explorer-flag-emoji" role="img" aria-label={`Flag of ${country.name}`}>{country.flagEmoji}</span>
       ) : (
-        <span className="muted text-xs" aria-label={`Flag unavailable for ${country.name}`}>No flag</span>
+        <span className="muted text-xs" aria-label={`Flag unavailable for ${country.name}`}>Unavailable</span>
       )}
     </span>
   );
@@ -156,6 +159,24 @@ function CountryCard({ country, countriesByAlpha3, eagerFlag = false, priorityFl
   );
 }
 
+function pageNumbers(currentPage: number, pageCount: number) {
+  if (pageCount <= 7) return Array.from({ length: pageCount }, (_, index) => index + 1);
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(pageCount - 1, currentPage + 1);
+  return [1, ...(start > 2 ? ["start-gap"] : []), ...Array.from({ length: end - start + 1 }, (_, index) => start + index), ...(end < pageCount - 1 ? ["end-gap"] : []), pageCount] as (number | string)[];
+}
+
+function ExplorerPagination({currentPage,pageCount,onPage,position,navRef}:{currentPage:number;pageCount:number;onPage:(page:number)=>void;position:"top"|"bottom";navRef:(node:HTMLElement|null)=>void}){
+  const pages=pageNumbers(currentPage,pageCount);
+  return <nav ref={navRef} tabIndex={-1} className={`explorer-pagination explorer-pagination-${position}`} aria-label={`${position} catalog pagination`}>
+    <button type="button" className="secondary explorer-page-arrow" aria-label="Previous page" disabled={currentPage===1} onClick={()=>onPage(currentPage-1)}>← Previous</button>
+    <div className="explorer-page-list" aria-label={`Page ${currentPage} of ${pageCount}`}>
+      {pages.map(page=>typeof page==="number"?<button type="button" className={`explorer-page-number ${page===currentPage?"is-current":""}`} aria-label={`Page ${page}`} aria-current={page===currentPage?"page":undefined} key={page} onClick={()=>onPage(page)}>{page}</button>:<span className="explorer-page-ellipsis" aria-hidden="true" key={page}>…</span>)}
+    </div>
+    <button type="button" className="secondary explorer-page-arrow" aria-label="Next page" disabled={currentPage===pageCount} onClick={()=>onPage(currentPage+1)}>Next →</button>
+  </nav>;
+}
+
 export default function Explorer() {
   const { data, error, reload } = useLoad<ExplorerCountry[]>(() => api.explore() as Promise<ExplorerCountry[]>);
   const [searchParams] = useSearchParams();
@@ -164,7 +185,8 @@ export default function Explorer() {
   const [region, setRegion] = useState("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("name");
   const [page, setPage] = useState(1);
-  const collectionRef = useRef<HTMLDivElement>(null);
+  const topPaginationRef = useRef<HTMLElement | null>(null);
+  const bottomPaginationRef = useRef<HTMLElement | null>(null);
   const lastQueryParam = useRef(queryParam);
 
   useEffect(() => {
@@ -210,11 +232,12 @@ export default function Explorer() {
   const hasFilters = search.trim() !== "" || region !== "all";
 
   function clearFilters() { setSearch(""); setRegion("all"); setPage(1); }
-  function changePage(nextPage: number) {
+  function changePage(nextPage: number, position: "top" | "bottom") {
     setPage(Math.max(1, Math.min(nextPage, pageCount)));
     requestAnimationFrame(() => {
-      collectionRef.current?.focus({ preventScroll: true });
-      collectionRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+      const nav=position==="top"?topPaginationRef.current:bottomPaginationRef.current;
+      nav?.scrollIntoView({ block: "nearest", behavior: "auto" });
+      requestAnimationFrame(()=>nav?.querySelector<HTMLButtonElement>('[aria-current="page"]')?.focus({preventScroll:true}));
     });
   }
 
@@ -250,10 +273,12 @@ export default function Explorer() {
       {hasFilters && <button type="button" className="secondary mt-4" onClick={clearFilters}>Clear filters</button>}
     </section>
 
-    <div ref={collectionRef} tabIndex={-1} className="collection-meta explorer-collection-meta my-5">
+    <div className="collection-meta explorer-collection-meta my-5">
       <p className="muted" role="status">{filtered.length === 0 ? `0 of ${data.length} places` : `Showing ${offset + 1}–${offset + visible.length} of ${filtered.length} places`}</p>
       <span className="map-coordinates" aria-hidden="true">ATLAS / EXPLORE</span>
     </div>
+
+    {pageCount > 1 && <ExplorerPagination currentPage={currentPage} pageCount={pageCount} onPage={next=>changePage(next,"top")} position="top" navRef={node=>{topPaginationRef.current=node}} />}
 
     {!filtered.length && <div className="empty-state"><span className="empty-icon" aria-hidden="true">⌕</span><h2 className="text-lg font-bold mt-3">{data.length ? "No places match those filters" : "The catalog is empty"}</h2><p className="muted mt-2">{data.length ? "Try another name or choose a different region." : "No catalog entries were returned by the backend."}</p>{hasFilters && <button type="button" className="secondary mt-4" onClick={clearFilters}>Show all places</button>}</div>}
 
@@ -261,11 +286,7 @@ export default function Explorer() {
       {visible.map((country, index) => <CountryCard key={country.code} country={country} countriesByAlpha3={countriesByAlpha3} eagerFlag={index === 0} priorityFlag={index === 0} />)}
     </div>
 
-    {pageCount > 1 && <nav className="explorer-pagination mt-8" aria-label="Country catalog pages">
-      <button type="button" className="secondary" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}>← Previous</button>
-      <p className="muted text-sm" aria-live="polite">Page {currentPage} of {pageCount}</p>
-      <button type="button" className="secondary" disabled={currentPage === pageCount} onClick={() => changePage(currentPage + 1)}>Next →</button>
-    </nav>}
+    {pageCount > 1 && <ExplorerPagination currentPage={currentPage} pageCount={pageCount} onPage={next=>changePage(next,"bottom")} position="bottom" navRef={node=>{bottomPaginationRef.current=node}} />}
     <p className="muted text-xs mt-8">Catalog entries can be explored without published quiz questions. Practice is offered only when enough matching questions are available.</p>
   </div>;
 }

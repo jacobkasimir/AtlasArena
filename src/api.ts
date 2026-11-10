@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
-import { FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
+import { FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
 import { flagsDemo } from "./flags-demo";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -78,6 +78,7 @@ export const api = {
   explore: () =>
     isDemo ? demo.explore() : rpc<ExplorerCountry[]>("arena_explore"),
   flagsSetup: () => isDemo ? flagsDemo.setup() : rpc<FlagsSetup>("arena_flags_setup"),
+  flagsBests: () => isDemo ? flagsDemo.bests() : rpc<FlagsBestBoard[]>("arena_flags_bests"),
   flagsStart: (direction: FlagsDirection, region: string | null, poolTier: FlagsPoolTier, requestId: string) =>
     isDemo ? flagsDemo.start(direction, region, poolTier, requestId) : rpc<FlagsSession>("arena_flags_start", {
       p_direction: direction, p_region: region, p_pool_tier: poolTier, p_request_id: requestId
