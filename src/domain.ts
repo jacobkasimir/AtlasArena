@@ -2,7 +2,7 @@ export const modes = ["classic", "practice", "timed", "endless"] as const;
 export type Mode = typeof modes[number];
 export const difficulties = ["easy", "medium", "hard", "expert"] as const;
 export type Difficulty = typeof difficulties[number];
-export const avatars = ["🌍", "🧭", "🚀", "🏔️"] as const;
+export const avatars = ["🌍", "🧭", "🚀", "🏔️", "✈️", "🗿", "📸", "🇦🇽", "🇦🇫", "🇺🇳", "🇧🇸"] as const;
 export function normalizeUsername(value: string) { return value.trim(); }
 export function validUsername(value: string) { return /^[A-Za-z0-9 _-]{2,24}$/.test(normalizeUsername(value)); }
 
@@ -257,6 +257,7 @@ export type FlagsEntry = {
 };
 export type FlagsChoice = Pick<FlagsEntry, "id" | "flagSvgUrl" | "flagPngUrl" | "flagDescription"> & {
   choicePosition?: number;
+  name?: string | null;
 };
 export type FlagsRegion = {
   id: string; name: string; easyCount: number; allCount: number;
