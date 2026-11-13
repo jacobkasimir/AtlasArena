@@ -12,3 +12,5 @@ information.txt
 .DS_Store
 country-import/
 .venv/
+.venv-1/
+country-import/generated-questions/
