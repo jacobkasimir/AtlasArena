@@ -15,7 +15,7 @@ const Admin = lazy(() => import("./Admin"));
 const Explorer = lazy(() => import("./Explorer"));
 const Flags = lazy(() => import("./Flags"));
 const Capitals = lazy(() => import("./Capitals"));
-const RegionRecallSetup = lazy(() => import("./RegionRecallSetup"));
+const Recall = lazy(() => import("./Recall"));
 
 const names: Record<Mode, string> = {
   classic: "Classic Quiz", practice: "Practice",
@@ -825,7 +825,7 @@ export default function App() {
       <Route path="auth" element={<Auth/>}/>
       <Route path="explorer" element={<Protected><Explorer/></Protected>}/>
       <Route path="flags/*" element={<Protected><Flags/></Protected>}/>
-      <Route path="recall/*" element={<Protected><RegionRecallSetup/></Protected>}/>
+      <Route path="recall/*" element={<Protected><Recall/></Protected>}/>
       <Route path="capitals/*" element={<Protected><Capitals/></Protected>}/>
       <Route path="admin" element={<Protected><Admin/></Protected>}/>
       <Route path="*" element={<section className="card">

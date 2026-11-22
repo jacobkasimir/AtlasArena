@@ -16,10 +16,10 @@ selection → playable session → feedback → results → saved progress.
 | Flags | `/flags/*` | End to end (server + demo) |
 | Capitals | `/capitals/*` | End to end (server + demo) |
 | Explorer | `/explorer` | Read-only atlas |
-| Recall | `/recall/*` (`src/RegionRecallSetup.tsx`) | **Setup screen only** — no session, answer checking, results or persistence yet |
+| Recall | `/recall/*` (`src/Recall.tsx`) | End to end (server + demo): set → type names (EN/DE/FR) → auto done list → results → bests |
 | Map Challenge, multiplayer | — | Deferred. Do not start. |
 
-Do not call Recall (or any mode) "playable" until all five steps work and are tested.
+Do not call any mode "playable" until all five steps work and are tested.
 Do not add a new mode or multiplayer while a mode is half-finished.
 
 ## Stack and layout
@@ -28,7 +28,7 @@ Do not add a new mode or multiplayer while a mode is half-finished.
 - `src/api.ts` — the only place that talks to Supabase. Every call has a demo branch.
 - `src/domain.ts` — shared types, scoring, eligibility and state rules. `*-domain.ts` per mode.
 - `src/demo.ts`, `flags-demo.ts`, `capitals-demo.ts` — device-local demo engines (localStorage).
-- `src/App.tsx` — layout, routes, quiz screens. Feature screens are lazy-loaded (`Admin`, `Explorer`, `Flags`, `Capitals`, `RegionRecallSetup`).
+- `src/App.tsx` — layout, routes, quiz screens. Feature screens are lazy-loaded (`Admin`, `Explorer`, `Flags`, `Capitals`, `Recall`).
 - `supabase/migrations/` — the **only** source of truth for schema and RPCs.
 - `scripts/` — build/import tooling (`build-sw.mjs` runs after `vite build`).
 
@@ -57,6 +57,12 @@ If you could not run them, say so explicitly.
 5. No service-role key in any `VITE_` variable or frontend file. Never print, copy or commit values
    from `.env.local` or `information.txt`.
 6. Admin rights come only from `auth.users.raw_app_meta_data.atlas_admin`, never from profile fields.
+
+### Recall answer matching
+- `private.recall_normalize()` (SQL) and `normalizeRecall()` (`src/recall-domain.ts`) must stay byte-for-byte
+  equivalent; the browser hashes typed text and the server re-hashes it. Change both together and keep the
+  pinned hash test in `src/recall-domain.test.ts` passing.
+- Answers are sent to the browser only as salted hashes while a round is active.
 
 ### Demo mode parity
 7. Demo mode (`isDemo` in `api.ts`) must keep working. Every new `api.*` function needs a demo
@@ -96,7 +102,9 @@ If you could not run them, say so explicitly.
 ## Open issues (fix before building on top)
 - README is stale: written by an earlier generator, does not mention Flags, Capitals, Explorer, Recall,
   the country catalog, or the real deployment. Update it when behaviour changes.
-- Recall (`/recall`) is a setup screen only. Cities are hidden until a city catalog exists.
+- Recall accepts German/French capital names only from the curated `private.recall_aliases` table
+  (the catalog stores English capitals). Add missing exonyms there via a migration. The demo has English names only.
+- Catalog display names `Naoero` (Nauru) and `DRC` (DR Congo) come from the import; fix in the importer, not by hand.
 - `src/api.auth.test.tsx` only passes when `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` are set
   (e.g. from `.env.local`); it should stub them with `vi.stubEnv` instead.
 - `npm test` from a Linux shell needs its own `npm ci`; the checked-out `node_modules` is macOS-only.

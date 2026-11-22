@@ -1,4 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { recallDemo } from "./recall-demo";
+import type { RecallAnswerResult, RecallChoice, RecallSession, RecallSetup } from "./recall-domain";
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
 import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
@@ -120,6 +122,15 @@ export const api = {
   capitalsAbandon: (id: string, requestId: string) => isDemo ? capitalsDemo.abandon(id, requestId)
     : rpc<CapitalSession>("arena_capitals_abandon", { p_session_id: id, p_request_id: requestId }),
   capitalsResults: (id: string) => isDemo ? capitalsDemo.results(id) : rpc<CapitalSession>("arena_capitals_results", { p_session_id: id }),
+  recallSetup: () => isDemo ? recallDemo.setup() : rpc<RecallSetup>("arena_recall_setup"),
+  recallStart: (choice: RecallChoice, requestId: string) => isDemo ? recallDemo.start(choice, requestId)
+    : rpc<RecallSession>("arena_recall_start", { p_kind: choice.kind, p_scope: choice.scope, p_region: choice.region,
+      p_size: choice.size, p_time_limit_seconds: choice.timeLimitSeconds, p_request_id: requestId }),
+  recallView: (id: string) => isDemo ? recallDemo.view(id) : rpc<RecallSession>("arena_recall_view", { p_session_id: id }),
+  recallAnswer: (id: string, position: number, answer: string) => isDemo ? recallDemo.answer(id, position, answer)
+    : rpc<RecallAnswerResult>("arena_recall_answer", { p_session_id: id, p_position: position, p_answer: answer }),
+  recallFinish: (id: string) => isDemo ? recallDemo.finish(id) : rpc<RecallSession>("arena_recall_finish", { p_session_id: id }),
+  recallAbandon: (id: string) => isDemo ? recallDemo.abandon(id) : rpc<void>("arena_recall_abandon", { p_session_id: id }),
   exportData: () =>
     isDemo ? demo.exportData() : rpc<unknown>("arena_export"),
   deleteAccount: async () => {
