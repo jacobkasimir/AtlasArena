@@ -3,7 +3,7 @@ import { recallDemo } from "./recall-demo";
 import type { RecallAnswerResult, RecallChoice, RecallSession, RecallSetup } from "./recall-domain";
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
-import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
+import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalBest, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
 import { flagsDemo } from "./flags-demo";
 import { capitalsDemo } from "./capitals-demo";
 
@@ -121,6 +121,7 @@ export const api = {
     : rpc<CapitalSession>("arena_capitals_next", { p_session_id: id, p_request_id: requestId }),
   capitalsAbandon: (id: string, requestId: string) => isDemo ? capitalsDemo.abandon(id, requestId)
     : rpc<CapitalSession>("arena_capitals_abandon", { p_session_id: id, p_request_id: requestId }),
+  capitalsBests: () => isDemo ? capitalsDemo.bests() : rpc<CapitalBest[]>("arena_capitals_bests"),
   capitalsResults: (id: string) => isDemo ? capitalsDemo.results(id) : rpc<CapitalSession>("arena_capitals_results", { p_session_id: id }),
   recallSetup: () => isDemo ? recallDemo.setup() : rpc<RecallSetup>("arena_recall_setup"),
   recallStart: (choice: RecallChoice, requestId: string) => isDemo ? recallDemo.start(choice, requestId)

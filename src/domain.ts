@@ -335,6 +335,10 @@ export type CapitalCountry = {
   capitalToCountryReason: string | null;
 };
 export type CapitalSetup = { countries: CapitalCountry[]; regions: string[]; activeSessions: { id: string; direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null; total: number; answered: number; score: number; createdAt: string }[] };
+export type CapitalBest = {
+  direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null; selectedCount: number;
+  total: number; score: number; maxScore: number; correct: number; elapsedMs: number; completedAt: string; runCount: number;
+};
 export type CapitalVocabularyOption = { id: string; label: string };
 export type CapitalAcceptedAnswer = { name: string; roles: string[]; primary: boolean };
 export type CapitalEntry = {

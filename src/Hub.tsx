@@ -6,7 +6,7 @@ import { ErrorBox, Loading, useLoad } from "./components";
 import { avatars, Dashboard, level, modes } from "./domain";
 import { accuracy, modeIcons, modeNames } from "./quiz-meta";
 import type { RecallSetup } from "./recall-domain";
-import type { CapitalSetup, FlagsBestBoard, FlagsSetup } from "./domain";
+import type { CapitalBest, CapitalSetup, FlagsBestBoard, FlagsSetup } from "./domain";
 import { Meter } from "./setup-ui";
 
 type HubData = {
@@ -14,6 +14,7 @@ type HubData = {
   flags: FlagsSetup | null;
   flagBests: FlagsBestBoard[] | null;
   capitals: CapitalSetup | null;
+  capitalBests: CapitalBest[] | null;
   recall: RecallSetup | null;
 };
 
@@ -21,11 +22,12 @@ type Continue = { id: string; game: string; title: string; detail: string; to: s
 
 async function loadHub(): Promise<HubData> {
   const optional = <T,>(promise: Promise<T>) => promise.catch(() => null);
-  const [quiz, flags, flagBests, capitals, recall] = await Promise.all([
+  const [quiz, flags, flagBests, capitals, capitalBests, recall] = await Promise.all([
     api.dashboard(),
     optional(api.flagsSetup()),
     optional(api.flagsBests()),
     optional(api.capitalsSetup()),
+    optional(api.capitalsBests()),
     optional(api.recallSetup()),
   ]);
   const withSessions = <T extends { activeSessions?: unknown }>(value: T | null) =>
@@ -35,6 +37,7 @@ async function loadHub(): Promise<HubData> {
     flags: withSessions(flags),
     flagBests: Array.isArray(flagBests) ? flagBests : null,
     capitals: withSessions(capitals),
+    capitalBests: Array.isArray(capitalBests) ? capitalBests : null,
     recall: recall && Array.isArray(recall.catalog) && recall.recalled ? withSessions(recall) : null,
   };
 }
@@ -102,6 +105,8 @@ export default function Hub() {
   const bestFlags = data.flagBests
     ?.flatMap((board) => board.topFive.map((run) => ({ ...run, total: board.total })))
     .sort((a, b) => b.score / b.maxScore - a.score / a.maxScore)[0];
+  const capitalRuns = data.capitalBests?.reduce((sum, best) => sum + best.runCount, 0) ?? 0;
+  const bestCapitals = [...(data.capitalBests ?? [])].sort((a, b) => b.score / Math.max(1, b.maxScore) - a.score / Math.max(1, a.maxScore))[0];
   const recallCatalog = data.recall?.catalog.filter((item) => item.un) ?? [];
   const recalledCountries = new Set(data.recall?.recalled.countries ?? []);
   const recalledCapitals = new Set(data.recall?.recalled.capitals ?? []);
@@ -183,7 +188,10 @@ export default function Hub() {
               <span><strong>{Math.round((bestFlags.score / bestFlags.maxScore) * 100)}%</strong> best round</span>
             </> : <span>No finished rounds yet</span>} />
           <GameCard to="/capitals" icon="🏛️" title="Capitals" text="Name the capital – or the country behind it – with spelling help as you type."
-            stat={<span><strong>{data.capitals?.activeSessions.length ?? 0}</strong> rounds in progress</span>} />
+            stat={bestCapitals ? <>
+              <span><strong>{capitalRuns}</strong> rounds finished</span>
+              <span><strong>{Math.round((bestCapitals.score / Math.max(1, bestCapitals.maxScore)) * 100)}%</strong> best round</span>
+            </> : <span>No finished rounds yet</span>} />
           <GameCard to="/recall" icon="🧠" title="Recall" text="Type every country or capital of a region from memory. English, German or French."
             stat={recallCatalog.length ? <>
               <span><strong>{unCountries}/{recallCatalog.length}</strong> countries named</span>

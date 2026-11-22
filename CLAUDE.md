@@ -105,8 +105,6 @@ If you could not run them, say so explicitly.
 22. Python tooling lives in `scripts/`, data in `content/`. Do not add new loose files at the repo root.
 
 ## Open issues (fix before building on top)
-- README is stale: written by an earlier generator, does not mention Flags, Capitals, Explorer, Recall,
-  the country catalog, or the real deployment. Update it when behaviour changes.
 - Recall accepts German/French capital names only from the curated `private.recall_aliases` table
   (the catalog stores English capitals). Add missing exonyms there via a migration. The demo has English names only.
 - Catalog display names `Naoero` (Nauru) and `DRC` (DR Congo) come from the import; fix in the importer, not by hand.

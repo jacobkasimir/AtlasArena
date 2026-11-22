@@ -2,9 +2,10 @@ import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useSta
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import { AUTO_CONTINUE_MS, haptic, loadSetup, oneOf, saveSetup, usePrefs } from "./prefs";
+import { AUTO_CONTINUE_MS, haptic, isIOS, loadSetup, oneOf, saveSetup, usePrefs } from "./prefs";
 import { Chips, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, StreakBadge, Step } from "./setup-ui";
 import {
+  CapitalBest,
   CapitalCountry,
   CapitalDirection,
   CapitalEntry,
@@ -32,6 +33,7 @@ function useCapitalSetup() {
 
 function Setup() {
   const { data, error, reload } = useCapitalSetup();
+  const bests = useLoad<CapitalBest[]>(() => api.capitalsBests());
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const saved = useMemo(() => (params.toString() ? {} : loadSetup("capitals")), []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -124,6 +126,7 @@ function Setup() {
   if (!data) return <Loading />;
 
   const side = (
+    <>
     <SideCard title="Unfinished rounds">
       <ResumeList
         empty="None – rounds are saved automatically, so you can stop any time."
@@ -137,6 +140,30 @@ function Setup() {
         }))}
       />
     </SideCard>
+    <SideCard title="Personal bests">
+      {bests.data?.length ? (
+        <ul className="side-list">
+          {bests.data.slice(0, 6).map((best, index) => (
+            <li key={index}>
+              <div>
+                <p className="font-semibold">{directions.find((item) => item.id === best.direction)?.title}</p>
+                <p className="muted text-sm">
+                  {best.poolMode === "manual" ? `${best.selectedCount} picked` : best.poolMode === "easy" ? "Well-known" : "All"} ·{" "}
+                  {best.region ?? "Whole world"} · {best.runCount} {best.runCount === 1 ? "run" : "runs"}
+                </p>
+              </div>
+              <p className="best-score">
+                {best.correct}/{best.total}
+                <span>{formatTime(best.elapsedMs)}</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted text-sm mt-2">Finish a round to record your first best.</p>
+      )}
+    </SideCard>
+    </>
   );
 
   return (
@@ -497,6 +524,7 @@ function Game() {
       return;
     }
     if (!session || !current) return;
+    if (isIOS) haptic("tap");
     void act(() => api.capitalsAnswer(session.id, current.id, answer, candidateId, requestId()));
   }
   function skip() {

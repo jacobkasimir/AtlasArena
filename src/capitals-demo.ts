@@ -1,5 +1,5 @@
 import countries from "./demo-countries.json";
-import { CapitalAcceptedAnswer, CapitalCountry, CapitalDirection, CapitalEntry, CapitalPoolMode, CapitalSession, CapitalSetup } from "./domain";
+import { CapitalAcceptedAnswer, CapitalBest, CapitalCountry, CapitalDirection, CapitalEntry, CapitalPoolMode, CapitalSession, CapitalSetup } from "./domain";
 import { classifyCapitalAnswer, isStrictCapitalBest, normalizeCapitalText } from "./capitals-domain";
 
 type DemoCountry = { code: string; name: string; capital: string; region: string; difficulty: string; flag: string };
@@ -100,5 +100,15 @@ export const capitalsDemo = {
     save(store); return publicSession(session);
   },
   async abandon(id: string, _requestId: string): Promise<CapitalSession> { const store = read(), session = get(store, id); session.state = "abandoned"; save(store); return publicSession(session); },
+  async bests(): Promise<CapitalBest[]> {
+    const done = read().sessions.filter(item => item.state === "completed");
+    const groups = new Map<string, CapitalSession[]>();
+    for (const item of done) groups.set(item.direction + "|" + item.poolSignature, [...(groups.get(item.direction + "|" + item.poolSignature) ?? []), item]);
+    return [...groups.values()].map(runs => {
+      const top = [...runs].sort((a, b) => b.score - a.score || (a.elapsedMs ?? 0) - (b.elapsedMs ?? 0))[0];
+      return { direction: top.direction, poolMode: top.poolMode, region: top.region, selectedCount: top.selectedCodes.length, total: top.total,
+        score: top.score, maxScore: top.total * 100, correct: top.correct, elapsedMs: top.elapsedMs ?? 0, completedAt: top.completedAt ?? "", runCount: runs.length };
+    }).sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+  },
   async results(id: string): Promise<CapitalSession> { const session = get(read(), id); if (session.state !== "completed" && session.state !== "abandoned") throw new Error("This round is not complete yet."); return publicSession(session); }
 };

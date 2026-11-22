@@ -31,7 +31,7 @@ import {
 import { ErrorBox, Feedback, Loading, OfflineBanner, download, useLoad } from "./components";
 import { analyticsEnabled, readEvents, setAnalytics, track } from "./analytics";
 import { accuracy, modeDescriptions, modeIcons, modeNames } from "./quiz-meta";
-import { AUTO_CONTINUE_MS, Prefs, clearSavedSetups, haptic, loadSetup, oneOf, saveSetup, setPref, usePrefs } from "./prefs";
+import { AUTO_CONTINUE_MS, Prefs, clearSavedSetups, haptic, isIOS, loadSetup, oneOf, saveSetup, setPref, usePrefs } from "./prefs";
 import { AutoContinueBar, Chips, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, Step, StreakBadge } from "./setup-ui";
 
 const Admin = lazy(() => import("./Admin"));
@@ -71,12 +71,20 @@ function Layout() {
   useEffect(() => {
     let live = true;
     if (isDemo) {
-      setIdentity(
-        localStorage.getItem("atlas-demo-signed-out") === "yes"
-          ? null
-          : { username: "Traveler", avatar: 0, isAnonymous: true, isAdmin: false, userId: "demo" },
-      );
-      return;
+      if (localStorage.getItem("atlas-demo-signed-out") === "yes") {
+        setIdentity(null);
+        return;
+      }
+      setIdentity((current) => current ?? { username: "Explorer", avatar: 0, isAnonymous: true, isAdmin: false, userId: "demo" });
+      api
+        .dashboard()
+        .then((d) => {
+          if (live) setIdentity({ username: d.profile.username, avatar: d.profile.avatar, isAnonymous: true, isAdmin: false, userId: "demo" });
+        })
+        .catch(() => {});
+      return () => {
+        live = false;
+      };
     }
     supabase?.auth.getSession().then(({ data }) => {
       if (live && data.session?.user) {
@@ -1093,6 +1101,7 @@ function Game() {
 
   async function action(kind: "answer" | "next", option?: string) {
     if (!view || pendingRef.current) return;
+    if (kind === "answer" && isIOS) haptic("tap");
     pendingRef.current = true;
     setPending(true);
     setError("");
@@ -2375,7 +2384,7 @@ function Settings() {
   const [motion, setMotion] = useState(localStorage.getItem("atlas-motion") === "reduce");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
-  const canVibrate = typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+  const canVibrate = (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") || isIOS;
   useEffect(() => {
     api
       .currentUser()
@@ -2421,7 +2430,13 @@ function Settings() {
             text="Hints like 1–4 to answer and Enter to continue."
             checked={prefs.keyboardHints} onChange={(value) => setPref("keyboardHints", value)} />
           <SettingToggle id="haptics" title="Vibration"
-            text={canVibrate ? "A short buzz for right and wrong answers." : "Not supported by this browser (iPhone Safari never vibrates)."}
+            text={
+              isIOS
+                ? "On iPhone you feel a light tick when an answer is accepted while you type (iOS 18 or newer)."
+                : canVibrate
+                  ? "A short buzz for right and wrong answers."
+                  : "This browser doesn't support vibration."
+            }
             checked={prefs.haptics && canVibrate} onChange={(value) => { setPref("haptics", value); if (value) haptic("tap"); }} />
         </div>
       </section>

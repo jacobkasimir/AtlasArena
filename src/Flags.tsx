@@ -2,7 +2,7 @@ import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useSta
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import { AUTO_CONTINUE_MS, getPrefs, haptic, loadSetup, saveSetup, usePrefs } from "./prefs";
+import { AUTO_CONTINUE_MS, getPrefs, haptic, isIOS, loadSetup, saveSetup, usePrefs } from "./prefs";
 import { Chips, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, Step, StreakBadge } from "./setup-ui";
 import {
   FlagsAnswerOption,
@@ -832,6 +832,7 @@ function Game() {
   }
   function choose(choiceId: string) {
     if (!session || !current || current.outcome !== "pending" || busy) return;
+    if (isIOS) haptic("tap");
     void act(() => api.flagsAnswer(session.id, current.id, choiceId, null, requestId()));
   }
   function onGridKey(e: KeyboardEvent<HTMLDivElement>) {
@@ -854,6 +855,7 @@ function Game() {
       return;
     }
     if (!session || !current) return;
+    if (isIOS) haptic("tap");
     void act(() => api.flagsAnswer(session.id, current.id, null, answer, requestId()));
   }
   if (error && !session)
@@ -1157,6 +1159,8 @@ function Game() {
 }
 function Results() {
   const { id = "" } = useParams();
+  const navigate = useNavigate();
+  const [replaying, setReplaying] = useState(false);
   const { data, error, reload } = useLoad(() => api.flagsResults(id));
   if (error)
     return (
@@ -1291,12 +1295,21 @@ function Results() {
         </ol>
       </section>
       <div className="flags-result-actions">
-        <Link
+        <button
           className="primary"
-          to={`/flags?direction=${data.direction}&region=${encodeURIComponent(data.region ?? "")}&difficulty=${data.poolTier}`}
+          disabled={replaying}
+          onClick={async () => {
+            setReplaying(true);
+            try {
+              const next = await api.flagsStart(data.direction, data.region, data.poolTier, requestId());
+              navigate(`/flags/session/${next.id}`);
+            } catch {
+              navigate(`/flags?direction=${data.direction}&region=${encodeURIComponent(data.region ?? "")}&difficulty=${data.poolTier}`);
+            }
+          }}
         >
-          Play again
-        </Link>
+          {replaying ? "Preparing…" : "Play again"}
+        </button>
         <Link className="secondary" to="/flags">
           Change settings
         </Link>

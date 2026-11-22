@@ -122,8 +122,8 @@ describe("authenticated dashboard loading", () => {
     render(<MemoryRouter initialEntries={["/home"]}><App/></MemoryRouter>);
 
     expect(await screen.findByText("Games")).toBeTruthy();
-    // route gate (2), quiz dashboard, flags setup + bests, capitals setup, recall setup
-    expect(authState.rpc).toHaveBeenCalledTimes(7);
+    // route gate (2), quiz dashboard, flags setup + bests, capitals setup + bests, recall setup
+    expect(authState.rpc).toHaveBeenCalledTimes(8);
   });
 
   it("opens the quiz setup on /quiz", async () => {

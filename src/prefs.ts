@@ -72,8 +72,40 @@ export function usePrefs(): Prefs {
 
 const patterns = { tap: 8, correct: 18, wrong: [30, 40, 30], complete: [20, 60, 20, 60, 40] } as const;
 
+let iosSwitch: HTMLLabelElement | null = null;
+
+/**
+ * iOS Safari has no Vibration API. Since iOS 18, toggling a native switch control gives a
+ * light haptic tick, which only works while handling a tap or keystroke. Best effort only.
+ */
+function iosTick() {
+  if (typeof document === "undefined") return;
+  if (!iosSwitch) {
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.setAttribute("switch", "");
+    input.id = "atlas-haptic-switch";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    iosSwitch = document.createElement("label");
+    iosSwitch.htmlFor = input.id;
+    iosSwitch.setAttribute("aria-hidden", "true");
+    iosSwitch.style.cssText = "position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden;left:-10px;top:0";
+    iosSwitch.appendChild(input);
+    document.body.appendChild(iosSwitch);
+  }
+  iosSwitch.click();
+}
+
+export const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (typeof navigator !== "undefined" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 export function haptic(kind: keyof typeof patterns) {
-  if (!read().haptics || typeof navigator === "undefined" || typeof navigator.vibrate !== "function") return;
+  if (!read().haptics || typeof navigator === "undefined") return;
+  if (typeof navigator.vibrate !== "function") {
+    if (isIOS) iosTick();
+    return;
+  }
   try {
     navigator.vibrate(patterns[kind] as number | number[]);
   } catch {
