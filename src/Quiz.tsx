@@ -130,7 +130,7 @@ export function QuizSetup() {
     <ModePage
       eyebrow="Atlas Quiz"
       title="Ready for a round?"
-      intro="Four ways to play and four difficulty tiers. Your record and unfinished games are on the right."
+      intro="Four ways to play, four difficulty tiers, fifteen topics."
       side={side}
     >
       <SetupForm onSubmit={start}>

@@ -17,6 +17,15 @@ const Capitals = lazy(() => import("./Capitals"));
 const Recall = lazy(() => import("./Recall"));
 const Hub = lazy(() => import("./Hub"));
 
+const tabs = [
+  { to: "/home", label: "Home", icon: "⌂" },
+  { to: "/quiz", label: "Quiz", icon: "◎" },
+  { to: "/flags", label: "Flags", icon: "⚑" },
+  { to: "/capitals", label: "Capitals", icon: "◆" },
+  { to: "/recall", label: "Recall", icon: "✦" },
+  { to: "/explorer", label: "Explorer", icon: "◍" },
+];
+
 function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -149,12 +158,11 @@ function Layout() {
           <nav aria-label="Primary" className="topbar-nav flex flex-wrap gap-1 items-center">
             {identity && (
               <>
-                <NavLink to="/home">Home</NavLink>
-                <NavLink to="/quiz">Quiz</NavLink>
-                <NavLink to="/flags">Flags</NavLink>
-                <NavLink to="/capitals">Capitals</NavLink>
-                <NavLink to="/recall">Recall</NavLink>
-                <NavLink to="/explorer">Explorer</NavLink>
+                {tabs.map((tab) => (
+                  <NavLink key={tab.to} to={tab.to} className="topbar-game-link">
+                    {tab.label}
+                  </NavLink>
+                ))}
                 {identity.isAdmin && (
                   <NavLink className="admin-nav-link" to="/admin" aria-label="Admin area">
                     Admin
@@ -233,6 +241,16 @@ function Layout() {
         <div className="demo-banner">
           LOCAL DEMO · Progress stays in this browser · Public, unverified sample questions
         </div>
+      )}
+      {identity && (
+        <nav className="bottom-tabs" aria-label="Games">
+          {tabs.slice(0, 5).map((tab) => (
+            <NavLink key={tab.to} to={tab.to}>
+              <span aria-hidden="true">{tab.icon}</span>
+              {tab.label}
+            </NavLink>
+          ))}
+        </nav>
       )}
       <OfflineBanner />
       <main id="main" className="shell py-8 md:py-12">
