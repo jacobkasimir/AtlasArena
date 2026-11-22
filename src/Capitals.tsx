@@ -497,7 +497,7 @@ function Game() {
       const result = await action();
       setSession(result);
       if (result.actionResult?.outcome === "ambiguous") {
-        setMessage("That name matches more than one catalog entry. Please be more specific; no attempt was used.");
+        setMessage("That name fits more than one place – please be more specific. No attempt was used.");
         inputRef.current?.focus();
       } else if (result.actionResult?.outcome === "correct") {
         haptic("correct");
@@ -667,7 +667,7 @@ function Game() {
               inputRef={inputRef}
             />
             <p className="capitals-answer-hint">
-              Suggestions use prefix matching. You can also submit an answer without selecting a suggestion.
+              Pick a suggestion or just type the name and press Enter.
             </p>
             <div className="capitals-answer-actions">
               <button type="submit" className="primary" disabled={busy || finalized || !current}>
@@ -699,7 +699,7 @@ function Game() {
                 </div>
               ) : null}
               {current.catalogKind === "non_iso" && (
-                <p className="capitals-neutral-note">This is a catalog entry without an ISO alpha-2 code.</p>
+                <p className="capitals-neutral-note">This place has no official ISO country code.</p>
               )}
               {current.sourceLinks.length > 0 && (
                 <div className="capitals-source-links">
@@ -766,8 +766,7 @@ function Game() {
             </div>
           </dl>
           <p className="capitals-timer-note">
-            No time limit. The final duration uses server start and completion timestamps, including feedback and time
-            away.
+            No time limit – the clock just records how long the round took.
           </p>
           {recent.length > 0 && (
             <div className="capitals-recent">
@@ -915,7 +914,7 @@ function Results() {
         </section>
         <section className="card capitals-best-card">
           <h2>Five best for this pool</h2>
-          <p>Separate by direction, selected catalog pool, content snapshot and scoring rules.</p>
+          <p>Kept separately for each direction and set of countries.</p>
           {data.topFive.length ? (
             <ol>
               {data.topFive.map((run, index) => (

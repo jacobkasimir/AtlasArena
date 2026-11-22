@@ -94,7 +94,7 @@ function CountryCard({ country, countriesByAlpha3, eagerFlag = false, priorityFl
             <span className="eyebrow">{displayText(country.region)}</span>
             <span role="heading" aria-level={2} className="text-lg font-bold mt-1 explorer-country-name">{country.name}</span>
             {country.catalogKind === "iso_alpha2" && <span className="muted text-xs mt-1 explorer-code-line">{country.code}</span>}
-            {nonIsoEntry && <span className="muted text-xs mt-1 explorer-code-line">Non-ISO catalog entry</span>}
+            {nonIsoEntry && <span className="muted text-xs mt-1 explorer-code-line">No official ISO code</span>}
           </span>
         </span>
         <span className="explorer-card-facts mt-4">

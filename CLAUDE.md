@@ -33,7 +33,7 @@ Do not add a new mode or multiplayer while a mode is half-finished.
 - `src/api.ts` — the only place that talks to Supabase. Every call has a demo branch.
 - `src/domain.ts` — shared types, scoring, eligibility and state rules. `*-domain.ts` per mode.
 - `src/demo.ts`, `flags-demo.ts`, `capitals-demo.ts` — device-local demo engines (localStorage).
-- `src/App.tsx` — layout, routes, quiz screens. Feature screens are lazy-loaded (`Admin`, `Explorer`, `Flags`, `Capitals`, `Recall`).
+- `src/App.tsx` — layout, player menu and routes. `Quiz.tsx` (quiz setup/game/results), `Auth.tsx` (welcome, sign-in, onboarding, route guard), `Profile.tsx`, `Settings.tsx`, `Hub.tsx` (Home). Explorer, Flags, Capitals, Recall and Admin are lazy-loaded.
 - `supabase/migrations/` — the **only** source of truth for schema and RPCs.
 - `scripts/` — build/import tooling (`build-sw.mjs` runs after `vite build`).
 

@@ -459,7 +459,7 @@ function FlagsBestsDialog({ onClose }: { onClose: () => void }) {
           <div>
             <p className="eyebrow">YOUR PROGRESS</p>
             <h2 id="flags-bests-title">Personal bests</h2>
-            <p className="muted">Your five strongest runs for each comparable catalog pool.</p>
+            <p className="muted">Your five best rounds for each setup.</p>
           </div>
           <button
             ref={closeRef}
@@ -807,7 +807,7 @@ function Game() {
             : a.outcome === "duplicate_choice"
               ? "That flag was already selected. Choose another flag."
               : a.outcome === "ambiguous"
-                ? "That answer could refer to more than one catalog entry. Please be more specific."
+                ? "That name fits more than one place – please be more specific."
                 : a.outcome === "not_solved"
                   ? "Not solved · 0 points. The correct flag is highlighted."
                   : a.outcome === "correct"
@@ -1039,9 +1039,9 @@ function Game() {
                   );
                 })}
               </div>
-              <p className="flags-access-note">
-                Flag options use generic labels during the challenge. Available catalog descriptions are announced when
-                provided.
+              <p className="sr-only">
+                Flag options are numbered so they don't give away the answer. A description of each flag is read out when
+                one is available.
               </p>
             </>
           ) : current ? (
