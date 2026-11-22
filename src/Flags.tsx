@@ -2,182 +2,1440 @@ import { FormEvent, KeyboardEvent, RefObject, useEffect, useRef, useState } from
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import { FlagsAnswerOption, FlagsBestBoard, FlagsChoice, FlagsDirection, FlagsEntry, FlagsPoolTier, FlagsSession, FlagsSetup as SetupData } from "./domain";
+import {
+  FlagsAnswerOption,
+  FlagsBestBoard,
+  FlagsChoice,
+  FlagsDirection,
+  FlagsEntry,
+  FlagsPoolTier,
+  FlagsSession,
+  FlagsSetup as SetupData,
+} from "./domain";
 
-const requestId=()=>crypto.randomUUID();
-const directionName=(d:FlagsDirection)=>d==="country_to_flag"?"Country → Flag":"Flag → Country";
-function localFlagFallback(svgUrl:string|null){
-  if(!svgUrl)return null;
-  try{const url=new URL(svgUrl);if(url.hostname!=="flags.restcountries.com")return null;const code=url.pathname.match(/\/([a-z]{2})\.svg$/i)?.[1];return code?`/flags/${code.toLowerCase()}.svg`:null}catch{return null}
+const requestId = () => crypto.randomUUID();
+const directionName = (d: FlagsDirection) => (d === "country_to_flag" ? "Country → Flag" : "Flag → Country");
+function localFlagFallback(svgUrl: string | null) {
+  if (!svgUrl) return null;
+  try {
+    const url = new URL(svgUrl);
+    if (url.hostname !== "flags.restcountries.com") return null;
+    const code = url.pathname.match(/\/([a-z]{2})\.svg$/i)?.[1];
+    return code ? `/flags/${code.toLowerCase()}.svg` : null;
+  } catch {
+    return null;
+  }
 }
-export function FlagImage({value,label,className="",onUnavailable}:{value:Pick<FlagsChoice,"flagSvgUrl"|"flagPngUrl"|"flagDescription">;label:string;className?:string;onUnavailable?:(missing:boolean)=>void}){
-  const sources=[...new Set([value.flagSvgUrl,value.flagPngUrl,localFlagFallback(value.flagSvgUrl)].filter((source):source is string=>Boolean(source)))];
-  const sourceKey=sources.join("|");
-  const [sourceIndex,setSourceIndex]=useState(0);
-  const [failed,setFailed]=useState(false);
-  useEffect(()=>{setSourceIndex(0);setFailed(false)},[sourceKey]);
-  const source=sources[sourceIndex]||"";
-  const onError=()=>{if(sourceIndex<sources.length-1){setSourceIndex(index=>index+1);return}setFailed(true);onUnavailable?.(true)};
-  return <span className={`flags-image ${className}`} role="img" aria-label={label}>
-    {source?<img ref={node=>node?.setAttribute("fetchpriority",className.includes("large")?"high":"auto")} src={source} alt="" width={className.includes("small")?72:undefined} height={className.includes("small")?48:undefined} loading={className.includes("large")?"eager":"lazy"} decoding="async" referrerPolicy="no-referrer" onLoad={()=>onUnavailable?.(false)} onError={onError}/>:<span className="flags-image-fallback" aria-hidden="true">{failed?"Flag unavailable":"Loading flag"}</span>}
-    {failed&&<button type="button" className="flags-retry" aria-label={`Retry loading ${label}`} onClick={()=>{setFailed(false);onUnavailable?.(false);setSourceIndex(0)}}>Retry</button>}
-  </span>
+export function FlagImage({
+  value,
+  label,
+  className = "",
+  onUnavailable,
+}: {
+  value: Pick<FlagsChoice, "flagSvgUrl" | "flagPngUrl" | "flagDescription">;
+  label: string;
+  className?: string;
+  onUnavailable?: (missing: boolean) => void;
+}) {
+  const sources = [
+    ...new Set(
+      [value.flagSvgUrl, value.flagPngUrl, localFlagFallback(value.flagSvgUrl)].filter((source): source is string =>
+        Boolean(source),
+      ),
+    ),
+  ];
+  const sourceKey = sources.join("|");
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setSourceIndex(0);
+    setFailed(false);
+  }, [sourceKey]);
+  const source = sources[sourceIndex] || "";
+  const onError = () => {
+    if (sourceIndex < sources.length - 1) {
+      setSourceIndex((index) => index + 1);
+      return;
+    }
+    setFailed(true);
+    onUnavailable?.(true);
+  };
+  return (
+    <span className={`flags-image ${className}`} role="img" aria-label={label}>
+      {source ? (
+        <img
+          ref={(node) => node?.setAttribute("fetchpriority", className.includes("large") ? "high" : "auto")}
+          src={source}
+          alt=""
+          width={className.includes("small") ? 72 : undefined}
+          height={className.includes("small") ? 48 : undefined}
+          loading={className.includes("large") ? "eager" : "lazy"}
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onLoad={() => onUnavailable?.(false)}
+          onError={onError}
+        />
+      ) : (
+        <span className="flags-image-fallback" aria-hidden="true">
+          {failed ? "Flag unavailable" : "Loading flag"}
+        </span>
+      )}
+      {failed && (
+        <button
+          type="button"
+          className="flags-retry"
+          aria-label={`Retry loading ${label}`}
+          onClick={() => {
+            setFailed(false);
+            onUnavailable?.(false);
+            setSourceIndex(0);
+          }}
+        >
+          Retry
+        </button>
+      )}
+    </span>
+  );
 }
-function normalizeOptionSearch(value:string){return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLocaleLowerCase().trim()}
-function CountryAnswerCombobox({options,value,onChange,disabled,inputRef}:{options:FlagsAnswerOption[];value:string;onChange:(value:string)=>void;disabled:boolean;inputRef:RefObject<HTMLInputElement>}){
-  const [open,setOpen]=useState(false);const [active,setActive]=useState(-1);const optionRefs=useRef<(HTMLButtonElement|null)[]>([]);
-  const query=normalizeOptionSearch(value);const filtered=query?options.filter(option=>normalizeOptionSearch(option.alpha2??"").startsWith(query)||normalizeOptionSearch(option.name).startsWith(query)):[];
-  useEffect(()=>{setActive(-1)},[value]);useEffect(()=>{if(active>=0)optionRefs.current[active]?.scrollIntoView?.({block:"nearest"})},[active,open]);
-  const select=(option:FlagsAnswerOption)=>{onChange(option.name);setOpen(false);setActive(-1);inputRef.current?.focus()};
-  function onKeyDown(event:KeyboardEvent<HTMLInputElement>){if(event.key==="ArrowDown"&&query){event.preventDefault();setOpen(true);setActive(index=>index<0?0:Math.min(filtered.length-1,index+1))}else if(event.key==="ArrowUp"&&query){event.preventDefault();setOpen(true);setActive(index=>index<0?filtered.length-1:Math.max(0,index-1))}else if(event.key==="Escape"&&open){event.preventDefault();setOpen(false)}else if(event.key==="Enter"&&open&&active>=0&&filtered[active]){event.preventDefault();select(filtered[active])}}
-  return <div className="flags-combobox">
-    <div className="flags-combobox-control"><input ref={inputRef} id="flags-answer" role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls="flags-answer-options" aria-activedescendant={open&&active>=0&&filtered[active]?`flags-answer-option-${active}`:undefined} autoComplete="off" maxLength={200} placeholder="Type a country name or ISO code" value={value} onFocus={()=>{if(query)setOpen(true)}} onClick={()=>{if(query)setOpen(true)}} onChange={event=>{onChange(event.target.value);setOpen(Boolean(normalizeOptionSearch(event.target.value)))}} onKeyDown={onKeyDown} onBlur={()=>window.setTimeout(()=>setOpen(false),120)} disabled={disabled}/><button type="button" className={`flags-combobox-toggle ${open?"is-open":""}`} aria-label={open?"Close country options":"Show country options"} aria-expanded={open} onMouseDown={event=>event.preventDefault()} onClick={()=>{if(query)setOpen(current=>!current);inputRef.current?.focus()}} disabled={disabled||!query}><span aria-hidden="true">⌄</span></button></div>
-    {open&&<div className="flags-combobox-menu" id="flags-answer-options" role="listbox" aria-label="Countries and territories">{filtered.length?filtered.map((option,index)=><button ref={node=>{optionRefs.current[index]=node}} type="button" role="option" aria-selected={index===active} id={`flags-answer-option-${index}`} className={`flags-combobox-option ${index===active?"is-active":""}`} key={`${option.alpha2??"no-code"}-${option.name}`} onMouseMove={()=>setActive(index)} onMouseDown={event=>event.preventDefault()} onClick={()=>select(option)}><span className="flags-combobox-code">{option.alpha2??"—"}</span><span className="flags-combobox-separator" aria-hidden="true">·</span><span className="flags-combobox-name">{option.name}</span></button>):<p className="flags-combobox-empty">No matching catalog entries.</p>}</div>}
-  </div>
+function normalizeOptionSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase()
+    .trim();
 }
-function useFlagsSetup(){return useLoad<SetupData>(()=>api.flagsSetup())}
-function Setup(){
-  const {data,error,reload}=useFlagsSetup();const navigate=useNavigate();
-  const replayParams=new URLSearchParams(window.location.search);
-  const [direction,setDirection]=useState<FlagsDirection>(replayParams.get("direction")==="flag_to_country"?"flag_to_country":"country_to_flag");const [region,setRegion]=useState(replayParams.get("region")??"");const [tier,setTier]=useState<FlagsPoolTier>((replayParams.get("difficulty")??replayParams.get("pool"))==="all"?"all":"easy");const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");const [deleteId,setDeleteId]=useState<string|null>(null);const [showBests,setShowBests]=useState(false);
-  const selected=data?.regions.find(r=>r.id===region);const count=(region?(tier==="easy"?selected?.easyCount:selected?.allCount):(tier==="easy"?data?.summary.easyCount:data?.summary.allCount))??0;
-  const easyCount=(region?selected?.easyCount:data?.summary.easyCount)??0;const allCount=(region?selected?.allCount:data?.summary.allCount)??0;
-  const missing=(region?(tier==="easy"?selected?.easyMissingAssets:selected?.allMissingAssets):(tier==="easy"?data?.summary.easyMissingAssets:data?.summary.allMissingAssets))??0;
-  const excluded=(region?(tier==="easy"?selected?.easyTierExcluded:0):(tier==="easy"?data?.summary.easyTierExcluded:0))??0;
-  const unsupported=(region?selected?.unsupportedDifficulty:data?.summary.unsupportedDifficulty)??0;
-  const regionOptions=[{value:"",label:"All regions",count:(tier==="easy"?data?.summary.easyCount:data?.summary.allCount)??0},...(data?.regions??[]).map(item=>({value:item.id,label:item.name,count:tier==="easy"?item.easyCount:item.allCount}))];
-  async function start(e:FormEvent){e.preventDefault();if(!count)return;setBusy(true);setMessage("");try{const result=await api.flagsStart(direction,region||null,tier,requestId());navigate(`/flags/session/${result.id}`)}catch(err){setMessage((err as Error).message)}finally{setBusy(false)}}
-  if(error)return <div className="flags-shell"><ErrorBox message={error} retry={reload}/></div>;
-  if(!data)return <Loading/>;
-  return <div className="flags-shell">
-    <header className="flags-heading flags-setup-hero"><div className="flags-hero-copy"><p className="eyebrow">ATLAS ARENA · LEARNING MODE</p><h1 tabIndex={-1}>Flags</h1><p className="muted">Build your round, explore the world one flag at a time, and track your progress as you learn.</p></div><div className="flags-hero-mark" aria-hidden="true"><span/><span/><span/><i/></div></header>
-    <div className="flags-setup-grid"><form className="card flags-setup-card" onSubmit={start}>
-      <div className="flags-setup-card-heading"><span className="eyebrow">YOUR NEXT ROUND</span><h2>Build your challenge</h2><p>Choose how you want to practice. Your round uses the full matching catalog pool.</p></div>
-      <fieldset className="flags-setup-section"><legend><span className="flags-step-number">01</span>Choose a direction</legend><div className="flags-direction-grid">
-        <label className={`flags-choice-card ${direction==="country_to_flag"?"selected":""}`}><input type="radio" name="direction" checked={direction==="country_to_flag"} onChange={()=>setDirection("country_to_flag")}/><span><strong>Country → Flag</strong><small>Find the flag that matches a country name.</small></span></label>
-        <label className={`flags-choice-card ${direction==="flag_to_country"?"selected":""}`}><input type="radio" name="direction" checked={direction==="flag_to_country"} onChange={()=>setDirection("flag_to_country")}/><span><strong>Flag → Country</strong><small>Identify a flag by typing its country name or code.</small></span></label>
-      </div></fieldset>
-      <fieldset className="flags-setup-section"><legend><span className="flags-step-number">02</span>Choose difficulty</legend><div className="flags-difficulty-grid">
-        <label className={`flags-difficulty-card ${tier==="easy"?"selected":""}`}><input type="radio" name="difficulty" value="easy" checked={tier==="easy"} onChange={()=>setTier("easy")}/><span className="flags-difficulty-copy"><strong>Easy flags</strong><small>Countries and territories rated easy or medium.</small><b>{easyCount} eligible {easyCount===1?"flag":"flags"}</b></span><span className="flags-radio-mark" aria-hidden="true"/></label>
-        <label className={`flags-difficulty-card ${tier==="all"?"selected":""}`}><input type="radio" name="difficulty" value="all" checked={tier==="all"} onChange={()=>setTier("all")}/><span className="flags-difficulty-copy"><strong>All flags</strong><small>Every catalog entry with a supported difficulty.</small><b>{allCount} eligible {allCount===1?"flag":"flags"}</b></span><span className="flags-radio-mark" aria-hidden="true"/></label>
-      </div></fieldset>
-      <fieldset className="flags-setup-section flags-region-section"><legend><span className="flags-step-number">03</span>Choose a region</legend><div className="flags-region-grid" role="radiogroup" aria-label="Choose a region">{regionOptions.map(option=><label key={option.value||"all-regions"} className={`flags-region-card ${region===option.value?"selected":""} ${option.count===0?"unavailable":""}`}><input type="radio" name="flags-region" value={option.value} checked={region===option.value} disabled={option.count===0} onChange={()=>setRegion(option.value)}/><span className="flags-region-card-content"><strong>{option.label}</strong><small>{option.count} eligible {option.count===1?"flag":"flags"}</small></span><span className="flags-region-indicator" aria-hidden="true">{region===option.value?"✓":""}</span></label>)}</div></fieldset>
-      {direction==="flag_to_country"&&region&&<p className="flags-hint-note flags-single-region-note">The selected region is already known, so region hints are unavailable in this round.</p>}
-      <section className="flags-pool-summary" aria-live="polite"><div className="flags-pool-count"><span>Round size</span><strong>{count}</strong><small>eligible {count===1?"flag":"flags"}</small></div><div className="flags-pool-details"><span>Full catalog pool · randomized once · no time limit</span>{count>30&&<span className="flags-long-round">This will be a long round with {count} flags.</span>}{missing>0&&<span>{missing} catalog {missing===1?"entry is":"entries are"} excluded because no usable flag asset is available.</span>}{excluded>0&&<span>{excluded} hard/expert entries are outside Easy flags.</span>}{unsupported>0&&<span>{unsupported} catalog {unsupported===1?"entry uses":"entries use"} an unsupported difficulty and cannot be included.</span>}</div></section>
-      {!count&&<p className="flags-empty" role="status">No entries with usable flag assets match this selection. Choose another region or pool.</p>}
-      {message&&<p className="error" role="alert">{message}</p>}
-      <div className="flags-start-action"><button className="primary" disabled={!count||busy}>{busy?"Preparing round…":"Start full round"}<span aria-hidden="true">→</span></button><p className="flags-footnote">No speed bonus. Elapsed time includes the entire round, including feedback and time away.</p></div>
-    </form>
-    <aside className="card flags-resume-card"><p className="eyebrow">YOUR ROUNDS</p><h2>Resume a saved round</h2>{data.activeSessions.length?data.activeSessions.map(s=><div className="flags-resume-row" key={s.id}><Link to={`/flags/session/${s.id}`}><span><strong>{directionName(s.direction)}</strong><small>{s.region||"All regions"} · {s.poolTier==="easy"?"Easy flags":"All flags"}{s.paused?" · Paused":" · In progress"}</small></span><span>{s.answered}/{s.total}<b aria-hidden="true"> →</b></span></Link><button type="button" className="flags-delete-link" onClick={()=>setDeleteId(s.id)}>Delete</button></div>):<p className="muted">Your saved rounds will appear here.</p>}
-      <button type="button" className="flags-bests-trigger" onClick={()=>setShowBests(true)}><span><strong>Personal bests</strong><small>Review your strongest completed rounds</small></span><span aria-hidden="true">↗</span></button>
-      <div className="flags-score-note"><strong>Learning mode</strong><p>Answers and flag assets come from the accessible catalog. These scores are personal learning records, not cheat-proof competition.</p></div>
-    </aside></div>
-    {showBests&&<FlagsBestsDialog onClose={()=>setShowBests(false)}/>}
-    {deleteId&&<div className="flags-dialog-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="flags-delete-title" className="card flags-confirm"><h2 id="flags-delete-title">Delete this saved round?</h2><p>This permanently removes the saved round and its question history.</p><div><button className="secondary" onClick={()=>setDeleteId(null)}>Keep round</button><button className="danger" onClick={async()=>{try{await api.flagsDelete(deleteId,requestId());setDeleteId(null);reload()}catch(e){setMessage((e as Error).message);setDeleteId(null)}}}>Delete round</button></div></section></div>}
-  </div>
-}
-
-function FlagsBestsDialog({onClose}:{onClose:()=>void}){
-  const {data,error,reload}=useLoad<FlagsBestBoard[]>(()=>api.flagsBests());
-  const [direction,setDirection]=useState<"all"|FlagsDirection>("all");
-  const [tier,setTier]=useState<"any"|FlagsPoolTier>("any");
-  const [region,setRegion]=useState("*");
-  const closeRef=useRef<HTMLButtonElement>(null);
-  useEffect(()=>{closeRef.current?.focus();const onKey=(event:globalThis.KeyboardEvent)=>{if(event.key==="Escape")onClose()};window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey)},[onClose]);
-  const regions=[...new Set((data??[]).map(board=>board.region??"__all_regions__"))];
-  const filtered=(data??[]).filter(board=>(direction==="all"||board.direction===direction)&&(tier==="any"||board.poolTier===tier)&&(region==="*"||(region==="__all_regions__"?board.region===null:board.region===region)));
-  const formatTime=(ms:number)=>`${Math.floor(ms/60000)}:${String(Math.floor(ms/1000)%60).padStart(2,"0")}`;
-  const formatDate=(value:string)=>new Intl.DateTimeFormat("en",{dateStyle:"medium"}).format(new Date(value));
-  return <div className="flags-dialog-backdrop flags-bests-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}><section role="dialog" aria-modal="true" aria-labelledby="flags-bests-title" className="card flags-bests-dialog">
-    <header className="flags-bests-header"><div><p className="eyebrow">YOUR PROGRESS</p><h2 id="flags-bests-title">Personal bests</h2><p className="muted">Your five strongest runs for each comparable catalog pool.</p></div><button ref={closeRef} type="button" className="flags-dialog-close" onClick={onClose} aria-label="Close personal bests">×</button></header>
-    <div className="flags-bests-filters" aria-label="Filter personal bests">
-      <label><span>Direction</span><select value={direction} onChange={event=>setDirection(event.target.value as "all"|FlagsDirection)}><option value="all">All directions</option><option value="country_to_flag">Country → Flag</option><option value="flag_to_country">Flag → Country</option></select></label>
-      <label><span>Difficulty</span><select value={tier} onChange={event=>setTier(event.target.value as "any"|FlagsPoolTier)}><option value="any">All difficulties</option><option value="easy">Easy flags</option><option value="all">All flags</option></select></label>
-      <label><span>Region</span><select value={region} onChange={event=>setRegion(event.target.value)}><option value="*">Any region</option>{regions.map(value=><option key={value} value={value}>{value==="__all_regions__"?"All regions":value}</option>)}</select></label>
-    </div>
-    {error?<div className="flags-bests-state"><ErrorBox message={error} retry={reload}/></div>:!data?<div className="flags-bests-state"><Loading/></div>:filtered.length===0?<div className="flags-bests-empty"><span aria-hidden="true">—</span><h3>{data.length?"No rounds match these filters":"No completed rounds yet"}</h3><p>{data.length?"Try another direction, difficulty, or region.":"Complete a Flags round and your best results will appear here."}</p></div>:<div className="flags-bests-boards">{filtered.map(board=><article className="flags-bests-board" key={`${board.direction}-${board.region??"all"}-${board.poolTier}-${board.poolVersion}`}>
-      <header><div><span className="flags-bests-kicker">{directionName(board.direction)}</span><h3>{board.region??"All regions"} <span>·</span> {board.poolTier==="easy"?"Easy flags":"All flags"}</h3><p>{board.total} catalog entries · Pool version {board.poolVersion}</p></div><span className="flags-bests-runs">{board.runCount} {board.runCount===1?"run":"runs"}</span></header>
-      <ol>{board.topFive.map((run,index)=><li key={`${run.completedAt}-${index}`}><span className="flags-bests-rank">{String(index+1).padStart(2,"0")}</span><div className="flags-bests-score"><strong>{run.score.toLocaleString()} <small>/ {run.maxScore.toLocaleString()}</small></strong><span>{run.maxScore?Math.round(run.score/run.maxScore*100):0}% score</span></div><div className="flags-bests-stats"><span>{run.correct}/{board.total} correct</span><span>{formatTime(run.elapsedMs)}</span><time dateTime={run.completedAt}>{formatDate(run.completedAt)}</time></div></li>)}</ol>
-    </article>)}</div>}
-  </section></div>
-}
-function StatsPanel({session,feedback,feedbackClass,busy,onNext,nextRef}:{session:FlagsSession;feedback:string;feedbackClass:string;busy:boolean;onNext:()=>void;nextRef:RefObject<HTMLButtonElement>}){
-  const [tick,setTick]=useState(Date.now());useEffect(()=>{const t=window.setInterval(()=>setTick(Date.now()),1000);return()=>clearInterval(t)},[]);
-  const elapsed=session.state==="completed"||session.paused?session.elapsedMs??0:Math.max(0,(session.elapsedMs??0)+tick-Date.parse(session.serverNow));
-  const fmt=(ms:number)=>{const sec=Math.floor(ms/1000);return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`};
-  return <aside className="card flags-stats"><h2>Round status</h2>{feedback&&<p className={`flags-feedback flags-sidebar-feedback ${feedbackClass}`} role="status" aria-live="polite">{feedback}</p>}<dl><div><dt>Progress</dt><dd>{session.answered} / {session.total}</dd></div><div><dt>Correct</dt><dd>{session.correct}</dd></div><div><dt>Incorrect</dt><dd>{session.incorrect}</dd></div>{session.direction==="flag_to_country"&&<div><dt>Skipped</dt><dd>{session.skipped}</dd></div>}<div><dt>Score</dt><dd>{session.score}</dd></div><div><dt>Elapsed</dt><dd>{fmt(elapsed)}</dd></div></dl>{session.current&&session.current.outcome!=="pending"&&<button ref={nextRef} className="primary flags-next" disabled={busy} onClick={onNext}>{session.answered===session.total?"View results":"Next flag"}</button>}</aside>
-}
-function Game(){
-  const {id=""}=useParams();const navigate=useNavigate();const [session,setSession]=useState<FlagsSession|null>(null);const [roundOutcomes,setRoundOutcomes]=useState<Record<string,Pick<FlagsEntry,"outcome"|"attempts">>>({});const [error,setError]=useState("");const [busy,setBusy]=useState(false);const [answer,setAnswer]=useState("");const [feedback,setFeedback]=useState("");const [confirmAbandon,setConfirmAbandon]=useState(false);const [focusedChoice,setFocusedChoice]=useState(0);const [unavailableAssets,setUnavailableAssets]=useState<string[]>([]);const headingRef=useRef<HTMLHeadingElement>(null);const answerRef=useRef<HTMLInputElement>(null);const gridRef=useRef<HTMLDivElement>(null);const nextRef=useRef<HTMLButtonElement>(null);const submitting=useRef(false);
-  const latestSession=useRef<FlagsSession|null>(null);const mobileNextRef=useRef<HTMLButtonElement>(null);
-  const focusNext=()=>window.setTimeout(()=>{const button=window.matchMedia("(max-width: 800px)").matches?mobileNextRef.current:nextRef.current;button?.focus()},30);
-  const load=async()=>{try{setError("");const s=await api.flagsResume(id,requestId());latestSession.current=s;setSession(s);const saved:Record<string,Pick<FlagsEntry,"outcome"|"attempts">>={};for(const entry of s.entries)if(entry.outcome!=="pending"){const result={outcome:entry.outcome,attempts:entry.attempts};saved[entry.id]=result;if(entry.choicePosition!=null)saved[`position:${entry.choicePosition}`]=result}if(s.current&&s.current.outcome!=="pending"){const result={outcome:s.current.outcome,attempts:s.current.attempts};saved[s.current.id]=result;if(s.current.choicePosition!=null)saved[`position:${s.current.choicePosition}`]=result}setRoundOutcomes(saved);if(s.state==="completed")navigate(`/flags/results/${id}`,{replace:true});else if(s.state==="abandoned")setError("This round was abandoned and cannot be resumed.")}catch(e){setError((e as Error).message)}};
-  useEffect(()=>{void load()},[id]);
-  useEffect(()=>()=>{const current=latestSession.current;if(current?.state==="active")void api.flagsPause(id,requestId()).catch(()=>{});},[id]);
-  useEffect(()=>{if(session?.current){setAnswer("");const entry=session.current;setFeedback(entry.outcome==="pending"?(session.direction==="country_to_flag"&&entry.attempts>0?`Incorrect. ${Math.max(0,3-entry.attempts)} ${3-entry.attempts===1?"attempt":"attempts"} remaining.`:""):entry.outcome==="correct"?session.direction==="country_to_flag"?`Correct · ${entry.attempts===1?"first":entry.attempts===2?"second":"third"} try · ${entry.points} points.`:`Correct · ${entry.points} points.`:entry.outcome==="skipped"?"Skipped · 0 points. The correct answer is shown.":"Not solved · 0 points. The correct answer is shown.");const active=document.activeElement;const shouldFocus=active===document.body||active===headingRef.current||!active?.closest("button,input,select,a,textarea");if(shouldFocus)setTimeout(()=>{if(session.direction==="flag_to_country")answerRef.current?.focus();else headingRef.current?.focus()},0)}},[session?.current?.id]);
-  const current=session?.current;const choices=current?.choices??session?.choices??[];const latestWrongChoice=choices.find(choice=>choice.id===current?.wrongChoiceIds[current.wrongChoiceIds.length-1]);const outcomesById=new Map((session?.entries??[]).map(entry=>[entry.id,entry]));const outcomesByChoicePosition=new Map((session?.entries??[]).map(entry=>[entry.choicePosition,entry]));
-  const getChoiceOutcome=(choice:FlagsChoice)=>roundOutcomes[choice.id]??(choice.choicePosition!=null?roundOutcomes[`position:${choice.choicePosition}`]:undefined)??outcomesById.get(choice.id)??outcomesByChoicePosition.get(choice.choicePosition);
-  const assetUnavailable=unavailableAssets.length>0;
-  const feedbackClass=current?.outcome==="correct"?`success attempt-${current.attempts}`:current?.outcome==="incorrect"?"failure unsolved":current?.outcome==="skipped"||current?.attempts?"failure":"";
-  const displayFeedback=session?.direction==="flag_to_country"&&(current?.outcome==="incorrect"||current?.outcome==="skipped")&&current.name?`${feedback} Correct country: ${current.name}.`:feedback;
-  const markAsset=(entryId:string,missing:boolean)=>setUnavailableAssets(items=>missing?(items.includes(entryId)?items:[...items,entryId]):items.filter(value=>value!==entryId));
-  async function act(fn:()=>Promise<FlagsSession>){if(submitting.current)return;submitting.current=true;setBusy(true);setError("");try{const s=await fn();latestSession.current=s;setSession(s);const resolved:Record<string,Pick<FlagsEntry,"outcome"|"attempts">>={};for(const entry of s.entries)if(entry.outcome!=="pending"){const result={outcome:entry.outcome,attempts:entry.attempts};resolved[entry.id]=result;if(entry.choicePosition!=null)resolved[`position:${entry.choicePosition}`]=result}if(s.current&&s.current.outcome!=="pending"){const result={outcome:s.current.outcome,attempts:s.current.attempts};resolved[s.current.id]=result;if(s.current.choicePosition!=null)resolved[`position:${s.current.choicePosition}`]=result}if(Object.keys(resolved).length)setRoundOutcomes(previous=>({...previous,...resolved}));if(s.actionResult){const a=s.actionResult;setFeedback(a.outcome==="wrong_choice"?`Incorrect. ${a.remainingAttempts} ${a.remainingAttempts===1?"attempt":"attempts"} remaining.`:a.outcome==="duplicate_choice"?"That flag was already selected. Choose another flag.":a.outcome==="ambiguous"?"That answer could refer to more than one catalog entry. Please be more specific.":a.outcome==="not_solved"?"Not solved · 0 points. The correct flag is highlighted.":a.outcome==="correct"?`Correct · ${current?.attempts===0?"first":current?.attempts===1?"second":"third"} try · ${s.current?.points??0} points.`:"Incorrect · 0 points. The answer is shown.");if(a.outcome==="wrong_choice"||a.outcome==="duplicate_choice")setTimeout(()=>gridRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus(),30);else if(a.outcome==="ambiguous")setTimeout(()=>answerRef.current?.focus(),30);else focusNext()}else if(s.current?.outcome==="skipped"){setFeedback("Skipped · 0 points. The correct answer is shown.");focusNext()}}catch(e){setError((e as Error).message);void load()}finally{setBusy(false);submitting.current=false}}
-  function choose(choiceId:string){if(!session||!current||current.outcome!=="pending"||busy)return;void act(()=>api.flagsAnswer(session.id,current.id,choiceId,null,requestId()))}
-  function onGridKey(e:KeyboardEvent<HTMLDivElement>){const keys=["ArrowRight","ArrowDown","ArrowLeft","ArrowUp"];if(!keys.includes(e.key))return;const buttons=[...gridRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")??[]];const i=buttons.indexOf(document.activeElement as HTMLButtonElement);if(i<0||!buttons.length)return;e.preventDefault();const next=(i+(e.key==="ArrowRight"||e.key==="ArrowDown"?1:-1)+buttons.length)%buttons.length;const button=buttons[next];const choiceIndex=choices.findIndex(choice=>choice.id===button?.dataset.choiceId);if(choiceIndex>=0)setFocusedChoice(choiceIndex);button?.focus()}
-  async function submit(e:FormEvent){e.preventDefault();if(!answer.trim()){setFeedback("Enter a country name or code first.");return}if(!session||!current)return;void act(()=>api.flagsAnswer(session.id,current.id,null,answer,requestId()))}
-  if(error&&!session)return <div className="flags-shell"><ErrorBox message={error} retry={load}/><Link className="secondary" to="/flags">Back to Flags</Link></div>;
-  if(!session)return <Loading/>;
-  if(session.state==="abandoned")return <div className="flags-shell"><div className="card"><h1>This round was abandoned</h1><p>Abandoned rounds do not count toward personal bests.</p><Link to="/flags" className="primary">Back to Flags</Link></div></div>;
-  const finalized=Boolean(current&&current.outcome!=="pending");
-  const canFocusChoice=(choice:FlagsChoice)=>Boolean(current&&!finalized&&!assetUnavailable&&!current.wrongChoiceIds.includes(choice.id)&&getChoiceOutcome(choice)?.outcome!=="correct"&&getChoiceOutcome(choice)?.outcome!=="incorrect");
-  const tabChoiceIndex=choices[focusedChoice]&&canFocusChoice(choices[focusedChoice])?focusedChoice:choices.findIndex(canFocusChoice);
-  async function next(){if(!session)return;const s=await api.flagsNext(session.id,requestId());latestSession.current=s;if(s.state==="completed")navigate(`/flags/results/${session.id}`);else setSession(s)}
-  async function saveAndLeave(){if(!session)return;setBusy(true);setError("");try{const paused=await api.flagsPause(session.id,requestId());latestSession.current=paused;setSession(paused);navigate("/flags")}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
-  return <div className="flags-shell"><div className="flags-mobile-status"><span><strong>{session.answered}/{session.total}</strong><small>{session.score} points</small></span>{finalized&&<button ref={mobileNextRef} className="primary flags-next flags-mobile-next" disabled={busy} onClick={()=>void next()}>{session.answered===session.total?"View results":"Next flag"}</button>}</div>
-    <header className="flags-game-heading"><div><p className="eyebrow">{directionName(session.direction)} · {session.region||"All regions"}</p><h1 tabIndex={-1} ref={headingRef}>{session.current?.position??session.answered+1} <span>of {session.total}</span></h1></div><div className="flags-game-actions"><button className="flags-abandon" type="button" disabled={busy} onClick={()=>setConfirmAbandon(true)}>Abandon round</button><button className="secondary" disabled={busy} onClick={()=>void saveAndLeave()}>{busy?"Saving…":"Save and leave"}</button></div></header>
-    {error&&<p className="error" role="alert">{error}</p>}
-    <div className="flags-play-layout"><section className="card flags-question">
-      {current&&session.direction==="country_to_flag"?<><p className="eyebrow">FIND THIS COUNTRY’S FLAG</p><div className="flags-target-row"><h2 className="flags-target-name">{current.name}</h2>{latestWrongChoice?.name&&<span className="flags-wrong-name" role="status">{latestWrongChoice.name}</span>}</div><div className="flags-option-grid" ref={gridRef} onKeyDown={onGridKey} role="group" aria-label="Flag options">{choices.map((c,i)=>{const wasWrong=current.wrongChoiceIds.includes(c.id);const outcome=getChoiceOutcome(c);const isCorrect=outcome?.outcome==="correct";const notGuessed=outcome?.outcome==="incorrect";const resultClass=isCorrect?`right attempt-${outcome.attempts}`:notGuessed?"unresolved":"";const resultLabel=isCorrect?`, correct on attempt ${outcome.attempts}`:notGuessed?", not guessed":"";return <button key={c.id} data-choice-id={c.id} type="button" tabIndex={i===tabChoiceIndex?0:-1} className={`flags-option ${wasWrong?"wrong":""} ${resultClass}`} aria-label={`Flag option ${i+1}${wasWrong?", incorrect selection":""}${wasWrong&&c.name?`, ${c.name}`:""}${resultLabel}`} aria-describedby={c.flagDescription?`flags-desc-${c.id}`:undefined} aria-pressed={isCorrect} disabled={busy||finalized||wasWrong||isCorrect||assetUnavailable} onClick={()=>choose(c.id)}><FlagImage value={c} label={`Flag option ${i+1}`} className="small" onUnavailable={missing=>markAsset(c.id,missing)}/>{isCorrect&&<span className="flags-option-correct-mark" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="m4 10.5 4 4L16 6.5"/></svg></span>}<span className="sr-only">Flag option {i+1}</span>{c.flagDescription&&<span className="sr-only" id={`flags-desc-${c.id}`}>{c.flagDescription}</span>}</button>})}</div><p className="flags-access-note">Flag options use generic labels during the challenge. Available catalog descriptions are announced when provided.</p></>
-      :current?<div className="flags-identify-layout"><div className="flags-identify-header"><span className="flags-mode-pill">FLAG IDENTIFICATION</span><span className="flags-question-count">Question {current.position} <i aria-hidden="true">/</i> {session.total}</span></div><FlagImage value={current} label={current.flagDescription||"Country flag image"} className="large" onUnavailable={missing=>markAsset(current.id,missing)}/>{!current.flagDescription&&<p className="flags-access-note flags-identify-access-note">This catalog flag has no text description.</p>}<div className="flags-identify-copy"><h2>Which country or territory does this flag represent?</h2><p>Search by name or ISO alpha-2 code, or browse the catalog list.</p></div><form className="flags-answer-form" onSubmit={submit}><label htmlFor="flags-answer">Your answer</label><CountryAnswerCombobox key={current.id} options={session.answerOptions??[]} value={answer} onChange={setAnswer} disabled={busy||finalized||assetUnavailable} inputRef={answerRef}/><div className="flags-inline-actions"><button className="primary" disabled={busy||finalized||assetUnavailable}>{busy?"Checking…":"Check country"}</button><button className="secondary" type="button" disabled={busy||finalized||assetUnavailable} onClick={()=>void act(()=>api.flagsSkip(session.id,current.id,requestId()))}>Skip this flag</button></div></form>{assetUnavailable&&<p className="flags-empty" role="alert">A required flag image did not load. Retry the image before answering or moving on.</p>}{!session.region&&current.hintUsed&&current.region&&<p className="flags-hint-note" role="status">Region hint: <strong>{current.region}</strong></p>}{!session.region&&!current.hintUsed&&<button type="button" className="flags-hint-link" disabled={busy||finalized||assetUnavailable} onClick={()=>void act(()=>api.flagsHint(session.id,current.id,requestId()))}>Show region hint <small>This permanently lowers this flag’s maximum score from 100 to 60.</small></button>}</div>:<Loading/>}
-      {assetUnavailable&&session.direction==="country_to_flag"&&<p className="flags-empty" role="alert">A required flag image did not load. Retry the image before selecting an answer.</p>}
-      {displayFeedback&&<p className={`flags-feedback flags-mobile-feedback ${feedbackClass}`} role="status" aria-live="polite">{displayFeedback}</p>}
-    </section><StatsPanel session={session} feedback={displayFeedback} feedbackClass={feedbackClass} busy={busy} onNext={()=>void next()} nextRef={nextRef}/></div>
-    {confirmAbandon&&<div className="flags-dialog-backdrop" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="flags-abandon-title" className="card flags-confirm"><h2 id="flags-abandon-title">Abandon this round?</h2><p>This ends the round permanently. It will not count toward personal bests.</p><div><button className="secondary" onClick={()=>setConfirmAbandon(false)}>Keep playing</button><button className="danger" onClick={()=>void act(async()=>{const s=await api.flagsAbandon(session.id,requestId());setConfirmAbandon(false);navigate("/flags");return s})}>Abandon round</button></div></section></div>}
-  </div>
-}
-function Results(){
-  const {id=""}=useParams();const {data,error,reload}=useLoad(()=>api.flagsResults(id));
-  if(error)return <div className="flags-shell"><ErrorBox message={error} retry={reload}/></div>;
-  if(!data)return <Loading/>;
-  const accuracy=data.total?Math.round(data.correct/data.total*100):0;
-  const percent=(value:number)=>data.total?Math.round(value/data.total*100):0;
-  const scorePercent=data.maxScore?Math.round(data.score/data.maxScore*100):0;
-  const first=data.entries.filter(e=>e.outcome==="correct"&&e.attempts===1).length;
-  const second=data.entries.filter(e=>e.outcome==="correct"&&e.attempts===2).length;
-  const third=data.entries.filter(e=>e.outcome==="correct"&&e.attempts===3).length;
-  const reviewEntries=[...data.entries].sort((a,b)=>b.points-a.points||a.position-b.position);
-  return <div className="flags-shell flags-results">
-    <header className="flags-heading"><p className="eyebrow">ROUND COMPLETE · {directionName(data.direction)}</p><h1 tabIndex={-1}>Your results</h1><p className="muted">{data.finalBadge==="first_run"?"First completed run":data.finalBadge==="new_best"?"New personal best":"Completed run"}</p></header>
-    <div className="flags-result-grid">
-      <section className="card flags-result-score">
-        <div className="flags-result-score-heading"><span>Final score</span><strong>{data.score}<small> / {data.maxScore}</small></strong><b>{scorePercent}% of maximum score</b></div>
-        <div className="flags-result-breakdown" aria-label="Round results">
-          <div><span>Correct</span><strong>{data.correct}<small> / {data.total}</small></strong><b>{percent(data.correct)}%</b></div>
-          <div><span>Incorrect</span><strong>{data.incorrect}<small> / {data.total}</small></strong><b>{percent(data.incorrect)}%</b></div>
-          <div><span>Skipped</span><strong>{data.skipped}<small> / {data.total}</small></strong><b>{percent(data.skipped)}%</b></div>
-          <div><span>Accuracy</span><strong>{accuracy}%</strong><b>{data.correct} of {data.total} flags</b></div>
+function CountryAnswerCombobox({
+  options,
+  value,
+  onChange,
+  disabled,
+  inputRef,
+}: {
+  options: FlagsAnswerOption[];
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  inputRef: RefObject<HTMLInputElement>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const query = normalizeOptionSearch(value);
+  const filtered = query
+    ? options.filter(
+        (option) =>
+          normalizeOptionSearch(option.alpha2 ?? "").startsWith(query) ||
+          normalizeOptionSearch(option.name).startsWith(query),
+      )
+    : [];
+  useEffect(() => {
+    setActive(-1);
+  }, [value]);
+  useEffect(() => {
+    if (active >= 0) optionRefs.current[active]?.scrollIntoView?.({ block: "nearest" });
+  }, [active, open]);
+  const select = (option: FlagsAnswerOption) => {
+    onChange(option.name);
+    setOpen(false);
+    setActive(-1);
+    inputRef.current?.focus();
+  };
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" && query) {
+      event.preventDefault();
+      setOpen(true);
+      setActive((index) => (index < 0 ? 0 : Math.min(filtered.length - 1, index + 1)));
+    } else if (event.key === "ArrowUp" && query) {
+      event.preventDefault();
+      setOpen(true);
+      setActive((index) => (index < 0 ? filtered.length - 1 : Math.max(0, index - 1)));
+    } else if (event.key === "Escape" && open) {
+      event.preventDefault();
+      setOpen(false);
+    } else if (event.key === "Enter" && open && active >= 0 && filtered[active]) {
+      event.preventDefault();
+      select(filtered[active]);
+    }
+  }
+  return (
+    <div className="flags-combobox">
+      <div className="flags-combobox-control">
+        <input
+          ref={inputRef}
+          id="flags-answer"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls="flags-answer-options"
+          aria-activedescendant={open && active >= 0 && filtered[active] ? `flags-answer-option-${active}` : undefined}
+          autoComplete="off"
+          maxLength={200}
+          placeholder="Type a country name or ISO code"
+          value={value}
+          onFocus={() => {
+            if (query) setOpen(true);
+          }}
+          onClick={() => {
+            if (query) setOpen(true);
+          }}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setOpen(Boolean(normalizeOptionSearch(event.target.value)));
+          }}
+          onKeyDown={onKeyDown}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          className={`flags-combobox-toggle ${open ? "is-open" : ""}`}
+          aria-label={open ? "Close country options" : "Show country options"}
+          aria-expanded={open}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (query) setOpen((current) => !current);
+            inputRef.current?.focus();
+          }}
+          disabled={disabled || !query}
+        >
+          <span aria-hidden="true">⌄</span>
+        </button>
+      </div>
+      {open && (
+        <div
+          className="flags-combobox-menu"
+          id="flags-answer-options"
+          role="listbox"
+          aria-label="Countries and territories"
+        >
+          {filtered.length ? (
+            filtered.map((option, index) => (
+              <button
+                ref={(node) => {
+                  optionRefs.current[index] = node;
+                }}
+                type="button"
+                role="option"
+                aria-selected={index === active}
+                id={`flags-answer-option-${index}`}
+                className={`flags-combobox-option ${index === active ? "is-active" : ""}`}
+                key={`${option.alpha2 ?? "no-code"}-${option.name}`}
+                onMouseMove={() => setActive(index)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => select(option)}
+              >
+                <span className="flags-combobox-code">{option.alpha2 ?? "—"}</span>
+                <span className="flags-combobox-separator" aria-hidden="true">
+                  ·
+                </span>
+                <span className="flags-combobox-name">{option.name}</span>
+              </button>
+            ))
+          ) : (
+            <p className="flags-combobox-empty">No matching catalog entries.</p>
+          )}
         </div>
-        <p className="flags-result-calculation">Percentages use all flags in the round. Accuracy is correct / total; incorrect and skipped flags are not correct.</p>
-        <p>Elapsed time: {formatTime(data.elapsedMs??0)}. This is server time from session creation to completion, including feedback screens and time spent away. There is no time limit or speed bonus.</p>
-        {data.direction==="country_to_flag"&&<p>Correct answer attempts: {first} first try · {second} second try · {third} third try.</p>}
-        {data.direction==="flag_to_country"&&<p>Region hints used: {data.hintsUsed}.</p>}
-        <p>Flags scores are separate from competitive XP.</p>
-      </section>
-      <section className="card"><h2>Top five for this pool</h2>{data.topFive.length?<ol className="flags-top-five">{data.topFive.map((r,i)=><li key={r.id}><b>#{i+1}</b><span>{r.score} points</span><span>{formatTime(r.elapsedMs)}</span></li>)}</ol>:<p>No completed runs yet.</p>}</section>
+      )}
     </div>
-    <section className="card flags-review"><header><div><h2>Question review</h2><p>Sorted by points earned, highest first. Ties follow round order.</p></div><span>{data.total} flags</span></header><ol>{reviewEntries.map(e=><li key={e.id}><span className="flags-review-position">Q{e.position}</span><FlagImage value={e} label={e.flagDescription||"Flag"} className="review"/><div><strong>{e.name||"Catalog entry"}</strong><p>{e.outcome==="correct"?`Correct · ${e.attempts===1?"first":e.attempts===2?"second":"third"} try`:e.outcome==="skipped"?"Skipped":`Not solved · ${e.attempts} attempts`} · {e.points} points</p>{e.hintUsed&&<small>Region hint used · 60 point maximum</small>}</div></li>)}</ol></section>
-    <div className="flags-result-actions"><Link className="primary" to={`/flags?direction=${data.direction}&region=${encodeURIComponent(data.region??"")}&difficulty=${data.poolTier}`}>Play again</Link><Link className="secondary" to="/flags">Change settings</Link></div>
-  </div>
+  );
 }
-function formatTime(ms:number){const sec=Math.floor(ms/1000);return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,"0")}`}
-export default function Flags(){return <Routes><Route index element={<Setup/>}/><Route path="session/:id" element={<Game/>}/><Route path="results/:id" element={<Results/>}/></Routes>}
+function useFlagsSetup() {
+  return useLoad<SetupData>(() => api.flagsSetup());
+}
+function Setup() {
+  const { data, error, reload } = useFlagsSetup();
+  const navigate = useNavigate();
+  const replayParams = new URLSearchParams(window.location.search);
+  const [direction, setDirection] = useState<FlagsDirection>(
+    replayParams.get("direction") === "flag_to_country" ? "flag_to_country" : "country_to_flag",
+  );
+  const [region, setRegion] = useState(replayParams.get("region") ?? "");
+  const [tier, setTier] = useState<FlagsPoolTier>(
+    (replayParams.get("difficulty") ?? replayParams.get("pool")) === "all" ? "all" : "easy",
+  );
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showBests, setShowBests] = useState(false);
+  const selected = data?.regions.find((r) => r.id === region);
+  const count =
+    (region
+      ? tier === "easy"
+        ? selected?.easyCount
+        : selected?.allCount
+      : tier === "easy"
+        ? data?.summary.easyCount
+        : data?.summary.allCount) ?? 0;
+  const easyCount = (region ? selected?.easyCount : data?.summary.easyCount) ?? 0;
+  const allCount = (region ? selected?.allCount : data?.summary.allCount) ?? 0;
+  const missing =
+    (region
+      ? tier === "easy"
+        ? selected?.easyMissingAssets
+        : selected?.allMissingAssets
+      : tier === "easy"
+        ? data?.summary.easyMissingAssets
+        : data?.summary.allMissingAssets) ?? 0;
+  const excluded =
+    (region
+      ? tier === "easy"
+        ? selected?.easyTierExcluded
+        : 0
+      : tier === "easy"
+        ? data?.summary.easyTierExcluded
+        : 0) ?? 0;
+  const unsupported = (region ? selected?.unsupportedDifficulty : data?.summary.unsupportedDifficulty) ?? 0;
+  const regionOptions = [
+    {
+      value: "",
+      label: "All regions",
+      count: (tier === "easy" ? data?.summary.easyCount : data?.summary.allCount) ?? 0,
+    },
+    ...(data?.regions ?? []).map((item) => ({
+      value: item.id,
+      label: item.name,
+      count: tier === "easy" ? item.easyCount : item.allCount,
+    })),
+  ];
+  async function start(e: FormEvent) {
+    e.preventDefault();
+    if (!count) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await api.flagsStart(direction, region || null, tier, requestId());
+      navigate(`/flags/session/${result.id}`);
+    } catch (err) {
+      setMessage((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (error)
+    return (
+      <div className="flags-shell">
+        <ErrorBox message={error} retry={reload} />
+      </div>
+    );
+  if (!data) return <Loading />;
+  return (
+    <div className="flags-shell">
+      <header className="flags-heading flags-setup-hero">
+        <div className="flags-hero-copy">
+          <p className="eyebrow">ATLAS ARENA · LEARNING MODE</p>
+          <h1 tabIndex={-1}>Flags</h1>
+          <p className="muted">
+            Build your round, explore the world one flag at a time, and track your progress as you learn.
+          </p>
+        </div>
+        <div className="flags-hero-mark" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <i />
+        </div>
+      </header>
+      <div className="flags-setup-grid">
+        <form className="card flags-setup-card" onSubmit={start}>
+          <div className="flags-setup-card-heading">
+            <span className="eyebrow">YOUR NEXT ROUND</span>
+            <h2>Build your challenge</h2>
+            <p>Choose how you want to practice. Your round uses the full matching catalog pool.</p>
+          </div>
+          <fieldset className="flags-setup-section">
+            <legend>
+              <span className="flags-step-number">01</span>Choose a direction
+            </legend>
+            <div className="flags-direction-grid">
+              <label className={`flags-choice-card ${direction === "country_to_flag" ? "selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="direction"
+                  checked={direction === "country_to_flag"}
+                  onChange={() => setDirection("country_to_flag")}
+                />
+                <span>
+                  <strong>Country → Flag</strong>
+                  <small>Find the flag that matches a country name.</small>
+                </span>
+              </label>
+              <label className={`flags-choice-card ${direction === "flag_to_country" ? "selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="direction"
+                  checked={direction === "flag_to_country"}
+                  onChange={() => setDirection("flag_to_country")}
+                />
+                <span>
+                  <strong>Flag → Country</strong>
+                  <small>Identify a flag by typing its country name or code.</small>
+                </span>
+              </label>
+            </div>
+          </fieldset>
+          <fieldset className="flags-setup-section">
+            <legend>
+              <span className="flags-step-number">02</span>Choose difficulty
+            </legend>
+            <div className="flags-difficulty-grid">
+              <label className={`flags-difficulty-card ${tier === "easy" ? "selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="difficulty"
+                  value="easy"
+                  checked={tier === "easy"}
+                  onChange={() => setTier("easy")}
+                />
+                <span className="flags-difficulty-copy">
+                  <strong>Easy flags</strong>
+                  <small>Countries and territories rated easy or medium.</small>
+                  <b>
+                    {easyCount} eligible {easyCount === 1 ? "flag" : "flags"}
+                  </b>
+                </span>
+                <span className="flags-radio-mark" aria-hidden="true" />
+              </label>
+              <label className={`flags-difficulty-card ${tier === "all" ? "selected" : ""}`}>
+                <input
+                  type="radio"
+                  name="difficulty"
+                  value="all"
+                  checked={tier === "all"}
+                  onChange={() => setTier("all")}
+                />
+                <span className="flags-difficulty-copy">
+                  <strong>All flags</strong>
+                  <small>Every catalog entry with a supported difficulty.</small>
+                  <b>
+                    {allCount} eligible {allCount === 1 ? "flag" : "flags"}
+                  </b>
+                </span>
+                <span className="flags-radio-mark" aria-hidden="true" />
+              </label>
+            </div>
+          </fieldset>
+          <fieldset className="flags-setup-section flags-region-section">
+            <legend>
+              <span className="flags-step-number">03</span>Choose a region
+            </legend>
+            <div className="flags-region-grid" role="radiogroup" aria-label="Choose a region">
+              {regionOptions.map((option) => (
+                <label
+                  key={option.value || "all-regions"}
+                  className={`flags-region-card ${region === option.value ? "selected" : ""} ${option.count === 0 ? "unavailable" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="flags-region"
+                    value={option.value}
+                    checked={region === option.value}
+                    disabled={option.count === 0}
+                    onChange={() => setRegion(option.value)}
+                  />
+                  <span className="flags-region-card-content">
+                    <strong>{option.label}</strong>
+                    <small>
+                      {option.count} eligible {option.count === 1 ? "flag" : "flags"}
+                    </small>
+                  </span>
+                  <span className="flags-region-indicator" aria-hidden="true">
+                    {region === option.value ? "✓" : ""}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {direction === "flag_to_country" && region && (
+            <p className="flags-hint-note flags-single-region-note">
+              The selected region is already known, so region hints are unavailable in this round.
+            </p>
+          )}
+          <section className="flags-pool-summary" aria-live="polite">
+            <div className="flags-pool-count">
+              <span>Round size</span>
+              <strong>{count}</strong>
+              <small>eligible {count === 1 ? "flag" : "flags"}</small>
+            </div>
+            <div className="flags-pool-details">
+              <span>Full catalog pool · randomized once · no time limit</span>
+              {count > 30 && <span className="flags-long-round">This will be a long round with {count} flags.</span>}
+              {missing > 0 && (
+                <span>
+                  {missing} catalog {missing === 1 ? "entry is" : "entries are"} excluded because no usable flag asset
+                  is available.
+                </span>
+              )}
+              {excluded > 0 && <span>{excluded} hard/expert entries are outside Easy flags.</span>}
+              {unsupported > 0 && (
+                <span>
+                  {unsupported} catalog {unsupported === 1 ? "entry uses" : "entries use"} an unsupported difficulty and
+                  cannot be included.
+                </span>
+              )}
+            </div>
+          </section>
+          {!count && (
+            <p className="flags-empty" role="status">
+              No entries with usable flag assets match this selection. Choose another region or pool.
+            </p>
+          )}
+          {message && (
+            <p className="error" role="alert">
+              {message}
+            </p>
+          )}
+          <div className="flags-start-action">
+            <button className="primary" disabled={!count || busy}>
+              {busy ? "Preparing round…" : "Start full round"}
+              <span aria-hidden="true">→</span>
+            </button>
+            <p className="flags-footnote">
+              No speed bonus. Elapsed time includes the entire round, including feedback and time away.
+            </p>
+          </div>
+        </form>
+        <aside className="card flags-resume-card">
+          <p className="eyebrow">YOUR ROUNDS</p>
+          <h2>Resume a saved round</h2>
+          {data.activeSessions.length ? (
+            data.activeSessions.map((s) => (
+              <div className="flags-resume-row" key={s.id}>
+                <Link to={`/flags/session/${s.id}`}>
+                  <span>
+                    <strong>{directionName(s.direction)}</strong>
+                    <small>
+                      {s.region || "All regions"} · {s.poolTier === "easy" ? "Easy flags" : "All flags"}
+                      {s.paused ? " · Paused" : " · In progress"}
+                    </small>
+                  </span>
+                  <span>
+                    {s.answered}/{s.total}
+                    <b aria-hidden="true"> →</b>
+                  </span>
+                </Link>
+                <button type="button" className="flags-delete-link" onClick={() => setDeleteId(s.id)}>
+                  Delete
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className="muted">Your saved rounds will appear here.</p>
+          )}
+          <button type="button" className="flags-bests-trigger" onClick={() => setShowBests(true)}>
+            <span>
+              <strong>Personal bests</strong>
+              <small>Review your strongest completed rounds</small>
+            </span>
+            <span aria-hidden="true">↗</span>
+          </button>
+          <div className="flags-score-note">
+            <strong>Learning mode</strong>
+            <p>
+              Answers and flag assets come from the accessible catalog. These scores are personal learning records, not
+              cheat-proof competition.
+            </p>
+          </div>
+        </aside>
+      </div>
+      {showBests && <FlagsBestsDialog onClose={() => setShowBests(false)} />}
+      {deleteId && (
+        <div className="flags-dialog-backdrop">
+          <section role="dialog" aria-modal="true" aria-labelledby="flags-delete-title" className="card flags-confirm">
+            <h2 id="flags-delete-title">Delete this saved round?</h2>
+            <p>This permanently removes the saved round and its question history.</p>
+            <div>
+              <button className="secondary" onClick={() => setDeleteId(null)}>
+                Keep round
+              </button>
+              <button
+                className="danger"
+                onClick={async () => {
+                  try {
+                    await api.flagsDelete(deleteId, requestId());
+                    setDeleteId(null);
+                    reload();
+                  } catch (e) {
+                    setMessage((e as Error).message);
+                    setDeleteId(null);
+                  }
+                }}
+              >
+                Delete round
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FlagsBestsDialog({ onClose }: { onClose: () => void }) {
+  const { data, error, reload } = useLoad<FlagsBestBoard[]>(() => api.flagsBests());
+  const [direction, setDirection] = useState<"all" | FlagsDirection>("all");
+  const [tier, setTier] = useState<"any" | FlagsPoolTier>("any");
+  const [region, setRegion] = useState("*");
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const regions = [...new Set((data ?? []).map((board) => board.region ?? "__all_regions__"))];
+  const filtered = (data ?? []).filter(
+    (board) =>
+      (direction === "all" || board.direction === direction) &&
+      (tier === "any" || board.poolTier === tier) &&
+      (region === "*" || (region === "__all_regions__" ? board.region === null : board.region === region)),
+  );
+  const formatTime = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+  const formatDate = (value: string) => new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
+  return (
+    <div
+      className="flags-dialog-backdrop flags-bests-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section role="dialog" aria-modal="true" aria-labelledby="flags-bests-title" className="card flags-bests-dialog">
+        <header className="flags-bests-header">
+          <div>
+            <p className="eyebrow">YOUR PROGRESS</p>
+            <h2 id="flags-bests-title">Personal bests</h2>
+            <p className="muted">Your five strongest runs for each comparable catalog pool.</p>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            className="flags-dialog-close"
+            onClick={onClose}
+            aria-label="Close personal bests"
+          >
+            ×
+          </button>
+        </header>
+        <div className="flags-bests-filters" aria-label="Filter personal bests">
+          <label>
+            <span>Direction</span>
+            <select value={direction} onChange={(event) => setDirection(event.target.value as "all" | FlagsDirection)}>
+              <option value="all">All directions</option>
+              <option value="country_to_flag">Country → Flag</option>
+              <option value="flag_to_country">Flag → Country</option>
+            </select>
+          </label>
+          <label>
+            <span>Difficulty</span>
+            <select value={tier} onChange={(event) => setTier(event.target.value as "any" | FlagsPoolTier)}>
+              <option value="any">All difficulties</option>
+              <option value="easy">Easy flags</option>
+              <option value="all">All flags</option>
+            </select>
+          </label>
+          <label>
+            <span>Region</span>
+            <select value={region} onChange={(event) => setRegion(event.target.value)}>
+              <option value="*">Any region</option>
+              {regions.map((value) => (
+                <option key={value} value={value}>
+                  {value === "__all_regions__" ? "All regions" : value}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {error ? (
+          <div className="flags-bests-state">
+            <ErrorBox message={error} retry={reload} />
+          </div>
+        ) : !data ? (
+          <div className="flags-bests-state">
+            <Loading />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flags-bests-empty">
+            <span aria-hidden="true">—</span>
+            <h3>{data.length ? "No rounds match these filters" : "No completed rounds yet"}</h3>
+            <p>
+              {data.length
+                ? "Try another direction, difficulty, or region."
+                : "Complete a Flags round and your best results will appear here."}
+            </p>
+          </div>
+        ) : (
+          <div className="flags-bests-boards">
+            {filtered.map((board) => (
+              <article
+                className="flags-bests-board"
+                key={`${board.direction}-${board.region ?? "all"}-${board.poolTier}-${board.poolVersion}`}
+              >
+                <header>
+                  <div>
+                    <span className="flags-bests-kicker">{directionName(board.direction)}</span>
+                    <h3>
+                      {board.region ?? "All regions"} <span>·</span>{" "}
+                      {board.poolTier === "easy" ? "Easy flags" : "All flags"}
+                    </h3>
+                    <p>
+                      {board.total} catalog entries · Pool version {board.poolVersion}
+                    </p>
+                  </div>
+                  <span className="flags-bests-runs">
+                    {board.runCount} {board.runCount === 1 ? "run" : "runs"}
+                  </span>
+                </header>
+                <ol>
+                  {board.topFive.map((run, index) => (
+                    <li key={`${run.completedAt}-${index}`}>
+                      <span className="flags-bests-rank">{String(index + 1).padStart(2, "0")}</span>
+                      <div className="flags-bests-score">
+                        <strong>
+                          {run.score.toLocaleString()} <small>/ {run.maxScore.toLocaleString()}</small>
+                        </strong>
+                        <span>{run.maxScore ? Math.round((run.score / run.maxScore) * 100) : 0}% score</span>
+                      </div>
+                      <div className="flags-bests-stats">
+                        <span>
+                          {run.correct}/{board.total} correct
+                        </span>
+                        <span>{formatTime(run.elapsedMs)}</span>
+                        <time dateTime={run.completedAt}>{formatDate(run.completedAt)}</time>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+function StatsPanel({
+  session,
+  feedback,
+  feedbackClass,
+  busy,
+  onNext,
+  nextRef,
+}: {
+  session: FlagsSession;
+  feedback: string;
+  feedbackClass: string;
+  busy: boolean;
+  onNext: () => void;
+  nextRef: RefObject<HTMLButtonElement>;
+}) {
+  const [tick, setTick] = useState(Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsed =
+    session.state === "completed" || session.paused
+      ? (session.elapsedMs ?? 0)
+      : Math.max(0, (session.elapsedMs ?? 0) + tick - Date.parse(session.serverNow));
+  const fmt = (ms: number) => {
+    const sec = Math.floor(ms / 1000);
+    return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  };
+  return (
+    <aside className="card flags-stats">
+      <h2>Round status</h2>
+      {feedback && (
+        <p className={`flags-feedback flags-sidebar-feedback ${feedbackClass}`} role="status" aria-live="polite">
+          {feedback}
+        </p>
+      )}
+      <dl>
+        <div>
+          <dt>Progress</dt>
+          <dd>
+            {session.answered} / {session.total}
+          </dd>
+        </div>
+        <div>
+          <dt>Correct</dt>
+          <dd>{session.correct}</dd>
+        </div>
+        <div>
+          <dt>Incorrect</dt>
+          <dd>{session.incorrect}</dd>
+        </div>
+        {session.direction === "flag_to_country" && (
+          <div>
+            <dt>Skipped</dt>
+            <dd>{session.skipped}</dd>
+          </div>
+        )}
+        <div>
+          <dt>Score</dt>
+          <dd>{session.score}</dd>
+        </div>
+        <div>
+          <dt>Elapsed</dt>
+          <dd>{fmt(elapsed)}</dd>
+        </div>
+      </dl>
+      {session.current && session.current.outcome !== "pending" && (
+        <button ref={nextRef} className="primary flags-next" disabled={busy} onClick={onNext}>
+          {session.answered === session.total ? "View results" : "Next flag"}
+        </button>
+      )}
+    </aside>
+  );
+}
+function Game() {
+  const { id = "" } = useParams();
+  const navigate = useNavigate();
+  const [session, setSession] = useState<FlagsSession | null>(null);
+  const [roundOutcomes, setRoundOutcomes] = useState<Record<string, Pick<FlagsEntry, "outcome" | "attempts">>>({});
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [confirmAbandon, setConfirmAbandon] = useState(false);
+  const [focusedChoice, setFocusedChoice] = useState(0);
+  const [unavailableAssets, setUnavailableAssets] = useState<string[]>([]);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const answerRef = useRef<HTMLInputElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const submitting = useRef(false);
+  const latestSession = useRef<FlagsSession | null>(null);
+  const mobileNextRef = useRef<HTMLButtonElement>(null);
+  const focusNext = () =>
+    window.setTimeout(() => {
+      const button = window.matchMedia("(max-width: 800px)").matches ? mobileNextRef.current : nextRef.current;
+      button?.focus();
+    }, 30);
+  const load = async () => {
+    try {
+      setError("");
+      const s = await api.flagsResume(id, requestId());
+      latestSession.current = s;
+      setSession(s);
+      const saved: Record<string, Pick<FlagsEntry, "outcome" | "attempts">> = {};
+      for (const entry of s.entries)
+        if (entry.outcome !== "pending") {
+          const result = { outcome: entry.outcome, attempts: entry.attempts };
+          saved[entry.id] = result;
+          if (entry.choicePosition != null) saved[`position:${entry.choicePosition}`] = result;
+        }
+      if (s.current && s.current.outcome !== "pending") {
+        const result = { outcome: s.current.outcome, attempts: s.current.attempts };
+        saved[s.current.id] = result;
+        if (s.current.choicePosition != null) saved[`position:${s.current.choicePosition}`] = result;
+      }
+      setRoundOutcomes(saved);
+      if (s.state === "completed") navigate(`/flags/results/${id}`, { replace: true });
+      else if (s.state === "abandoned") setError("This round was abandoned and cannot be resumed.");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, [id]);
+  useEffect(
+    () => () => {
+      const current = latestSession.current;
+      if (current?.state === "active") void api.flagsPause(id, requestId()).catch(() => {});
+    },
+    [id],
+  );
+  useEffect(() => {
+    if (session?.current) {
+      setAnswer("");
+      const entry = session.current;
+      setFeedback(
+        entry.outcome === "pending"
+          ? session.direction === "country_to_flag" && entry.attempts > 0
+            ? `Incorrect. ${Math.max(0, 3 - entry.attempts)} ${3 - entry.attempts === 1 ? "attempt" : "attempts"} remaining.`
+            : ""
+          : entry.outcome === "correct"
+            ? session.direction === "country_to_flag"
+              ? `Correct · ${entry.attempts === 1 ? "first" : entry.attempts === 2 ? "second" : "third"} try · ${entry.points} points.`
+              : `Correct · ${entry.points} points.`
+            : entry.outcome === "skipped"
+              ? "Skipped · 0 points. The correct answer is shown."
+              : "Not solved · 0 points. The correct answer is shown.",
+      );
+      const active = document.activeElement;
+      const shouldFocus =
+        active === document.body || active === headingRef.current || !active?.closest("button,input,select,a,textarea");
+      if (shouldFocus)
+        setTimeout(() => {
+          if (session.direction === "flag_to_country") answerRef.current?.focus();
+          else headingRef.current?.focus();
+        }, 0);
+    }
+  }, [session?.current?.id]);
+  const current = session?.current;
+  const choices = current?.choices ?? session?.choices ?? [];
+  const latestWrongChoice = choices.find(
+    (choice) => choice.id === current?.wrongChoiceIds[current.wrongChoiceIds.length - 1],
+  );
+  const outcomesById = new Map((session?.entries ?? []).map((entry) => [entry.id, entry]));
+  const outcomesByChoicePosition = new Map((session?.entries ?? []).map((entry) => [entry.choicePosition, entry]));
+  const getChoiceOutcome = (choice: FlagsChoice) =>
+    roundOutcomes[choice.id] ??
+    (choice.choicePosition != null ? roundOutcomes[`position:${choice.choicePosition}`] : undefined) ??
+    outcomesById.get(choice.id) ??
+    outcomesByChoicePosition.get(choice.choicePosition);
+  const assetUnavailable = unavailableAssets.length > 0;
+  const feedbackClass =
+    current?.outcome === "correct"
+      ? `success attempt-${current.attempts}`
+      : current?.outcome === "incorrect"
+        ? "failure unsolved"
+        : current?.outcome === "skipped" || current?.attempts
+          ? "failure"
+          : "";
+  const displayFeedback =
+    session?.direction === "flag_to_country" &&
+    (current?.outcome === "incorrect" || current?.outcome === "skipped") &&
+    current.name
+      ? `${feedback} Correct country: ${current.name}.`
+      : feedback;
+  const markAsset = (entryId: string, missing: boolean) =>
+    setUnavailableAssets((items) =>
+      missing ? (items.includes(entryId) ? items : [...items, entryId]) : items.filter((value) => value !== entryId),
+    );
+  async function act(fn: () => Promise<FlagsSession>) {
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const s = await fn();
+      latestSession.current = s;
+      setSession(s);
+      const resolved: Record<string, Pick<FlagsEntry, "outcome" | "attempts">> = {};
+      for (const entry of s.entries)
+        if (entry.outcome !== "pending") {
+          const result = { outcome: entry.outcome, attempts: entry.attempts };
+          resolved[entry.id] = result;
+          if (entry.choicePosition != null) resolved[`position:${entry.choicePosition}`] = result;
+        }
+      if (s.current && s.current.outcome !== "pending") {
+        const result = { outcome: s.current.outcome, attempts: s.current.attempts };
+        resolved[s.current.id] = result;
+        if (s.current.choicePosition != null) resolved[`position:${s.current.choicePosition}`] = result;
+      }
+      if (Object.keys(resolved).length) setRoundOutcomes((previous) => ({ ...previous, ...resolved }));
+      if (s.actionResult) {
+        const a = s.actionResult;
+        setFeedback(
+          a.outcome === "wrong_choice"
+            ? `Incorrect. ${a.remainingAttempts} ${a.remainingAttempts === 1 ? "attempt" : "attempts"} remaining.`
+            : a.outcome === "duplicate_choice"
+              ? "That flag was already selected. Choose another flag."
+              : a.outcome === "ambiguous"
+                ? "That answer could refer to more than one catalog entry. Please be more specific."
+                : a.outcome === "not_solved"
+                  ? "Not solved · 0 points. The correct flag is highlighted."
+                  : a.outcome === "correct"
+                    ? `Correct · ${current?.attempts === 0 ? "first" : current?.attempts === 1 ? "second" : "third"} try · ${s.current?.points ?? 0} points.`
+                    : "Incorrect · 0 points. The answer is shown.",
+        );
+        if (a.outcome === "wrong_choice" || a.outcome === "duplicate_choice")
+          setTimeout(() => gridRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus(), 30);
+        else if (a.outcome === "ambiguous") setTimeout(() => answerRef.current?.focus(), 30);
+        else focusNext();
+      } else if (s.current?.outcome === "skipped") {
+        setFeedback("Skipped · 0 points. The correct answer is shown.");
+        focusNext();
+      }
+    } catch (e) {
+      setError((e as Error).message);
+      void load();
+    } finally {
+      setBusy(false);
+      submitting.current = false;
+    }
+  }
+  function choose(choiceId: string) {
+    if (!session || !current || current.outcome !== "pending" || busy) return;
+    void act(() => api.flagsAnswer(session.id, current.id, choiceId, null, requestId()));
+  }
+  function onGridKey(e: KeyboardEvent<HTMLDivElement>) {
+    const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
+    if (!keys.includes(e.key)) return;
+    const buttons = [...(gridRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
+    const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (i < 0 || !buttons.length) return;
+    e.preventDefault();
+    const next = (i + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+    const button = buttons[next];
+    const choiceIndex = choices.findIndex((choice) => choice.id === button?.dataset.choiceId);
+    if (choiceIndex >= 0) setFocusedChoice(choiceIndex);
+    button?.focus();
+  }
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!answer.trim()) {
+      setFeedback("Enter a country name or code first.");
+      return;
+    }
+    if (!session || !current) return;
+    void act(() => api.flagsAnswer(session.id, current.id, null, answer, requestId()));
+  }
+  if (error && !session)
+    return (
+      <div className="flags-shell">
+        <ErrorBox message={error} retry={load} />
+        <Link className="secondary" to="/flags">
+          Back to Flags
+        </Link>
+      </div>
+    );
+  if (!session) return <Loading />;
+  if (session.state === "abandoned")
+    return (
+      <div className="flags-shell">
+        <div className="card">
+          <h1>This round was abandoned</h1>
+          <p>Abandoned rounds do not count toward personal bests.</p>
+          <Link to="/flags" className="primary">
+            Back to Flags
+          </Link>
+        </div>
+      </div>
+    );
+  const finalized = Boolean(current && current.outcome !== "pending");
+  const canFocusChoice = (choice: FlagsChoice) =>
+    Boolean(
+      current &&
+      !finalized &&
+      !assetUnavailable &&
+      !current.wrongChoiceIds.includes(choice.id) &&
+      getChoiceOutcome(choice)?.outcome !== "correct" &&
+      getChoiceOutcome(choice)?.outcome !== "incorrect",
+    );
+  const tabChoiceIndex =
+    choices[focusedChoice] && canFocusChoice(choices[focusedChoice])
+      ? focusedChoice
+      : choices.findIndex(canFocusChoice);
+  async function next() {
+    if (!session) return;
+    const s = await api.flagsNext(session.id, requestId());
+    latestSession.current = s;
+    if (s.state === "completed") navigate(`/flags/results/${session.id}`);
+    else setSession(s);
+  }
+  async function saveAndLeave() {
+    if (!session) return;
+    setBusy(true);
+    setError("");
+    try {
+      const paused = await api.flagsPause(session.id, requestId());
+      latestSession.current = paused;
+      setSession(paused);
+      navigate("/flags");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flags-shell">
+      <div className="flags-mobile-status">
+        <span>
+          <strong>
+            {session.answered}/{session.total}
+          </strong>
+          <small>{session.score} points</small>
+        </span>
+        {finalized && (
+          <button
+            ref={mobileNextRef}
+            className="primary flags-next flags-mobile-next"
+            disabled={busy}
+            onClick={() => void next()}
+          >
+            {session.answered === session.total ? "View results" : "Next flag"}
+          </button>
+        )}
+      </div>
+      <header className="flags-game-heading">
+        <div>
+          <p className="eyebrow">
+            {directionName(session.direction)} · {session.region || "All regions"}
+          </p>
+          <h1 tabIndex={-1} ref={headingRef}>
+            {session.current?.position ?? session.answered + 1} <span>of {session.total}</span>
+          </h1>
+        </div>
+        <div className="flags-game-actions">
+          <button className="flags-abandon" type="button" disabled={busy} onClick={() => setConfirmAbandon(true)}>
+            Abandon round
+          </button>
+          <button className="secondary" disabled={busy} onClick={() => void saveAndLeave()}>
+            {busy ? "Saving…" : "Save and leave"}
+          </button>
+        </div>
+      </header>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="flags-play-layout">
+        <section className="card flags-question">
+          {current && session.direction === "country_to_flag" ? (
+            <>
+              <p className="eyebrow">FIND THIS COUNTRY’S FLAG</p>
+              <div className="flags-target-row">
+                <h2 className="flags-target-name">{current.name}</h2>
+                {latestWrongChoice?.name && (
+                  <span className="flags-wrong-name" role="status">
+                    {latestWrongChoice.name}
+                  </span>
+                )}
+              </div>
+              <div
+                className="flags-option-grid"
+                ref={gridRef}
+                onKeyDown={onGridKey}
+                role="group"
+                aria-label="Flag options"
+              >
+                {choices.map((c, i) => {
+                  const wasWrong = current.wrongChoiceIds.includes(c.id);
+                  const outcome = getChoiceOutcome(c);
+                  const isCorrect = outcome?.outcome === "correct";
+                  const notGuessed = outcome?.outcome === "incorrect";
+                  const resultClass = isCorrect ? `right attempt-${outcome.attempts}` : notGuessed ? "unresolved" : "";
+                  const resultLabel = isCorrect
+                    ? `, correct on attempt ${outcome.attempts}`
+                    : notGuessed
+                      ? ", not guessed"
+                      : "";
+                  return (
+                    <button
+                      key={c.id}
+                      data-choice-id={c.id}
+                      type="button"
+                      tabIndex={i === tabChoiceIndex ? 0 : -1}
+                      className={`flags-option ${wasWrong ? "wrong" : ""} ${resultClass}`}
+                      aria-label={`Flag option ${i + 1}${wasWrong ? ", incorrect selection" : ""}${wasWrong && c.name ? `, ${c.name}` : ""}${resultLabel}`}
+                      aria-describedby={c.flagDescription ? `flags-desc-${c.id}` : undefined}
+                      aria-pressed={isCorrect}
+                      disabled={busy || finalized || wasWrong || isCorrect || assetUnavailable}
+                      onClick={() => choose(c.id)}
+                    >
+                      <FlagImage
+                        value={c}
+                        label={`Flag option ${i + 1}`}
+                        className="small"
+                        onUnavailable={(missing) => markAsset(c.id, missing)}
+                      />
+                      {isCorrect && (
+                        <span className="flags-option-correct-mark" aria-hidden="true">
+                          <svg viewBox="0 0 20 20" focusable="false">
+                            <path d="m4 10.5 4 4L16 6.5" />
+                          </svg>
+                        </span>
+                      )}
+                      <span className="sr-only">Flag option {i + 1}</span>
+                      {c.flagDescription && (
+                        <span className="sr-only" id={`flags-desc-${c.id}`}>
+                          {c.flagDescription}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="flags-access-note">
+                Flag options use generic labels during the challenge. Available catalog descriptions are announced when
+                provided.
+              </p>
+            </>
+          ) : current ? (
+            <div className="flags-identify-layout">
+              <div className="flags-identify-header">
+                <span className="flags-mode-pill">FLAG IDENTIFICATION</span>
+                <span className="flags-question-count">
+                  Question {current.position} <i aria-hidden="true">/</i> {session.total}
+                </span>
+              </div>
+              <FlagImage
+                value={current}
+                label={current.flagDescription || "Country flag image"}
+                className="large"
+                onUnavailable={(missing) => markAsset(current.id, missing)}
+              />
+              {!current.flagDescription && (
+                <p className="flags-access-note flags-identify-access-note">
+                  This catalog flag has no text description.
+                </p>
+              )}
+              <div className="flags-identify-copy">
+                <h2>Which country or territory does this flag represent?</h2>
+                <p>Search by name or ISO alpha-2 code, or browse the catalog list.</p>
+              </div>
+              <form className="flags-answer-form" onSubmit={submit}>
+                <label htmlFor="flags-answer">Your answer</label>
+                <CountryAnswerCombobox
+                  key={current.id}
+                  options={session.answerOptions ?? []}
+                  value={answer}
+                  onChange={setAnswer}
+                  disabled={busy || finalized || assetUnavailable}
+                  inputRef={answerRef}
+                />
+                <div className="flags-inline-actions">
+                  <button className="primary" disabled={busy || finalized || assetUnavailable}>
+                    {busy ? "Checking…" : "Check country"}
+                  </button>
+                  <button
+                    className="secondary"
+                    type="button"
+                    disabled={busy || finalized || assetUnavailable}
+                    onClick={() => void act(() => api.flagsSkip(session.id, current.id, requestId()))}
+                  >
+                    Skip this flag
+                  </button>
+                </div>
+              </form>
+              {assetUnavailable && (
+                <p className="flags-empty" role="alert">
+                  A required flag image did not load. Retry the image before answering or moving on.
+                </p>
+              )}
+              {!session.region && current.hintUsed && current.region && (
+                <p className="flags-hint-note" role="status">
+                  Region hint: <strong>{current.region}</strong>
+                </p>
+              )}
+              {!session.region && !current.hintUsed && (
+                <button
+                  type="button"
+                  className="flags-hint-link"
+                  disabled={busy || finalized || assetUnavailable}
+                  onClick={() => void act(() => api.flagsHint(session.id, current.id, requestId()))}
+                >
+                  Show region hint <small>This permanently lowers this flag’s maximum score from 100 to 60.</small>
+                </button>
+              )}
+            </div>
+          ) : (
+            <Loading />
+          )}
+          {assetUnavailable && session.direction === "country_to_flag" && (
+            <p className="flags-empty" role="alert">
+              A required flag image did not load. Retry the image before selecting an answer.
+            </p>
+          )}
+          {displayFeedback && (
+            <p className={`flags-feedback flags-mobile-feedback ${feedbackClass}`} role="status" aria-live="polite">
+              {displayFeedback}
+            </p>
+          )}
+        </section>
+        <StatsPanel
+          session={session}
+          feedback={displayFeedback}
+          feedbackClass={feedbackClass}
+          busy={busy}
+          onNext={() => void next()}
+          nextRef={nextRef}
+        />
+      </div>
+      {confirmAbandon && (
+        <div className="flags-dialog-backdrop" role="presentation">
+          <section role="dialog" aria-modal="true" aria-labelledby="flags-abandon-title" className="card flags-confirm">
+            <h2 id="flags-abandon-title">Abandon this round?</h2>
+            <p>This ends the round permanently. It will not count toward personal bests.</p>
+            <div>
+              <button className="secondary" onClick={() => setConfirmAbandon(false)}>
+                Keep playing
+              </button>
+              <button
+                className="danger"
+                onClick={() =>
+                  void act(async () => {
+                    const s = await api.flagsAbandon(session.id, requestId());
+                    setConfirmAbandon(false);
+                    navigate("/flags");
+                    return s;
+                  })
+                }
+              >
+                Abandon round
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+function Results() {
+  const { id = "" } = useParams();
+  const { data, error, reload } = useLoad(() => api.flagsResults(id));
+  if (error)
+    return (
+      <div className="flags-shell">
+        <ErrorBox message={error} retry={reload} />
+      </div>
+    );
+  if (!data) return <Loading />;
+  const accuracy = data.total ? Math.round((data.correct / data.total) * 100) : 0;
+  const percent = (value: number) => (data.total ? Math.round((value / data.total) * 100) : 0);
+  const scorePercent = data.maxScore ? Math.round((data.score / data.maxScore) * 100) : 0;
+  const first = data.entries.filter((e) => e.outcome === "correct" && e.attempts === 1).length;
+  const second = data.entries.filter((e) => e.outcome === "correct" && e.attempts === 2).length;
+  const third = data.entries.filter((e) => e.outcome === "correct" && e.attempts === 3).length;
+  const reviewEntries = [...data.entries].sort((a, b) => b.points - a.points || a.position - b.position);
+  return (
+    <div className="flags-shell flags-results">
+      <header className="flags-heading">
+        <p className="eyebrow">ROUND COMPLETE · {directionName(data.direction)}</p>
+        <h1 tabIndex={-1}>Your results</h1>
+        <p className="muted">
+          {data.finalBadge === "first_run"
+            ? "First completed run"
+            : data.finalBadge === "new_best"
+              ? "New personal best"
+              : "Completed run"}
+        </p>
+      </header>
+      <div className="flags-result-grid">
+        <section className="card flags-result-score">
+          <div className="flags-result-score-heading">
+            <span>Final score</span>
+            <strong>
+              {data.score}
+              <small> / {data.maxScore}</small>
+            </strong>
+            <b>{scorePercent}% of maximum score</b>
+          </div>
+          <div className="flags-result-breakdown" aria-label="Round results">
+            <div>
+              <span>Correct</span>
+              <strong>
+                {data.correct}
+                <small> / {data.total}</small>
+              </strong>
+              <b>{percent(data.correct)}%</b>
+            </div>
+            <div>
+              <span>Incorrect</span>
+              <strong>
+                {data.incorrect}
+                <small> / {data.total}</small>
+              </strong>
+              <b>{percent(data.incorrect)}%</b>
+            </div>
+            <div>
+              <span>Skipped</span>
+              <strong>
+                {data.skipped}
+                <small> / {data.total}</small>
+              </strong>
+              <b>{percent(data.skipped)}%</b>
+            </div>
+            <div>
+              <span>Accuracy</span>
+              <strong>{accuracy}%</strong>
+              <b>
+                {data.correct} of {data.total} flags
+              </b>
+            </div>
+          </div>
+          <p className="flags-result-calculation">
+            Percentages use all flags in the round. Accuracy is correct / total; incorrect and skipped flags are not
+            correct.
+          </p>
+          <p>
+            Elapsed time: {formatTime(data.elapsedMs ?? 0)}. This is server time from session creation to completion,
+            including feedback screens and time spent away. There is no time limit or speed bonus.
+          </p>
+          {data.direction === "country_to_flag" && (
+            <p>
+              Correct answer attempts: {first} first try · {second} second try · {third} third try.
+            </p>
+          )}
+          {data.direction === "flag_to_country" && <p>Region hints used: {data.hintsUsed}.</p>}
+          <p>Flags scores are separate from competitive XP.</p>
+        </section>
+        <section className="card">
+          <h2>Top five for this pool</h2>
+          {data.topFive.length ? (
+            <ol className="flags-top-five">
+              {data.topFive.map((r, i) => (
+                <li key={r.id}>
+                  <b>#{i + 1}</b>
+                  <span>{r.score} points</span>
+                  <span>{formatTime(r.elapsedMs)}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>No completed runs yet.</p>
+          )}
+        </section>
+      </div>
+      <section className="card flags-review">
+        <header>
+          <div>
+            <h2>Question review</h2>
+            <p>Sorted by points earned, highest first. Ties follow round order.</p>
+          </div>
+          <span>{data.total} flags</span>
+        </header>
+        <ol>
+          {reviewEntries.map((e) => (
+            <li key={e.id}>
+              <span className="flags-review-position">Q{e.position}</span>
+              <FlagImage value={e} label={e.flagDescription || "Flag"} className="review" />
+              <div>
+                <strong>{e.name || "Catalog entry"}</strong>
+                <p>
+                  {e.outcome === "correct"
+                    ? `Correct · ${e.attempts === 1 ? "first" : e.attempts === 2 ? "second" : "third"} try`
+                    : e.outcome === "skipped"
+                      ? "Skipped"
+                      : `Not solved · ${e.attempts} attempts`}{" "}
+                  · {e.points} points
+                </p>
+                {e.hintUsed && <small>Region hint used · 60 point maximum</small>}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <div className="flags-result-actions">
+        <Link
+          className="primary"
+          to={`/flags?direction=${data.direction}&region=${encodeURIComponent(data.region ?? "")}&difficulty=${data.poolTier}`}
+        >
+          Play again
+        </Link>
+        <Link className="secondary" to="/flags">
+          Change settings
+        </Link>
+      </div>
+    </div>
+  );
+}
+function formatTime(ms: number) {
+  const sec = Math.floor(ms / 1000);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+export default function Flags() {
+  return (
+    <Routes>
+      <Route index element={<Setup />} />
+      <Route path="session/:id" element={<Game />} />
+      <Route path="results/:id" element={<Results />} />
+    </Routes>
+  );
+}
