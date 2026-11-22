@@ -26,6 +26,14 @@ Do not add a new mode or multiplayer while a mode is half-finished.
 ## Stack and layout
 - React 18 + TypeScript (strict) + React Router 6 + Tailwind 3, built with Vite 6.
 - Supabase (Postgres, Auth, RPC, one Edge Function) is the backend. Vercel hosts static files only.
+- `src/game-setup.tsx` — the ONE setup screen for Flags, Capitals and Recall (`GameSetup`): mode · catalog (UN member
+  states / all) · region · difficulty (all / well-known / pick my own) · length (whole set or 10/25/50 random) · time
+  limit. Any new option must be added here and to all three games (server start RPC, demo engine, results "Play again").
+  Rules: random samples are practice (`sample_size`, badge `unranked`, never a personal best); timed rounds have a
+  `deadline_at`, can't be paused, get a separate best signature and count unanswered entries as skipped when time is up
+  (`private.flags_expire` / `private.capitals_expire` / `private.recall_expire`, called by every round RPC).
+  Personal bests for all three come from `arena_personal_bests()`; totals from `arena_game_stats()` (Profile → Statistics,
+  Home). Keep existing best signatures stable: untimed whole-set rounds must hash exactly as before.
 - `src/setup-ui.tsx` — shared setup building blocks (ModePage, Step, OptionCards, Chips, StartBar, ResumeList,
   StreakBadge). Every mode's setup screen uses them; don't build a one-off setup layout.
 - `src/prefs.ts` — device-local game preferences (auto-continue, remembered setups, confirmations, keyboard

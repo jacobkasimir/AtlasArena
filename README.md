@@ -14,6 +14,11 @@ A geography game that helps people learn the world through play – and gives th
 | Explorer | `/explorer` | Searchable atlas of every country and territory |
 | Settings | `/settings` | Gameplay preferences, theme, data export and account deletion |
 
+Flags, Capitals and Recall share one setup: UN member states or all countries and territories, a region, all /
+well-known / your own picks, the whole set or 10, 25 or 50 at random (practice rounds that never count as bests) and an
+optional time limit (5–20 min, ranked separately). Every setup keeps its own personal best; all of them, plus totals
+per game, are under Profile → Statistics.
+
 Every game follows the same loop: **choose a set → play → feedback → results → saved progress**.
 Unfinished rounds are saved and can be resumed from Home or the game's setup screen.
 
@@ -29,6 +34,8 @@ Key source files:
 | File | Purpose |
 |---|---|
 | `src/api.ts` | The only place that talks to Supabase; every call has a demo branch |
+| `src/game-setup.tsx` | The shared setup screen, personal bests, timer and round tags for Flags, Capitals and Recall |
+| `src/Statistics.tsx` | Per-game statistics and all personal bests on the profile page |
 | `src/setup-ui.tsx` | Shared setup and in-game building blocks used by every game |
 | `src/prefs.ts` | Device-local game preferences (auto-continue, remembered setups, vibration …) |
 | `src/Hub.tsx`, `src/App.tsx` | Home hub; layout, quiz screens, settings |

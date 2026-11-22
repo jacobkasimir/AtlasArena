@@ -10,7 +10,7 @@ import {
 type StoredEntry = { position: number; code: string; region: string; country: string; answer: string;
   aliases: { key: string; lang: RecallLang }[]; foundAt: string | null; matched: string | null; lang: RecallLang | null };
 type Stored = Omit<RecallSession, "entries" | "serverNow" | "best" | "ambiguous" | "salt"> & {
-  salt: string; signature: string | null; requestId: string; entries: StoredEntry[] };
+  salt: string; signature: string | null; requestId: string; entries: StoredEntry[]; picks?: string[] };
 
 const KEY = "atlas-demo-recall";
 const countries = countryData as Country[];
@@ -24,8 +24,10 @@ function find(id: string) {
   if (!session) throw new Error("RECALL_SESSION_NOT_FOUND");
   return { sessions, session };
 }
-const signatureOf = (choice: RecallChoice) => choice.size === null
-  ? JSON.stringify([choice.kind, choice.scope, choice.region, choice.timeLimitSeconds]) : null;
+const signatureOf = (choice: RecallChoice, sampled: boolean) => sampled ? null
+  : JSON.stringify([choice.kind, choice.scope, choice.region, choice.timeLimitSeconds,
+    ...(choice.pool === "all" ? [] : [choice.pool, [...choice.picks].sort()])]);
+const isEasy = (country: Country) => country.difficulty === "easy" || country.difficulty === "medium";
 
 function best(sessions: Stored[], signature: string | null, exclude?: string) {
   if (!signature) return null;
@@ -64,12 +66,13 @@ async function view(sessions: Stored[], session: Stored): Promise<RecallSession>
       h: await recallHash(session.salt, alias.key), l: alias.lang, x: extendedBy(entry, alias.key)
     }))) : null
   })));
-  const { signature, requestId, ...rest } = session; void requestId;
-  return { ...rest, salt: active ? session.salt : null, ambiguous: [], serverNow: new Date().toISOString(),
+  const { signature, requestId, picks, ...rest } = session; void requestId;
+  return { ...rest, selectedCodes: picks ?? [], salt: active ? session.salt : null, ambiguous: [], serverNow: new Date().toISOString(),
     ranked: signature !== null, best: best(sessions, signature, session.state === "completed" ? session.id : undefined), entries };
 }
 
 export const recallDemo = {
+  sessions: () => load(),
   async setup(): Promise<RecallSetup> {
     const sessions = load(); sessions.forEach(session => expire(sessions, session)); save(sessions);
     const recalled = (kind: string) => [...new Set(sessions.filter(item => item.kind === kind)
@@ -80,11 +83,14 @@ export const recallDemo = {
       if (!current || item.found > current.found || (item.found === current.found && (item.elapsedMs ?? 0) < (current.elapsedMs ?? 0))) bests.set(item.signature, item);
     }
     return {
-      catalog: countries.map(country => ({ code: country.code, region: country.region, un: true, hasCapital: Boolean(country.capital) })),
+      catalog: countries.map(country => ({ code: country.code, name: country.name, alpha2: country.code, region: country.region, un: true,
+        easy: isEasy(country), hasCapital: Boolean(country.capital) })),
       activeSessions: sessions.filter(item => item.state === "active").reverse().map(item => ({
         id: item.id, kind: item.kind, scope: item.scope, region: item.region, size: item.size, timeLimitSeconds: item.timeLimitSeconds,
-        total: item.total, found: item.found, createdAt: item.createdAt, deadlineAt: item.deadlineAt })),
+        total: item.total, found: item.found, createdAt: item.createdAt, deadlineAt: item.deadlineAt, pool: item.pool ?? "all",
+        selectedCount: item.selectedCount ?? 0 })),
       bests: [...bests.values()].map(item => ({ kind: item.kind, scope: item.scope, region: item.region, timeLimitSeconds: item.timeLimitSeconds,
+        pool: item.pool ?? "all", selectedCount: item.selectedCount ?? 0,
         found: item.found, total: item.total, elapsedMs: item.elapsedMs ?? 0, completedAt: item.completedAt ?? "" })),
       recalled: { countries: recalled("countries"), capitals: recalled("capitals") }
     };
@@ -93,19 +99,21 @@ export const recallDemo = {
     const sessions = load();
     const existing = sessions.find(item => item.requestId === requestId);
     if (existing) return view(sessions, existing);
-    let pool = countries.filter(country => (!choice.region || country.region === choice.region) && (choice.kind === "countries" || country.capital));
-    if (choice.size !== null) {
-      if (pool.length < choice.size) throw new Error("RECALL_SET_TOO_SMALL");
-      pool = [...pool].sort(() => Math.random() - .5).slice(0, choice.size);
-    }
+    const picks = new Set(choice.picks ?? []);
+    const poolKind = choice.pool ?? "all";
+    let pool = countries.filter(country => (!choice.region || country.region === choice.region) && (choice.kind === "countries" || country.capital)
+      && (poolKind !== "easy" || isEasy(country)) && (poolKind !== "manual" || picks.has(country.code)));
     if (!pool.length) throw new Error("EMPTY_RECALL_POOL");
+    const size = choice.size !== null && choice.size < pool.length ? choice.size : null;
+    if (size !== null) pool = [...pool].sort(() => Math.random() - .5).slice(0, size);
     pool.sort((a, b) => choice.kind === "countries" ? a.region.localeCompare(b.region) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
     const now = new Date();
     const session: Stored = {
-      id: crypto.randomUUID(), requestId, kind: choice.kind, scope: choice.scope, region: choice.region, size: choice.size,
+      id: crypto.randomUUID(), requestId, kind: choice.kind, scope: choice.scope, region: choice.region, size,
+      pool: poolKind, selectedCount: poolKind === "manual" ? picks.size : 0, picks: poolKind === "manual" ? [...picks].sort() : [],
       timeLimitSeconds: choice.timeLimitSeconds, state: "active", endReason: null, badge: null, total: pool.length, found: 0,
       createdAt: now.toISOString(), deadlineAt: choice.timeLimitSeconds ? new Date(now.getTime() + choice.timeLimitSeconds * 1000).toISOString() : null,
-      completedAt: null, elapsedMs: null, ranked: choice.size === null, salt: crypto.randomUUID().replace(/-/g, ""), signature: signatureOf(choice),
+      completedAt: null, elapsedMs: null, ranked: size === null, salt: crypto.randomUUID().replace(/-/g, ""), signature: signatureOf(choice, size !== null),
       entries: pool.map((country, index) => {
         const answer = choice.kind === "countries" ? country.name : country.capital;
         const names = choice.kind === "countries" ? [country.name, country.officialName] : [country.capital];

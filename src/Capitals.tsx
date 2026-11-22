@@ -2,19 +2,14 @@ import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useSta
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import { AUTO_CONTINUE_MS, haptic, isIOS, loadSetup, oneOf, saveSetup, usePrefs } from "./prefs";
-import { Chips, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, StreakBadge, Step } from "./setup-ui";
+import { AUTO_CONTINUE_MS, haptic, isIOS, usePrefs } from "./prefs";
+import { StreakBadge } from "./setup-ui";
+import { CapitalDirection, CapitalEntry, CapitalSession, CapitalSetup, CapitalVocabularyOption } from "./domain";
+import { capitalPercentage, normalizeCapitalText } from "./capitals-domain";
 import {
-  CapitalBest,
-  CapitalCountry,
-  CapitalDirection,
-  CapitalEntry,
-  CapitalPoolMode,
-  CapitalSession,
-  CapitalSetup,
-  CapitalVocabularyOption,
-} from "./domain";
-import { capitalPercentage, capitalPool, normalizeCapitalText } from "./capitals-domain";
+  GameChoice, GameSetup, PersonalBest, RoundTags, SetupPlace, TimeLeft, badgeText, describeSetup, endedOnTime, initialChoice,
+  regionLabel, roundOptions, setupUrl, useTimeLeft,
+} from "./game-setup";
 
 const requestId = () => crypto.randomUUID();
 const directions: { id: CapitalDirection; title: string; description: string }[] = [
@@ -22,58 +17,19 @@ const directions: { id: CapitalDirection; title: string; description: string }[]
   { id: "capital_to_country", title: "Capital → Country", description: "See a capital. Identify its country." },
 ];
 const normalize = normalizeCapitalText;
-const countryFlag = (country: CapitalCountry) =>
-  (country.catalogKind === "iso_alpha2" && country.codeAlpha2
-    ? "/flags/" + country.codeAlpha2.toLowerCase() + ".svg"
-    : null) || country.flagSvgUrl;
-
-function useCapitalSetup() {
-  return useLoad<CapitalSetup>(() => api.capitalsSetup());
-}
+const choiceOf = (s: CapitalSession): GameChoice => ({
+  mode: s.direction, scope: s.scope ?? "all", region: s.region, pool: s.poolMode, picks: s.poolMode === "manual" ? s.selectedCodes : [],
+  size: s.sampleSize ?? null, limit: s.timeLimitSeconds ?? null,
+});
 
 function Setup() {
-  const { data, error, reload } = useCapitalSetup();
-  const bests = useLoad<CapitalBest[]>(() => api.capitalsBests());
+  const { data, error, reload } = useLoad<CapitalSetup>(() => api.capitalsSetup());
+  const bests = useLoad<PersonalBest[]>(() => api.personalBests());
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const saved = useMemo(() => (params.toString() ? {} : loadSetup("capitals")), []); // eslint-disable-line react-hooks/exhaustive-deps
-  const [direction, setDirection] = useState<CapitalDirection>(
-    (params.get("direction") ?? saved.direction) === "capital_to_country" ? "capital_to_country" : "country_to_capital",
-  );
-  const [poolMode, setPoolMode] = useState<CapitalPoolMode>(
-    oneOf(params.get("pool") ?? saved.poolMode, ["all", "easy", "manual"] as const, "all"),
-  );
-  const [selectedCodes, setSelectedCodes] = useState<string[]>(
-    params.get("selected")
-      ? params.get("selected")!.split(",").filter(Boolean)
-      : Array.isArray(saved.selectedCodes)
-        ? saved.selectedCodes.filter((code): code is string => typeof code === "string")
-        : [],
-  );
-  const [region, setRegion] = useState(params.get("region") ?? (typeof saved.region === "string" ? saved.region : ""));
-  const [countrySearch, setCountrySearch] = useState("");
-  const [busy, setBusy] = useState(false);
+  const initial = useMemo(() => initialChoice("capitals", params, directions.map((item) => item.id)), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [message, setMessage] = useState("");
   const [pendingReplay, setPendingReplay] = useState<string | null>(params.get("replay"));
-  const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
-  const countries = data?.countries ?? [];
-  const eligible = (country: CapitalCountry) =>
-    direction === "country_to_capital" ? country.countryToCapitalEligible : country.capitalToCountryEligible;
-  const filteredPool = capitalPool(countries, direction, poolMode, selectedCodes, region || null);
-  const outsideRegion = filteredPool.outsideRegion;
-  const eligiblePool = filteredPool.countries;
-  const search = normalize(countrySearch);
-  const matchingCountries = countries.filter(
-    (country) =>
-      (!search ||
-        normalize([country.name, country.officialName ?? "", country.code, country.codeAlpha3 ?? ""].join(" ")).includes(
-          search,
-        )) &&
-      (!region || country.region === region),
-  );
-  const modeLabel = directions.find((item) => item.id === direction)!.title;
-  const poolSize = (mode: CapitalPoolMode) => capitalPool(countries, direction, mode, selectedCodes, region || null).countries.length;
-  const regionSize = (name: string) => capitalPool(countries, direction, poolMode, selectedCodes, name || null).countries.length;
 
   useEffect(() => {
     if (!pendingReplay || !data) return;
@@ -85,38 +41,7 @@ function Setup() {
     setPendingReplay(null);
     setMessage("That saved Capitals round could not be found. Choose settings and start a new round.");
   }, [pendingReplay, data, navigate]);
-  useEffect(() => {
-    if (data && region && !data.regions.includes(region)) setRegion("");
-  }, [data, region]);
-  function toggle(code: string) {
-    setSelectedCodes((current) =>
-      current.includes(code) ? current.filter((value) => value !== code) : [...current, code],
-    );
-  }
-  function selectAllMatching() {
-    setSelectedCodes((current) => [...new Set([...current, ...matchingCountries.map((country) => country.code)])]);
-  }
-  async function start(event: FormEvent) {
-    event.preventDefault();
-    if (!eligiblePool.length) return;
-    setBusy(true);
-    setMessage("");
-    saveSetup("capitals", { direction, poolMode, region, selectedCodes: poolMode === "manual" ? selectedCodes : [] });
-    try {
-      const session = await api.capitalsStart(
-        direction,
-        poolMode,
-        poolMode === "manual" ? selectedCodes : [],
-        region || null,
-        requestId(),
-      );
-      navigate("/capitals/session/" + session.id);
-    } catch (cause) {
-      setMessage((cause as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+
   if (error)
     return (
       <div className="mode-shell">
@@ -124,169 +49,58 @@ function Setup() {
       </div>
     );
   if (!data) return <Loading />;
-
-  const side = (
-    <>
-    <SideCard title="Unfinished rounds">
-      <ResumeList
-        empty="None – rounds are saved automatically, so you can stop any time."
-        items={data.activeSessions.map((session) => ({
-          id: session.id,
-          title: directions.find((item) => item.id === session.direction)?.title ?? "Capitals",
-          detail: `${session.poolMode === "manual" ? "Your picks" : session.poolMode === "easy" ? "Well-known" : "All countries"} · ${session.region ?? "Whole world"} · ${session.score} pts`,
-          to: "/capitals/session/" + session.id,
-          done: session.answered,
-          total: session.total,
-        }))}
-      />
-    </SideCard>
-    <SideCard title="Personal bests">
-      {bests.data?.length ? (
-        <ul className="side-list">
-          {bests.data.slice(0, 6).map((best, index) => (
-            <li key={index}>
-              <div>
-                <p className="font-semibold">{directions.find((item) => item.id === best.direction)?.title}</p>
-                <p className="muted text-sm">
-                  {best.poolMode === "manual" ? `${best.selectedCount} picked` : best.poolMode === "easy" ? "Well-known" : "All"} ·{" "}
-                  {best.region ?? "Whole world"} · {best.runCount} {best.runCount === 1 ? "run" : "runs"}
-                </p>
-              </div>
-              <p className="best-score">
-                {best.correct}/{best.total}
-                <span>{formatTime(best.elapsedMs)}</span>
-              </p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted text-sm mt-2">Finish a round to record your first best.</p>
-      )}
-    </SideCard>
-    </>
-  );
+  const places: SetupPlace[] = data.countries.map((country) => {
+    const modes = [
+      ...(country.countryToCapitalEligible ? ["country_to_capital"] : []),
+      ...(country.capitalToCountryEligible ? ["capital_to_country"] : []),
+    ];
+    return {
+      code: country.code, name: country.name, region: country.region, un: Boolean(country.un),
+      easy: country.difficulty === "easy" || country.difficulty === "medium",
+      alpha2: country.catalogKind === "iso_alpha2" ? country.codeAlpha2 : null,
+      modes,
+      unModes: [
+        ...(country.countryToCapitalEligible ? ["country_to_capital"] : []),
+        ...((country.unCapitalToCountryEligible ?? country.capitalToCountryEligible) ? ["capital_to_country"] : []),
+      ],
+    };
+  });
 
   return (
-    <ModePage
+    <GameSetup
+      game="capitals"
       eyebrow="Atlas Capitals"
       title="Capital cities, one by one."
       intro="Each country (or capital) in your set comes up once. Type your answer – spelling help appears as you type."
-      side={side}
-    >
-      <SetupForm onSubmit={start}>
-        <Step n={1} title="How do you want to play?">
-          <OptionCards
-            value={direction}
-            onChange={setDirection}
-            options={directions.map((option) => ({
-              value: option.id,
-              icon: option.id === "country_to_capital" ? "🏛️" : "🗺️",
-              title: option.title,
-              text: option.description,
-            }))}
-          />
-        </Step>
-        <Step n={2} title="Which countries?">
-          <Chips
-            label="Country pool"
-            value={poolMode}
-            onChange={(value) => setPoolMode(value)}
-            options={[
-              { value: "all", label: "All", count: poolSize("all") },
-              { value: "easy", label: "Well-known", count: poolSize("easy") },
-              { value: "manual", label: "Pick my own" },
-            ]}
-          />
-          {poolMode === "manual" && (
-            <div className="capitals-country-picker">
-              <div className="capitals-picker-toolbar">
-                <label className="capitals-search-label">
-                  Search countries and territories
-                  <input
-                    type="search"
-                    value={countrySearch}
-                    onChange={(event) => setCountrySearch(event.target.value)}
-                    placeholder="Search by name or code"
-                    autoComplete="off"
-                  />
-                </label>
-                <div className="capitals-picker-actions">
-                  <button type="button" className="secondary" onClick={selectAllMatching} disabled={!matchingCountries.length}>
-                    Select all {matchingCountries.length}
-                  </button>
-                  <button type="button" className="secondary" onClick={() => setSelectedCodes([])} disabled={!selectedCodes.length}>
-                    Clear
-                  </button>
-                </div>
-              </div>
-              <p className="capitals-selected-count" aria-live="polite">
-                {selectedCodes.length} selected
-              </p>
-              <div className="capitals-country-options" role="group" aria-label="Select countries and territories">
-                {matchingCountries.map((country) => {
-                  const flag = countryFlag(country);
-                  return (
-                    <label
-                      key={country.code}
-                      className={"capitals-country-option " + (selectedSet.has(country.code) ? "is-selected" : "")}
-                    >
-                      <input type="checkbox" checked={selectedSet.has(country.code)} onChange={() => toggle(country.code)} />
-                      {flag ? (
-                        <img src={flag} width="32" height="22" loading="lazy" alt="" />
-                      ) : (
-                        <span className="capitals-flag-placeholder" aria-hidden="true" />
-                      )}
-                      <span className="capitals-country-option-copy">
-                        <strong>{country.name}</strong>
-                        {!eligible(country) && <small>No usable capital data</small>}
-                      </span>
-                    </label>
-                  );
-                })}
-                {!matchingCountries.length && <p className="muted">No entries match this search.</p>}
-              </div>
-            </div>
-          )}
-        </Step>
-        <Step
-          n={3}
-          title="Region"
-          hint={
-            poolMode === "manual" && outsideRegion.length > 0
-              ? `${outsideRegion.length} of your picks ${outsideRegion.length === 1 ? "is" : "are"} outside this region and will be left out.`
-              : undefined
-          }
-        >
-          <Chips
-            label="Region"
-            value={region}
-            onChange={setRegion}
-            options={[
-              { value: "", label: "Whole world", count: regionSize("") },
-              ...data.regions.map((value) => ({ value, label: value, count: regionSize(value), disabled: regionSize(value) === 0 })),
-            ]}
-          />
-        </Step>
-        <StartBar
-          count={eligiblePool.length}
-          unit={eligiblePool.length === 1 ? "question" : "questions"}
-          busy={busy}
-          disabled={!eligiblePool.length}
-          label="Start round"
-          summary={`${modeLabel} · ${region || "Whole world"} · 100 points each`}
-        />
-        {!eligiblePool.length && (
-          <p className="muted" role="status">
-            Nothing matches this choice yet – pick countries, or try another region.
-          </p>
-        )}
-        {message && (
-          <p className="error" role="alert">
-            {message}
-          </p>
-        )}
-      </SetupForm>
-    </ModePage>
+      modes={directions.map((option) => ({
+        value: option.id,
+        icon: option.id === "country_to_capital" ? "🏛️" : "🗺️",
+        title: option.title,
+        text: option.description,
+      }))}
+      places={places}
+      regions={data.regions.map((region) => ({ id: region, name: region }))}
+      unit={(count) => (count === 1 ? "question" : "questions")}
+      summaryNote="100 points each"
+      initial={initial}
+      bests={bests.error ? null : bests.data ?? []}
+      resumeEmpty="None – rounds are saved automatically, so you can stop any time."
+      resume={data.activeSessions.map((session) => ({
+        id: session.id,
+        title: directions.find((item) => item.id === session.direction)?.title ?? "Capitals",
+        detail: describeSetup({ scope: session.scope ?? "all", region: session.region, pool: session.poolMode, picks: session.selectedCount,
+          size: session.sampleSize, limit: session.timeLimitSeconds ?? null }) + ` · ${session.score} pts`,
+        to: "/capitals/session/" + session.id,
+        done: session.answered,
+        total: session.total,
+      }))}
+      error={message}
+      onStart={async (choice) => {
+        const session = await api.capitalsStart(choice.mode as CapitalDirection, choice.pool, choice.pool === "manual" ? choice.picks : [],
+          choice.region, requestId(), roundOptions(choice));
+        navigate("/capitals/session/" + session.id);
+      }}
+    />
   );
 }
 
@@ -461,6 +275,14 @@ function Game() {
     for (let i = done.length - 1; i >= 0 && done[i].outcome === "correct"; i--) count++;
     return count;
   }, [session?.entries]);
+  const timeLeft = useTimeLeft(session?.state === "active" ? session.deadlineAt : null, session?.serverNow);
+  useEffect(() => {
+    if (timeLeft !== 0 || !session) return;
+    void api.capitalsView(session.id).then((result) => {
+      if (result.state === "completed") navigate("/capitals/results/" + result.id, { replace: true });
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft === 0]);
   const autoContinue = Boolean(prefs.autoContinue && current?.outcome === "correct" && session?.state === "active");
   useEffect(() => {
     if (!autoContinue) return;
@@ -495,6 +317,11 @@ function Game() {
     setError("");
     try {
       const result = await action();
+      if (result.state === "completed") {
+        haptic("complete");
+        navigate("/capitals/results/" + result.id);
+        return;
+      }
       setSession(result);
       if (result.actionResult?.outcome === "ambiguous") {
         setMessage("That name fits more than one place – please be more specific. No attempt was used.");
@@ -603,16 +430,20 @@ function Game() {
       <header className="capitals-game-header">
         <div>
           <p className="eyebrow">
-            {directions.find((item) => item.id === session.direction)?.title} · {session.region ?? "All regions"}
+            {directions.find((item) => item.id === session.direction)?.title} · {regionLabel(session.region)}
           </p>
           <h1 tabIndex={-1} ref={headingRef}>
             Question {current?.position ?? session.answered} <span>of {session.total}</span>
           </h1>
-          <StreakBadge streak={streak} />
+          <div className="round-meta">
+            {timeLeft !== null && <TimeLeft ms={timeLeft} />}
+            <RoundTags scope={session.scope} pool={session.poolMode} picks={session.selectedCodes.length} sample={session.sampleSize} limit={session.timeLimitSeconds} />
+            <StreakBadge streak={streak} />
+          </div>
         </div>
         <div>
           <button className="secondary" type="button" disabled={busy} onClick={() => void leave()}>
-            Save and leave
+            {session.timeLimitSeconds ? "Leave (clock keeps running)" : "Save and leave"}
           </button>
           <button className="capitals-abandon" type="button" disabled={busy} onClick={() => (prefs.confirmGiveUp ? setConfirmAbandon(true) : void abandonNow())}>
             Abandon round
@@ -636,8 +467,8 @@ function Game() {
           <small>Points</small>
         </span>
         <span>
-          <strong>{formatTime(timer)}</strong>
-          <small>Elapsed</small>
+          <strong>{formatTime(timeLeft ?? timer)}</strong>
+          <small>{timeLeft !== null ? "Left" : "Elapsed"}</small>
         </span>
       </div>
       <div className="capitals-play-layout">
@@ -761,12 +592,14 @@ function Game() {
               <dd>{session.skipped}</dd>
             </div>
             <div>
-              <dt>Elapsed</dt>
-              <dd>{formatTime(timer)}</dd>
+              <dt>{timeLeft !== null ? "Time left" : "Elapsed"}</dt>
+              <dd>{formatTime(timeLeft ?? timer)}</dd>
             </div>
           </dl>
           <p className="capitals-timer-note">
-            No time limit – the clock just records how long the round took.
+            {timeLeft !== null
+              ? "When the time runs out, every unanswered question counts as skipped."
+              : "No time limit – the clock just records how long the round took."}
           </p>
           {recent.length > 0 && (
             <div className="capitals-recent">
@@ -858,10 +691,12 @@ function Results() {
         resultData.poolMode === "manual" ? resultData.selectedCodes : [],
         resultData.region,
         requestId(),
+        roundOptions(choiceOf(resultData)),
       );
       navigate("/capitals/session/" + session.id);
     } catch (cause) {
       setMessage((cause as Error).message);
+      navigate(setupUrl("capitals", choiceOf(resultData)));
     } finally {
       setBusy(false);
     }
@@ -869,15 +704,10 @@ function Results() {
   return (
     <div className="capitals-shell capitals-results">
       <header>
-        <p className="eyebrow">ROUND COMPLETE · {directions.find((item) => item.id === data.direction)?.title}</p>
+        <p className="eyebrow">ROUND COMPLETE · {directions.find((item) => item.id === data.direction)?.title} · {regionLabel(data.region)}</p>
         <h1 tabIndex={-1}>Your results</h1>
-        <p className="muted">
-          {data.finalBadge === "first_run"
-            ? "First completed run"
-            : data.finalBadge === "new_best"
-              ? "New personal best"
-              : "Completed run"}
-        </p>
+        <p className={`result-badge is-${data.finalBadge ?? "done"}`}>{badgeText(data.finalBadge, endedOnTime(data))}</p>
+        <RoundTags scope={data.scope} pool={data.poolMode} picks={data.selectedCodes.length} sample={data.sampleSize} limit={data.timeLimitSeconds} />
       </header>
       <div className="capitals-results-grid">
         <section className="card capitals-result-score">
@@ -913,9 +743,10 @@ function Results() {
           </small>
         </section>
         <section className="card capitals-best-card">
-          <h2>Five best for this pool</h2>
-          <p>Kept separately for each direction and set of countries.</p>
-          {data.topFive.length ? (
+          <h2>{data.ranked === false ? "Practice round" : "Five best for this setup"}</h2>
+          <p>{data.ranked === false ? "Random picks don't count for personal bests. Play the whole set to rank this setup."
+            : "Kept separately for each direction, set of countries and time limit."}</p>
+          {data.ranked === false ? null : data.topFive.length ? (
             <ol>
               {data.topFive.map((run, index) => (
                 <li key={run.completedAt + "-" + index}>
@@ -976,7 +807,7 @@ function Results() {
         <button className="primary" onClick={() => void replay()} disabled={busy}>
           {busy ? "Preparing round…" : "Play again"}
         </button>
-        <Link className="secondary" to="/capitals">
+        <Link className="secondary" to={setupUrl("capitals", choiceOf(data))}>
           Change settings
         </Link>
       </div>

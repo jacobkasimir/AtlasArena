@@ -4,6 +4,9 @@ import type { RecallAnswerResult, RecallChoice, RecallSession, RecallSetup } fro
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
 import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalBest, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
+import type { RoundOptions } from "./domain";
+import type { GameStats, PersonalBest } from "./game-setup";
+import { demoGameStats, demoPersonalBests } from "./bests-demo";
 import { flagsDemo } from "./flags-demo";
 import { capitalsDemo } from "./capitals-demo";
 
@@ -13,6 +16,7 @@ export const configurationError = Boolean(url) !== Boolean(key)
   ? "Set both Supabase environment variables, or leave both empty for local demo."
   : null;
 export const isDemo = !url && !key;
+const defaultRound: RoundOptions = { scope: "all", picks: [], size: null, limit: null };
 export const supabase = url && key ? createClient(url, key) : null;
 
 async function rpc<T>(name: string, params = {}): Promise<T> {
@@ -82,10 +86,10 @@ export const api = {
     isDemo ? demo.explore() : rpc<ExplorerCountry[]>("arena_explore"),
   flagsSetup: () => isDemo ? flagsDemo.setup() : rpc<FlagsSetup>("arena_flags_setup"),
   flagsBests: () => isDemo ? flagsDemo.bests() : rpc<FlagsBestBoard[]>("arena_flags_bests"),
-  flagsStart: (direction: FlagsDirection, region: string | null, poolTier: FlagsPoolTier, requestId: string) =>
-    isDemo ? flagsDemo.start(direction, region, poolTier, requestId) : rpc<FlagsSession>("arena_flags_start", {
-      p_direction: direction, p_region: region, p_pool_tier: poolTier, p_request_id: requestId
-    }),
+  flagsStart: (direction: FlagsDirection, region: string | null, poolTier: FlagsPoolTier, requestId: string, options: RoundOptions = defaultRound) =>
+    isDemo ? flagsDemo.start(direction, region, poolTier, requestId, options) : rpc<FlagsSession>("arena_flags_start", {
+      p_direction: direction, p_region: region, p_pool_tier: poolTier, p_request_id: requestId, p_scope: options.scope,
+      p_selected_codes: poolTier === "manual" ? options.picks : null, p_size: options.size, p_time_limit_seconds: options.limit }),
   flagsView: (id: string) => isDemo ? flagsDemo.view(id) : rpc<FlagsSession>("arena_flags_view", { p_session_id: id }),
   flagsAnswer: (id: string, entryId: string, choiceId: string | null, answer: string | null, requestId: string) =>
     isDemo ? flagsDemo.answer(id, entryId, choiceId, answer, requestId) : rpc<FlagsSession>("arena_flags_answer", {
@@ -107,9 +111,10 @@ export const api = {
     ? flagsDemo.abandon(id, requestId) : rpc<FlagsSession>("arena_flags_abandon", { p_session_id: id, p_request_id: requestId }),
   flagsResults: (id: string) => isDemo ? flagsDemo.results(id) : rpc<FlagsSession>("arena_flags_results", { p_session_id: id }),
   capitalsSetup: () => isDemo ? capitalsDemo.setup() : rpc<CapitalSetup>("arena_capitals_setup"),
-  capitalsStart: (direction: CapitalDirection, poolMode: CapitalPoolMode, selectedCodes: string[], region: string | null, requestId: string) => isDemo
-    ? capitalsDemo.start(direction, poolMode, selectedCodes, region, requestId)
-    : rpc<CapitalSession>("arena_capitals_start", { p_direction: direction, p_pool_mode: poolMode, p_selected_codes: selectedCodes, p_region: region, p_request_id: requestId }),
+  capitalsStart: (direction: CapitalDirection, poolMode: CapitalPoolMode, selectedCodes: string[], region: string | null, requestId: string, options: RoundOptions = defaultRound) => isDemo
+    ? capitalsDemo.start(direction, poolMode, selectedCodes, region, requestId, options)
+    : rpc<CapitalSession>("arena_capitals_start", { p_direction: direction, p_pool_mode: poolMode, p_selected_codes: selectedCodes, p_region: region,
+      p_request_id: requestId, p_scope: options.scope, p_size: options.size, p_time_limit_seconds: options.limit }),
   capitalsView: (id: string) => isDemo ? capitalsDemo.view(id) : rpc<CapitalSession>("arena_capitals_view", { p_session_id: id }),
   capitalsAnswer: (id: string, entryId: string, answer: string, candidateId: string | null, requestId: string) => isDemo
     ? capitalsDemo.answer(id, entryId, answer, candidateId, requestId)
@@ -126,12 +131,15 @@ export const api = {
   recallSetup: () => isDemo ? recallDemo.setup() : rpc<RecallSetup>("arena_recall_setup"),
   recallStart: (choice: RecallChoice, requestId: string) => isDemo ? recallDemo.start(choice, requestId)
     : rpc<RecallSession>("arena_recall_start", { p_kind: choice.kind, p_scope: choice.scope, p_region: choice.region,
-      p_size: choice.size, p_time_limit_seconds: choice.timeLimitSeconds, p_request_id: requestId }),
+      p_size: choice.size, p_time_limit_seconds: choice.timeLimitSeconds, p_request_id: requestId,
+      p_pool: choice.pool, p_selected_codes: choice.pool === "manual" ? choice.picks : null }),
   recallView: (id: string) => isDemo ? recallDemo.view(id) : rpc<RecallSession>("arena_recall_view", { p_session_id: id }),
   recallAnswer: (id: string, position: number, answer: string) => isDemo ? recallDemo.answer(id, position, answer)
     : rpc<RecallAnswerResult>("arena_recall_answer", { p_session_id: id, p_position: position, p_answer: answer }),
   recallFinish: (id: string) => isDemo ? recallDemo.finish(id) : rpc<RecallSession>("arena_recall_finish", { p_session_id: id }),
   recallAbandon: (id: string) => isDemo ? recallDemo.abandon(id) : rpc<void>("arena_recall_abandon", { p_session_id: id }),
+  personalBests: () => isDemo ? demoPersonalBests() : rpc<PersonalBest[]>("arena_personal_bests"),
+  gameStats: () => isDemo ? demoGameStats() : rpc<GameStats>("arena_game_stats"),
   exportData: () =>
     isDemo ? demo.exportData() : rpc<unknown>("arena_export"),
   deleteAccount: async () => {

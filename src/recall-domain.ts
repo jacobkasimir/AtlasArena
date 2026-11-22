@@ -5,6 +5,7 @@
 
 export type RecallKind = "countries" | "capitals";
 export type RecallScope = "un" | "all";
+export type RecallPool = "all" | "easy" | "manual";
 export type RecallLang = "en" | "de" | "fr";
 
 export type RecallKey = { h: string; l: RecallLang; x: number[] };
@@ -31,6 +32,9 @@ export type RecallSession = {
   region: string | null;
   size: number | null;
   timeLimitSeconds: number | null;
+  pool?: RecallPool;
+  selectedCount?: number;
+  selectedCodes?: string[];
   state: "active" | "completed" | "abandoned";
   endReason: "all_found" | "gave_up" | "time_up" | null;
   badge: "first_run" | "new_best" | "not_best" | "unranked" | null;
@@ -62,15 +66,18 @@ export type RecallAnswerResult = {
   endReason: RecallSession["endReason"];
 };
 
-export type RecallCatalogItem = { code: string; region: string | null; un: boolean; hasCapital: boolean };
+export type RecallCatalogItem = {
+  code: string; name?: string; alpha2?: string | null; region: string | null; un: boolean; easy?: boolean; hasCapital: boolean;
+};
 
 export type RecallSetup = {
   catalog: RecallCatalogItem[];
   activeSessions: {
     id: string; kind: RecallKind; scope: RecallScope; region: string | null; size: number | null;
     timeLimitSeconds: number | null; total: number; found: number; createdAt: string; deadlineAt: string | null;
+    pool?: RecallPool; selectedCount?: number;
   }[];
-  bests: (RecallBest & { kind: RecallKind; scope: RecallScope; region: string | null; timeLimitSeconds: number | null })[];
+  bests: (RecallBest & { kind: RecallKind; scope: RecallScope; region: string | null; timeLimitSeconds: number | null; pool?: RecallPool; selectedCount?: number })[];
   recalled: { countries: string[]; capitals: string[] };
 };
 
@@ -80,6 +87,8 @@ export type RecallChoice = {
   region: string | null;
   size: number | null;
   timeLimitSeconds: number | null;
+  pool: RecallPool;
+  picks: string[];
 };
 
 // Characters PostgreSQL's unaccent folds to more than a stripped base letter.

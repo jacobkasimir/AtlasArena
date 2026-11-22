@@ -6,39 +6,40 @@ import { ErrorBox, Loading, useLoad } from "./components";
 import { avatars, Dashboard, level, modes } from "./domain";
 import { accuracy, modeIcons, modeNames } from "./quiz-meta";
 import type { RecallSetup } from "./recall-domain";
-import type { CapitalBest, CapitalSetup, FlagsBestBoard, FlagsSetup } from "./domain";
+import type { CapitalSetup, FlagsSetup } from "./domain";
+import { BestsList, GameStat, GameStats, PersonalBest, describeSetup, regionLabel } from "./game-setup";
 import { Meter } from "./setup-ui";
 
 type HubData = {
   quiz: Dashboard;
   flags: FlagsSetup | null;
-  flagBests: FlagsBestBoard[] | null;
   capitals: CapitalSetup | null;
-  capitalBests: CapitalBest[] | null;
   recall: RecallSetup | null;
+  bests: PersonalBest[] | null;
+  stats: GameStats | null;
 };
 
 type Continue = { id: string; game: string; title: string; detail: string; to: string; done: number; total: number };
 
 async function loadHub(): Promise<HubData> {
   const optional = <T,>(promise: Promise<T>) => promise.catch(() => null);
-  const [quiz, flags, flagBests, capitals, capitalBests, recall] = await Promise.all([
+  const [quiz, flags, capitals, recall, bests, stats] = await Promise.all([
     api.dashboard(),
     optional(api.flagsSetup()),
-    optional(api.flagsBests()),
     optional(api.capitalsSetup()),
-    optional(api.capitalsBests()),
     optional(api.recallSetup()),
+    optional(api.personalBests()),
+    optional(api.gameStats()),
   ]);
   const withSessions = <T extends { activeSessions?: unknown }>(value: T | null) =>
     value && Array.isArray(value.activeSessions) ? value : null;
   return {
     quiz,
     flags: withSessions(flags),
-    flagBests: Array.isArray(flagBests) ? flagBests : null,
     capitals: withSessions(capitals),
-    capitalBests: Array.isArray(capitalBests) ? capitalBests : null,
     recall: recall && Array.isArray(recall.catalog) && recall.recalled ? withSessions(recall) : null,
+    bests: Array.isArray(bests) ? bests : null,
+    stats: stats && typeof stats === "object" && "flags" in stats ? stats : null,
   };
 }
 
@@ -49,17 +50,19 @@ function continueItems(data: HubData): Continue[] {
   for (const s of data.flags?.activeSessions ?? [])
     items.push({
       id: s.id, game: "Flags", title: s.direction === "country_to_flag" ? "Country → Flag" : "Flag → Country",
-      detail: `${s.region || "Whole world"}${s.paused ? " · paused" : ""}`, to: `/flags/session/${s.id}`, done: s.answered, total: s.total,
+      detail: describeSetup({ scope: s.scope ?? "all", region: s.region, pool: s.poolTier, picks: s.selectedCount, size: s.sampleSize, limit: s.timeLimitSeconds ?? null })
+        + (s.paused ? " · paused" : ""), to: `/flags/session/${s.id}`, done: s.answered, total: s.total,
     });
   for (const s of data.capitals?.activeSessions ?? [])
     items.push({
       id: s.id, game: "Capitals", title: s.direction === "country_to_capital" ? "Country → Capital" : "Capital → Country",
-      detail: s.region ?? "Whole world", to: `/capitals/session/${s.id}`, done: s.answered, total: s.total,
+      detail: describeSetup({ scope: s.scope ?? "all", region: s.region, pool: s.poolMode, picks: s.selectedCount, size: s.sampleSize, limit: s.timeLimitSeconds ?? null }),
+      to: `/capitals/session/${s.id}`, done: s.answered, total: s.total,
     });
   for (const s of data.recall?.activeSessions ?? [])
     items.push({
       id: s.id, game: "Recall", title: s.kind === "countries" ? "Name the countries" : "Name the capitals",
-      detail: s.region ?? (s.scope === "un" ? "UN member states" : "Whole world"), to: `/recall/play/${s.id}`, done: s.found, total: s.total,
+      detail: `${s.scope === "un" ? "UN member states" : "All countries & territories"} · ${regionLabel(s.region)}`, to: `/recall/play/${s.id}`, done: s.found, total: s.total,
     });
   return items;
 }
@@ -101,12 +104,11 @@ export default function Hub() {
     );
 
   const items = continueItems(data);
-  const flagsRuns = data.flagBests?.reduce((sum, board) => sum + board.runCount, 0) ?? 0;
-  const bestFlags = data.flagBests
-    ?.flatMap((board) => board.topFive.map((run) => ({ ...run, total: board.total })))
-    .sort((a, b) => b.score / b.maxScore - a.score / a.maxScore)[0];
-  const capitalRuns = data.capitalBests?.reduce((sum, best) => sum + best.runCount, 0) ?? 0;
-  const bestCapitals = [...(data.capitalBests ?? [])].sort((a, b) => b.score / Math.max(1, b.maxScore) - a.score / Math.max(1, a.maxScore))[0];
+  const gameStat = (game: "flags" | "capitals", stat: GameStat | undefined) => stat && stat.rounds > 0 ? <>
+    <span><strong>{stat.rounds}</strong> {stat.rounds === 1 ? "round" : "rounds"}</span>
+    <span><strong>{stat.answered ? Math.round((stat.correct / stat.answered) * 100) : 0}%</strong> correct</span>
+    <span><strong>{stat.places}</strong> {game === "flags" ? "flags known" : "capitals known"}</span>
+  </> : <span>No finished rounds yet</span>;
   const recallCatalog = data.recall?.catalog.filter((item) => item.un) ?? [];
   const recalledCountries = new Set(data.recall?.recalled.countries ?? []);
   const recalledCapitals = new Set(data.recall?.recalled.capitals ?? []);
@@ -183,15 +185,9 @@ export default function Hub() {
             </div>
           </GameCard>
           <GameCard to="/flags" icon="🏳️" title="Flags" text="Match flags and countries, region by region. Hints when you're stuck."
-            stat={bestFlags ? <>
-              <span><strong>{flagsRuns}</strong> rounds finished</span>
-              <span><strong>{Math.round((bestFlags.score / bestFlags.maxScore) * 100)}%</strong> best round</span>
-            </> : <span>No finished rounds yet</span>} />
+            stat={gameStat("flags", data.stats?.flags)} />
           <GameCard to="/capitals" icon="🏛️" title="Capitals" text="Name the capital – or the country behind it – with spelling help as you type."
-            stat={bestCapitals ? <>
-              <span><strong>{capitalRuns}</strong> rounds finished</span>
-              <span><strong>{Math.round((bestCapitals.score / Math.max(1, bestCapitals.maxScore)) * 100)}%</strong> best round</span>
-            </> : <span>No finished rounds yet</span>} />
+            stat={gameStat("capitals", data.stats?.capitals)} />
           <GameCard to="/recall" icon="🧠" title="Recall" text="Type every country or capital of a region from memory. English, German or French."
             stat={recallCatalog.length ? <>
               <span><strong>{unCountries}/{recallCatalog.length}</strong> countries named</span>
@@ -201,6 +197,18 @@ export default function Hub() {
             stat={<span>Practice any country with one click</span>} />
         </div>
       </section>
+
+      {data.bests && data.bests.length > 0 && (
+        <section aria-labelledby="hub-bests">
+          <div className="hub-section-row">
+            <h2 id="hub-bests" className="hub-section-title">Latest personal bests</h2>
+            <Link className="text-link" to="/profile#statistics">All statistics →</Link>
+          </div>
+          <div className="card">
+            <BestsList bests={data.bests.slice(0, 4)} showGame />
+          </div>
+        </section>
+      )}
 
       {leaderboardOpen && <LeaderboardDialog onClose={() => { setLeaderboardOpen(false); leaderboardButtonRef.current?.focus(); }} />}
     </div>

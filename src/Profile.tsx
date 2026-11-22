@@ -7,6 +7,7 @@ import { accuracy, modeNames } from "./quiz-meta";
 
 import { AccountActions, authMessage } from "./Auth";
 import { GuestSessionRecovery } from "./Quiz";
+import { Statistics } from "./Statistics";
 
 export function AvatarPicker({ value }: { value: number }) {
   const initial = Number.isInteger(value) && value >= 0 && value < avatars.length ? value : 0;
@@ -173,7 +174,7 @@ export function ProfilePage() {
           <p>
             {data.totals.games} completed games · {accuracy(data.totals.correct, data.totals.incorrect)} accuracy
           </p>
-          <h3 className="font-bold mt-6 mb-2">Best scores by mode</h3>
+          <h3 className="font-bold mt-6 mb-2">Quiz best scores</h3>
           {(["classic", "timed", "endless"] as Mode[]).map((m) => (
             <p key={m} className="flex justify-between py-2 border-b border-line/15">
               <span>{modeNames[m]}</span>
@@ -196,10 +197,11 @@ export function ProfilePage() {
           )}
         </section>
       </div>
+      <Statistics />
       <div className="section-heading mt-9 mb-4">
         <div>
           <p className="eyebrow">YOUR JOURNEY</p>
-          <h2 className="text-2xl font-bold mt-2">Recent sessions</h2>
+          <h2 className="text-2xl font-bold mt-2">Recent quiz games</h2>
         </div>
         <span className="muted text-sm">{data.sessions.length} recent</span>
       </div>

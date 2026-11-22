@@ -107,7 +107,7 @@ describe("authenticated dashboard loading", () => {
     render(<MemoryRouter initialEntries={["/profile"]}><App/></MemoryRouter>);
 
     expect(await screen.findByText("Your explorer profile")).toBeTruthy();
-    expect(authState.rpc).toHaveBeenCalledTimes(3); // route gate (profile and onboarding status) plus profile load
+    expect(authState.rpc).toHaveBeenCalledTimes(5); // + game stats and personal bests; route gate (profile and onboarding status) plus profile load
   });
 
   it("loads /home directly with a restored guest session", async () => {

@@ -259,7 +259,15 @@ export type ExplorerNeighbor = {
 };
 
 export type FlagsDirection = "country_to_flag" | "flag_to_country";
-export type FlagsPoolTier = "easy" | "all";
+export type FlagsPoolTier = "easy" | "all" | "manual";
+export type SetupScope = "un" | "all";
+/** Extra round options shared by Flags, Capitals and Recall. */
+export type RoundOptions = { scope: SetupScope; picks: string[]; size: number | null; limit: number | null };
+/** Fields every timed or sampled Flags/Capitals round reports. */
+export type RoundExtras = {
+  scope?: SetupScope; timeLimitSeconds?: number | null; deadlineAt?: string | null; sampleSize?: number | null;
+  ranked?: boolean; timeUp?: boolean;
+};
 export type FlagsOutcome = "pending" | "correct" | "incorrect" | "skipped";
 export type FlagsEntry = {
   id: string; position: number; choicePosition?: number; name: string | null; region: string | null;
@@ -278,13 +286,16 @@ export type FlagsRegion = {
   easyMissingAssets: number; allMissingAssets: number; easyTierExcluded: number;
   unsupportedDifficulty: number;
 };
+export type FlagsPlace = { code: string; name: string; region: string; un: boolean; easy: boolean; alpha2: string | null };
 export type FlagsSetup = {
   regions: FlagsRegion[];
-  summary: Omit<FlagsRegion, "id" | "name">;
-  activeSessions: { id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier; total: number; answered: number; score: number; createdAt: string; paused: boolean }[];
+  summary: Partial<Omit<FlagsRegion, "id" | "name">>;
+  countries: FlagsPlace[];
+  activeSessions: ({ id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier; total: number; answered: number; score: number; createdAt: string; paused: boolean; selectedCount?: number } & RoundExtras)[];
   rulesVersion: number; competitiveXp: false;
 };
-export type FlagsSession = {
+export type FlagsSession = RoundExtras & {
+  selectedCount?: number; selectedCodes?: string[];
   id: string; direction: FlagsDirection; region: string | null; poolTier: FlagsPoolTier;
   poolSignature: string; rulesVersion: number; state: "active" | "paused" | "completed" | "abandoned"; paused: boolean;
   pausedAt?: string | null; pausedTotalMs?: number;
@@ -292,7 +303,7 @@ export type FlagsSession = {
   total: number; maxScore: number; currentPosition?: number; answered: number; score: number; correct: number; incorrect: number;
   skipped: number; hintsUsed: number; current: FlagsEntry | null; entries: FlagsEntry[];
   answerOptions?: FlagsAnswerOption[];
-  finalBadge: "first_run" | "new_best" | "not_best" | null;
+  finalBadge: "first_run" | "new_best" | "not_best" | "unranked" | null;
   topFive: { id: string; score: number; maxScore: number; elapsedMs: number; correct: number; incorrect: number; skipped: number; completedAt: string }[];
   choices?: FlagsChoice[] | null;
   actionResult?: { type: string; outcome: string; remainingAttempts: number };
@@ -329,15 +340,18 @@ export type CapitalCountry = {
   codeAlpha2: string | null;
   codeAlpha3: string | null;
   flagSvgUrl: string | null;
+  un?: boolean;
+  unCapitalToCountryEligible?: boolean;
   countryToCapitalEligible: boolean;
   countryToCapitalReason: string | null;
   capitalToCountryEligible: boolean;
   capitalToCountryReason: string | null;
 };
-export type CapitalSetup = { countries: CapitalCountry[]; regions: string[]; activeSessions: { id: string; direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null; total: number; answered: number; score: number; createdAt: string }[] };
+export type CapitalSetup = { countries: CapitalCountry[]; regions: string[]; activeSessions: ({ id: string; direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null; total: number; answered: number; score: number; createdAt: string; selectedCount?: number } & RoundExtras)[] };
 export type CapitalBest = {
   direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null; selectedCount: number;
   total: number; score: number; maxScore: number; correct: number; elapsedMs: number; completedAt: string; runCount: number;
+  scope?: SetupScope; timeLimitSeconds?: number | null;
 };
 export type CapitalVocabularyOption = { id: string; label: string };
 export type CapitalAcceptedAnswer = { name: string; roles: string[]; primary: boolean };
@@ -348,14 +362,14 @@ export type CapitalEntry = {
   submittedAnswer: string | null; outcome: "pending" | "correct" | "incorrect" | "skipped";
   points: number; sourceLinks: { label: string; url: string }[];
 };
-export type CapitalSession = {
+export type CapitalSession = RoundExtras & {
   id: string; direction: CapitalDirection; poolMode: CapitalPoolMode; region: string | null;
   poolSignature: string;
   state: "active" | "completed" | "abandoned"; createdAt: string; completedAt: string | null;
   serverNow: string; elapsedMs: number | null; total: number; answered: number; score: number;
   currentPosition: number;
   correct: number; incorrect: number; skipped: number; current: CapitalEntry | null;
-  entries: CapitalEntry[]; vocabulary: CapitalVocabularyOption[]; finalBadge: "first_run" | "new_best" | "not_best" | null;
+  entries: CapitalEntry[]; vocabulary: CapitalVocabularyOption[]; finalBadge: "first_run" | "new_best" | "not_best" | "unranked" | null;
   topFive: { score: number; elapsedMs: number; completedAt: string }[];
   selectedCodes: string[]; rulesVersion: number;
   actionResult?: { outcome: "correct" | "incorrect" | "skipped" | "ambiguous" };
