@@ -372,5 +372,5 @@ export type CapitalSession = RoundExtras & {
   entries: CapitalEntry[]; vocabulary: CapitalVocabularyOption[]; finalBadge: "first_run" | "new_best" | "not_best" | "unranked" | null;
   topFive: { score: number; elapsedMs: number; completedAt: string }[];
   selectedCodes: string[]; rulesVersion: number;
-  actionResult?: { outcome: "correct" | "incorrect" | "skipped" | "ambiguous" };
+  actionResult?: { outcome: "correct" | "incorrect" | "skipped" | "ambiguous"; lang?: "en" | "de" | "fr" | null };
 };

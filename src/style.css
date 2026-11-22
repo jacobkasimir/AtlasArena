@@ -1131,15 +1131,9 @@ html[data-theme="light"] .text-mint { color:#087f78; }
 .capitals-prompt { margin: clamp(2rem, 7vw, 4.5rem) 0 2.2rem; font-size: clamp(1.8rem, 5vw, 3.6rem); line-height: 1.12; letter-spacing: -.045em; overflow-wrap: anywhere; }
 .capitals-answer-form { max-width: 680px; display: grid; gap: .55rem; }
 .capitals-answer-form>label { font-weight: 750; font-size: .85rem; }
-.capitals-combobox { position: relative; z-index: 5; }
 .capitals-input-wrap { position: relative; }
 .capitals-input-wrap input { padding-right: 3rem; font-size: 1rem; }
 .capitals-input-shortcut { position: absolute; top: 50%; right: .75rem; transform: translateY(-50%); display: grid; place-items: center; width: 26px; height: 25px; border: 1px solid rgb(var(--c-line) / .23); border-radius: .4rem; color: rgb(var(--c-muted)); font-size: .8rem; }
-.capitals-suggestion-menu { position: absolute; z-index: 30; top: calc(100% + .35rem); left: 0; right: 0; max-height: min(320px, 45vh); overflow: auto; padding: .35rem; border: 1px solid rgb(var(--c-line) / .25); border-radius: .8rem; background: rgb(var(--c-surface)); box-shadow: 0 20px 45px rgb(2 8 24 / .28); }
-.capitals-suggestion-menu button { width: 100%; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .55rem .7rem; border: 1px solid transparent; border-radius: .55rem; background: transparent; color: rgb(var(--c-text)); text-align: left; }
-.capitals-suggestion-menu button:hover, .capitals-suggestion-menu button.is-active { border-color: rgb(var(--c-mint) / .3); background: rgb(var(--c-mint) / .09); }
-.capitals-suggestion-menu button>span:last-child { color: rgb(var(--c-mint)); }
-.capitals-suggestion-menu p, .capitals-suggestion-menu>small { display: block; margin: 0; padding: .65rem .7rem; color: rgb(var(--c-muted)); font-size: .8rem; }
 .capitals-answer-hint { margin: 0; color: rgb(var(--c-muted)); font-size: .76rem; }
 .capitals-answer-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .5rem; }
 .capitals-answer-actions button, .capitals-next-question { min-height: 46px; }
@@ -1200,7 +1194,7 @@ html[data-theme="light"] .text-mint { color:#087f78; }
 .capitals-result-actions>* { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; }
 .capitals-shell button:focus-visible, .capitals-shell a:focus-visible, .capitals-shell input:focus-visible, .capitals-shell select:focus-visible { outline: 3px solid rgb(var(--c-mint)); outline-offset: 3px; }
 @media (max-width: 860px) { .capitals-play-layout { grid-template-columns: minmax(0,1fr); } .capitals-stats { position: static; } .capitals-results-grid { grid-template-columns: minmax(0,1fr); } }
-@media (max-width: 600px) { .capitals-game-header { align-items: flex-start; flex-direction: column; } .capitals-game-header>div:last-child { justify-content: flex-start; } .pick-grid { grid-template-columns: minmax(0,1fr); max-height: 270px; } .capitals-prompt { margin: 2.3rem 0 1.7rem; } .capitals-suggestion-menu { max-height: 38vh; } }
+@media (max-width: 600px) { .capitals-game-header { align-items: flex-start; flex-direction: column; } .capitals-game-header>div:last-child { justify-content: flex-start; } .pick-grid { grid-template-columns: minmax(0,1fr); max-height: 270px; } .capitals-prompt { margin: 2.3rem 0 1.7rem; } }
 @media (prefers-reduced-motion: reduce) { .capitals-shell *, .capitals-shell *:before, .capitals-shell *:after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
 .capitals-mobile-status { display: none; }
 @media (max-width: 860px) { .capitals-mobile-status { display: flex; justify-content: space-around; gap: .45rem; padding: .6rem .75rem; border: 1px solid rgb(var(--c-line) / .16); border-radius: .8rem; background: rgb(var(--c-surface)); } .capitals-mobile-status>span { display: grid; justify-items: center; gap: .05rem; min-width: 0; } .capitals-mobile-status strong { font-size: .9rem; font-variant-numeric: tabular-nums; } .capitals-mobile-status small { color: rgb(var(--c-muted)); font-size: .66rem; } }

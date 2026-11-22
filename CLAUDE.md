@@ -71,6 +71,12 @@ If you could not run them, say so explicitly.
    from `.env.local` or `information.txt`.
 6. Admin rights come only from `auth.users.raw_app_meta_data.atlas_admin`, never from profile fields.
 
+### Capitals answer matching
+- Capitals has no autocomplete or suggestions: players type from memory. `private.capitals_match()` accepts English,
+  German and French names – the same names Recall uses (`private.recall_catalog()`, incl. `private.recall_aliases`) –
+  normalized with `private.recall_normalize()`. A country name shared by several places is answered with "be more
+  specific" unless it is the entry's own English name. `capitals_view` sends an empty `vocabulary`.
+
 ### Recall answer matching
 - `private.recall_normalize()` (SQL) and `normalizeRecall()` (`src/recall-domain.ts`) must stay byte-for-byte
   equivalent; the browser hashes typed text and the server re-hashes it. Change both together and keep the

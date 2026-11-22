@@ -1,11 +1,11 @@
-import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
 import { AUTO_CONTINUE_MS, haptic, isIOS, usePrefs } from "./prefs";
 import { StreakBadge } from "./setup-ui";
 import { CapitalDirection, CapitalEntry, CapitalSession, CapitalSetup, CapitalVocabularyOption } from "./domain";
-import { capitalPercentage, normalizeCapitalText } from "./capitals-domain";
+import { capitalPercentage } from "./capitals-domain";
 import {
   GameChoice, GameSetup, PersonalBest, RoundTags, SetupPlace, TimeLeft, badgeText, describeSetup, endedOnTime, initialChoice,
   regionLabel, roundOptions, setupUrl, useTimeLeft,
@@ -16,7 +16,6 @@ const directions: { id: CapitalDirection; title: string; description: string }[]
   { id: "country_to_capital", title: "Country → Capital", description: "See a country. Name one of its capitals." },
   { id: "capital_to_country", title: "Capital → Country", description: "See a capital. Identify its country." },
 ];
-const normalize = normalizeCapitalText;
 const choiceOf = (s: CapitalSession): GameChoice => ({
   mode: s.direction, scope: s.scope ?? "all", region: s.region, pool: s.poolMode, picks: s.poolMode === "manual" ? s.selectedCodes : [],
   size: s.sampleSize ?? null, limit: s.timeLimitSeconds ?? null,
@@ -104,137 +103,6 @@ function Setup() {
   );
 }
 
-export function CapitalCombobox({
-  options,
-  value,
-  candidateId,
-  onChange,
-  onSelect,
-  disabled,
-  inputRef,
-}: {
-  options: CapitalVocabularyOption[];
-  value: string;
-  candidateId: string | null;
-  onChange: (value: string) => void;
-  onSelect: (value: string, id: string) => void;
-  disabled: boolean;
-  inputRef: RefObject<HTMLInputElement>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
-  const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const query = normalize(value);
-  const matches = useMemo(
-    () =>
-      query
-        ? options
-            .filter((option) => normalize(option.label).startsWith(query))
-            .sort((a, b) => a.label.localeCompare(b.label, "en", { sensitivity: "base", numeric: true }))
-        : [],
-    [options, query],
-  );
-  const visible = matches.slice(0, 9);
-  useEffect(() => {
-    setActive(-1);
-  }, [value]);
-  useEffect(() => {
-    if (active >= 0) optionRefs.current[active]?.scrollIntoView?.({ block: "nearest" });
-  }, [active, open]);
-  const choose = (option: CapitalVocabularyOption) => {
-    onSelect(option.label, option.id);
-    setOpen(false);
-    setActive(-1);
-  };
-  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "ArrowDown" && query) {
-      event.preventDefault();
-      setOpen(true);
-      setActive((index) => Math.min(visible.length - 1, index + 1));
-    } else if (event.key === "ArrowUp" && query) {
-      event.preventDefault();
-      setOpen(true);
-      setActive((index) => (index < 0 ? visible.length - 1 : Math.max(0, index - 1)));
-    } else if (event.key === "Escape" && open) {
-      event.preventDefault();
-      setOpen(false);
-      setActive(-1);
-    } else if (event.key === "Enter" && open && active >= 0 && visible[active]) {
-      event.preventDefault();
-      event.stopPropagation();
-      choose(visible[active]);
-    }
-  }
-  return (
-    <div className="capitals-combobox">
-      <div className="capitals-input-wrap">
-        <input
-          ref={inputRef}
-          id="capital-answer"
-          role="combobox"
-          aria-autocomplete="list"
-          aria-expanded={open && Boolean(query)}
-          aria-controls="capital-suggestions"
-          aria-activedescendant={open && active >= 0 && visible[active] ? "capital-suggestion-" + active : undefined}
-          autoComplete="off"
-          value={value}
-          disabled={disabled}
-          placeholder="Type your answer"
-          onFocus={() => {
-            if (query) setOpen(true);
-          }}
-          onChange={(event) => {
-            onChange(event.target.value);
-            setOpen(Boolean(normalize(event.target.value)));
-          }}
-          onKeyDown={onKeyDown}
-          onBlur={() => window.setTimeout(() => setOpen(false), 140)}
-        />
-        <span className="capitals-input-shortcut" aria-hidden="true">
-          ↵
-        </span>
-      </div>
-      {open && query && (
-        <div
-          className="capitals-suggestion-menu"
-          id="capital-suggestions"
-          role="listbox"
-          aria-label="Answer suggestions"
-        >
-          {visible.length ? (
-            visible.map((option, index) => (
-              <button
-                ref={(node) => {
-                  optionRefs.current[index] = node;
-                }}
-                type="button"
-                role="option"
-                aria-selected={active === index}
-                id={"capital-suggestion-" + index}
-                className={active === index ? "is-active" : ""}
-                key={option.id + "-" + option.label}
-                onMouseMove={() => setActive(index)}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(option)}
-              >
-                <span>{option.label}</span>
-                <span aria-hidden="true">↵</span>
-              </button>
-            ))
-          ) : (
-            <p>No matching suggestions</p>
-          )}
-          {matches.length > visible.length && <small>Keep typing to narrow results</small>}
-        </div>
-      )}
-      <span className="sr-only" aria-live="polite">
-        {open && query ? (matches.length ? matches.length + " matching suggestions." : "No matching suggestions.") : ""}
-        {candidateId ? " Suggestion selected." : ""}
-      </span>
-    </div>
-  );
-}
-
 function Game() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
@@ -242,7 +110,6 @@ function Game() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [answer, setAnswer] = useState("");
-  const [candidateId, setCandidateId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -292,7 +159,6 @@ function Game() {
   }, [autoContinue, current?.id]);
   useEffect(() => {
     setAnswer("");
-    setCandidateId(null);
     setMessage("");
     if (current && current.outcome !== "pending") {
       setMessage(
@@ -328,7 +194,8 @@ function Game() {
         inputRef.current?.focus();
       } else if (result.actionResult?.outcome === "correct") {
         haptic("correct");
-        setMessage("Correct · 100 points.");
+        const lang = result.actionResult.lang;
+        setMessage(`Correct · 100 points${lang === "de" ? " · accepted in German" : lang === "fr" ? " · accepted in French" : ""}.`);
       }
       else if (result.actionResult?.outcome === "incorrect") {
         haptic("wrong");
@@ -352,7 +219,7 @@ function Game() {
     }
     if (!session || !current) return;
     if (isIOS) haptic("tap");
-    void act(() => api.capitalsAnswer(session.id, current.id, answer, candidateId, requestId()));
+    void act(() => api.capitalsAnswer(session.id, current.id, answer, null, requestId()));
   }
   function skip() {
     if (!session || !current) return;
@@ -482,23 +349,24 @@ function Game() {
           <h2 className="capitals-prompt">{current?.prompt}</h2>
           <form className="capitals-answer-form" onSubmit={submit}>
             <label htmlFor="capital-answer">Your answer</label>
-            <CapitalCombobox
-              options={session.vocabulary}
-              value={answer}
-              candidateId={candidateId}
-              onChange={(value) => {
-                setAnswer(value);
-                setCandidateId(null);
-              }}
-              onSelect={(value, key) => {
-                setAnswer(value);
-                setCandidateId(key);
-              }}
-              disabled={busy || finalized || !current}
-              inputRef={inputRef}
-            />
+            <div className="capitals-input-wrap">
+              <input
+                ref={inputRef}
+                id="capital-answer"
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                disabled={busy || finalized || !current}
+                placeholder={session.direction === "country_to_capital" ? "Type the capital" : "Type the country"}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="words"
+                spellCheck={false}
+                enterKeyHint="go"
+              />
+            </div>
             <p className="capitals-answer-hint">
-              Pick a suggestion or just type the name and press Enter.
+              No suggestions – type it from memory in English, German or French and press Enter. Accents, capital
+              letters, hyphens and spaces don't matter.
             </p>
             <div className="capitals-answer-actions">
               <button type="submit" className="primary" disabled={busy || finalized || !current}>
