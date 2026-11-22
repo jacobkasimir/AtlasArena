@@ -1,4 +1,9 @@
-CREATE OR REPLACE FUNCTION public.arena_explore()
+-- Reconcile public.arena_explore() with the definition that is live in the hosted
+-- database (it was applied from explorer.sql outside the migration history) and add
+-- googleMapsUrl from 20261109130000. Returns borders, codeAlpha3 and sourceUrl,
+-- which src/Explorer.tsx relies on.
+
+create or replace function public.arena_explore()
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -21,7 +26,6 @@ begin
     select coalesce(jsonb_agg(jsonb_build_object(
       'code', country.code,
       'codeAlpha3', country.code_alpha3,
-      'borders', country.borders,
       'name', country.name,
       'capital', country.capital,
       'region', country.region,
@@ -37,6 +41,7 @@ begin
       'population', country.population,
       'areaKm2', country.area_km2,
       'wikipediaUrl', country.link_wikipedia,
+      'googleMapsUrl', country.link_google_maps,
       'languages', case
         when jsonb_typeof(country.languages) = 'array' then (
           select coalesce(jsonb_agg(language_name order by language_name), '[]'::jsonb)
@@ -118,5 +123,9 @@ begin
      and availability.difficulty = country.difficulty
   );
 end;
-$function$
+$function$;
+
+revoke all on function public.arena_explore() from public, anon, authenticated;
+grant execute on function public.arena_explore() to authenticated;
+
 notify pgrst, 'reload schema';

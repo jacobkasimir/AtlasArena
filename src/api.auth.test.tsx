@@ -128,7 +128,7 @@ describe("authenticated dashboard loading", () => {
   it("redirects an unauthenticated direct private link to sign-in without a protected RPC", async () => {
     authState.session=null;
     render(<MemoryRouter initialEntries={["/profile"]}><App/></MemoryRouter>);
-    expect(await screen.findByLabelText("E-Mail")).toBeTruthy();
+    expect(await screen.findByLabelText("Email")).toBeTruthy();
     expect(authState.rpc).not.toHaveBeenCalled();
   });
 

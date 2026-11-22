@@ -14,3 +14,6 @@ country-import/
 .venv/
 .venv-1/
 country-import/generated-questions/
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/

@@ -2,7 +2,7 @@ import bank from "./demo-content.json";
 import countryData from "./demo-countries.json";
 import {
   Dashboard, Difficulty, Mode, PlayableQuestion, Profile, Review, ResultView, State,
-  Summary, View, Country, eligibleDifficulty, eligibleXP, expired, rank,
+  Summary, View, Country, ExplorerCountry, eligibleDifficulty, eligibleXP, expired, rank,
   score, shuffle, validateOption
 } from "./domain";
 
@@ -242,7 +242,7 @@ export const demo = {
     data.profile = { ...data.profile, ...profile };
     write(data);
   },
-  async explore(): Promise<Country[]> { return countryData as Country[]; },
+  async explore(): Promise<ExplorerCountry[]> { return countryData as Country[]; },
   async exportData() { return read(); },
   async deleteAccount() { localStorage.removeItem(KEY); },
   async signOut() {}
