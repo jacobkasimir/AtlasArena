@@ -1,4 +1,4 @@
-import { FormEvent, Suspense, lazy, useEffect, useRef, useState } from "react";
+import { FormEvent, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   NavLink,
@@ -30,25 +30,17 @@ import {
 } from "./domain";
 import { ErrorBox, Feedback, Loading, OfflineBanner, download, useLoad } from "./components";
 import { analyticsEnabled, readEvents, setAnalytics, track } from "./analytics";
+import { accuracy, modeDescriptions, modeIcons, modeNames } from "./quiz-meta";
+import { AUTO_CONTINUE_MS, Prefs, clearSavedSetups, haptic, loadSetup, oneOf, saveSetup, setPref, usePrefs } from "./prefs";
+import { AutoContinueBar, Chips, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, Step, StreakBadge } from "./setup-ui";
 
 const Admin = lazy(() => import("./Admin"));
 const Explorer = lazy(() => import("./Explorer"));
 const Flags = lazy(() => import("./Flags"));
 const Capitals = lazy(() => import("./Capitals"));
 const Recall = lazy(() => import("./Recall"));
+const Hub = lazy(() => import("./Hub"));
 
-const names: Record<Mode, string> = {
-  classic: "Classic Quiz",
-  practice: "Practice",
-  timed: "Timed Challenge",
-  endless: "Endless",
-};
-const descriptions: Record<Mode, string> = {
-  classic: "Ten questions. Four options. One new personal best.",
-  practice: "Take your time. Learn from every answer. No XP pressure.",
-  timed: "One minute. How far can your knowledge take you?",
-  endless: "Three lives. Build a correct streak to unlock tougher tiers.",
-};
 function applyTheme(theme: string) {
   if (theme === "system") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = theme;
@@ -176,10 +168,11 @@ function Layout() {
           <nav aria-label="Primary" className="topbar-nav flex flex-wrap gap-1 items-center">
             {identity && (
               <>
-                <NavLink to="/home">Play</NavLink>
+                <NavLink to="/home">Home</NavLink>
+                <NavLink to="/quiz">Quiz</NavLink>
                 <NavLink to="/flags">Flags</NavLink>
-                <NavLink to="/recall">Recall</NavLink>
                 <NavLink to="/capitals">Capitals</NavLink>
+                <NavLink to="/recall">Recall</NavLink>
                 <NavLink to="/explorer">Explorer</NavLink>
                 {identity.isAdmin && (
                   <NavLink className="admin-nav-link" to="/admin" aria-label="Admin area">
@@ -553,7 +546,7 @@ function PlayerWindow({
                       <h4>Personal bests</h4>
                       {(["classic", "timed", "endless"] as Mode[]).map((mode) => (
                         <p key={mode}>
-                          <span>{names[mode]}</span>
+                          <span>{modeNames[mode]}</span>
                           <strong>{data.best[mode] ?? "—"}</strong>
                         </p>
                       ))}
@@ -801,417 +794,159 @@ function Welcome() {
   );
 }
 
-function Home() {
+function accuracyLine(correct: number, incorrect: number) {
+  const total = correct + incorrect;
+  const share = total ? correct / total : 0;
+  return share >= 0.8 ? "Great run!" : share >= 0.5 ? "Solid run." : total ? "Keep practising." : "Run complete.";
+}
+
+function QuizSetup() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [mode, setMode] = useState<Mode>(
-    (modes as readonly string[]).includes(params.get("mode") ?? "") ? (params.get("mode") as Mode) : "classic",
-  );
-  const [difficulty, setDifficulty] = useState<Difficulty>(
-    (difficulties as readonly string[]).includes(params.get("difficulty") ?? "")
-      ? (params.get("difficulty") as Difficulty)
-      : "easy",
-  );
-  const [category, setCategory] = useState(() =>
-    categories.includes(params.get("category") ?? "") ? params.get("category")! : "all",
-  );
-  const [categoryOpen, setCategoryOpen] = useState(false);
-  const categoryPickerRef = useRef<HTMLDivElement>(null);
-  const categoryTriggerRef = useRef<HTMLButtonElement>(null);
+  const saved = useMemo(() => loadSetup("quiz"), []);
+  const [mode, setMode] = useState<Mode>(oneOf(params.get("mode") ?? saved.mode, modes, "classic"));
+  const [difficulty, setDifficulty] = useState<Difficulty>(oneOf(params.get("difficulty") ?? saved.difficulty, difficulties, "easy"));
+  const [category, setCategory] = useState<string>(oneOf(params.get("category") ?? saved.category, ["all", ...categories], "all"));
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const { data, error: loadError, reload } = useLoad(() => api.dashboard());
-  const leaderboard = useLoad(() => api.leaderboard());
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  const leaderboardButtonRef = useRef<HTMLButtonElement>(null);
-  const leaderboardCloseRef = useRef<HTMLButtonElement>(null);
-  const leaderboardDialogRef = useRef<HTMLElement>(null);
   const country = params.get("country") ?? undefined;
   const countParam = Number(params.get("count"));
   const questionCount =
-    Number.isInteger(countParam) && countParam >= 1 && countParam <= 10
-      ? countParam
-      : country && mode === "practice"
-        ? 4
-        : 10;
+    Number.isInteger(countParam) && countParam >= 1 && countParam <= 10 ? countParam : country && mode === "practice" ? 4 : 10;
 
   useEffect(() => {
-    if (!categoryOpen) return;
-    const outside = (event: MouseEvent) => {
-      if (!categoryPickerRef.current?.contains(event.target as Node)) setCategoryOpen(false);
-    };
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setCategoryOpen(false);
-        categoryTriggerRef.current?.focus();
-      }
-    };
-    document.addEventListener("mousedown", outside);
-    window.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", outside);
-      window.removeEventListener("keydown", key);
-    };
-  }, [categoryOpen]);
-
-  useEffect(() => {
-    if (!leaderboardOpen) return;
-    leaderboardCloseRef.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const handleDialogKeys = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setLeaderboardOpen(false);
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = leaderboardDialogRef.current?.querySelectorAll<HTMLElement>(
-        'button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]',
-      );
-      if (!focusable?.length) return;
-      const first = focusable[0],
-        last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", handleDialogKeys);
-    return () => {
-      window.removeEventListener("keydown", handleDialogKeys);
-      document.body.style.overflow = previousOverflow;
-      leaderboardButtonRef.current?.focus();
-    };
-  }, [leaderboardOpen]);
+    const target = location.hash ? document.querySelector(location.hash) : null;
+    target?.scrollIntoView({ block: "center" });
+  }, []);
 
   async function start(e: FormEvent) {
     e.preventDefault();
     setPending(true);
     setError("");
+    saveSetup("quiz", { mode, difficulty, category });
     try {
       const s = await api.play(mode, category === "all" ? [] : [category], difficulty, country, questionCount);
       track("game_started", { mode, category, difficulty });
       navigate("/play/" + s.id);
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyQuizError((e as Error).message));
     } finally {
       setPending(false);
     }
   }
 
-  return (
-    <div className="home-shell">
+  const unfinished =
+    data?.sessions.filter((s) => s.status === "awaiting_answer" || s.status === "showing_feedback") ?? [];
+  const roundSize =
+    mode === "timed" ? { count: 60, unit: "seconds" } : mode === "endless" ? { count: 3, unit: "lives" } : { count: questionCount, unit: "questions" };
+  const side = (
+    <>
+      <SideCard title="Unfinished games">
+        <ResumeList
+          empty="None – a game you leave is kept here until you finish it."
+          items={unfinished.map((s) => ({
+            id: s.id,
+            title: modeNames[s.mode],
+            detail: `${s.difficulty} · ${s.correct + s.incorrect} answered · ${s.score} pts`,
+            to: "/play/" + s.id,
+            done: s.correct + s.incorrect,
+            total: s.mode === "classic" || s.mode === "practice" ? 10 : s.correct + s.incorrect,
+          }))}
+        />
+      </SideCard>
       {data && (
-        <section className="home-stats-bar" aria-label="Your game statistics">
-          <div className="home-stat-item">
-            <span>Completed</span>
-            <strong>{data.totals.games}</strong>
-          </div>
-          <div className="home-stat-item">
-            <span>Accuracy</span>
-            <strong>{accuracy(data.totals.correct, data.totals.incorrect)}</strong>
-          </div>
-          <div className="home-stat-item">
-            <span>Classic best</span>
-            <strong>{data.best.classic ?? "—"}</strong>
-          </div>
-          <button
-            ref={leaderboardButtonRef}
-            className="home-stat-item home-rank-button"
-            type="button"
-            aria-label={
-              leaderboard.data?.currentRank
-                ? `Your server rank is ${leaderboard.data.currentRank}. Open top 25 players`
-                : "Open server leaderboard"
-            }
-            aria-haspopup="dialog"
-            onClick={() => setLeaderboardOpen(true)}
-          >
-            <span>Server rank</span>
-            <strong>{leaderboard.data?.currentRank ? `#${leaderboard.data.currentRank}` : "#—"}</strong>
-            <small>
-              Top 25 players <span aria-hidden="true">↗</span>
-            </small>
-          </button>
-        </section>
-      )}
-      <div className="section-heading home-heading">
-        <div>
-          <p className="eyebrow">YOUR NEXT ADVENTURE</p>
-          <h1 tabIndex={-1} className="heading mt-2">
-            Welcome back{data ? `, ${data.profile.username}` : ""}.
-          </h1>
-        </div>
-        {data && (
-          <p className="pill">
-            Level {level(data.profile.xp)} · {data.profile.xp} XP
-          </p>
-        )}
-      </div>
-      <ErrorBox message={loadError} retry={reload} />
-      {loadError.includes("AUTH_REQUIRED") && <GuestSessionRecovery retry={reload} />}
-      {data?.sessions
-        .filter((s) => s.status === "awaiting_answer" || s.status === "showing_feedback")
-        .map((s) => (
-          <Link className="resume-card card block mb-3" key={s.id} to={"/play/" + s.id}>
-            <span>
-              <strong>Resume {names[s.mode]}</strong>
-              <small className="muted">Your run is ready when you are.</small>
-            </span>
-            <span aria-hidden="true">→</span>
-          </Link>
-        ))}
-      <form onSubmit={start} className="challenge-form mt-8">
-        <fieldset id="challenge-mode-picker" className="challenge-fieldset">
-          <legend className="text-xl font-bold mb-4">Choose your challenge</legend>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {modes.map((m, i) => (
-              <label key={m} className={`mode-card ${mode === m ? "selected" : ""}`}>
-                <input
-                  className="sr-only"
-                  type="radio"
-                  name="mode"
-                  value={m}
-                  checked={mode === m}
-                  onChange={() => setMode(m)}
-                />
-                <span className="text-2xl text-mint" aria-hidden="true">
-                  {["◎", "◇", "◷", "∞"][i]}
-                </span>
-                <span className="block font-bold text-lg mt-4">{names[m]}</span>
-                <span className="block text-sm muted mt-2">{descriptions[m]}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <div className="challenge-filters card mt-5 grid md:grid-cols-[1fr_1.4fr_auto] gap-5 items-end">
-          <div className="category-picker" ref={categoryPickerRef}>
-            <span className="challenge-label">Question category</span>
-            <button
-              ref={categoryTriggerRef}
-              type="button"
-              className="category-picker-trigger"
-              aria-haspopup="listbox"
-              aria-expanded={categoryOpen}
-              aria-controls="category-picker-options"
-              onClick={() => setCategoryOpen((value) => !value)}
-            >
-              <span>
-                <small>Choose category</small>
-                <strong>{category === "all" ? "All available geography" : category}</strong>
-              </span>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-            {categoryOpen && (
-              <div className="category-picker-menu">
-                <div className="category-picker-menu-heading">
-                  <span>Choose a topic</span>
-                  <small>{categories.length} topics</small>
-                </div>
-                <div id="category-picker-options" role="listbox" aria-label="Question category">
-                  {[
-                    { id: "all", label: "All available geography" },
-                    ...categories.map((value) => ({ id: value, label: value })),
-                  ].map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      role="option"
-                      aria-selected={category === option.id}
-                      className={`category-picker-option ${category === option.id ? "is-selected" : ""}`}
-                      onClick={() => {
-                        setCategory(option.id);
-                        setCategoryOpen(false);
-                        categoryTriggerRef.current?.focus();
-                      }}
-                    >
-                      <span className="category-option-label">
-                        {option.id === "all" && (
-                          <span className="category-option-glyph" aria-hidden="true">
-                            ✦
-                          </span>
-                        )}
-                        {option.label}
-                      </span>
-                      {category === option.id && (
-                        <span className="category-picker-check" aria-hidden="true">
-                          ✓
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <fieldset id="difficulty-picker" className="difficulty-picker">
-            <legend className="challenge-label">{mode === "endless" ? "Starting difficulty" : "Difficulty"}</legend>
-            <div className="difficulty-options">
-              {difficulties.map((d, i) => (
-                <label
-                  key={d}
-                  className={`difficulty-option ${d === "easy" ? "is-easy" : ""} ${d === "expert" ? "is-expert" : ""} ${difficulty === d ? "is-selected" : ""}`}
-                >
-                  <input
-                    className="sr-only"
-                    type="radio"
-                    name="difficulty"
-                    value={d}
-                    checked={difficulty === d}
-                    onChange={() => setDifficulty(d)}
-                  />
-                  <span className="difficulty-mark" aria-hidden="true">
-                    {["◌", "◉", "◆", "✦"][i]}
-                  </span>
-                  <span>{d}</span>
-                </label>
+        <SideCard title="Your quiz record">
+          <ul className="side-list">
+            <li>
+              <span className="muted">Games finished</span>
+              <strong>{data.totals.games}</strong>
+            </li>
+            <li>
+              <span className="muted">Accuracy</span>
+              <strong>{accuracy(data.totals.correct, data.totals.incorrect)}</strong>
+            </li>
+            {modes
+              .filter((m) => m !== "practice")
+              .map((m) => (
+                <li key={m}>
+                  <span className="muted">{modeNames[m]} best</span>
+                  <strong>{data.best[m]?.toLocaleString() ?? "—"}</strong>
+                </li>
               ))}
-            </div>
-          </fieldset>
-          <button className="primary" disabled={pending || !!loadError}>
-            {pending ? "Creating session…" : "Start adventure →"}
-          </button>
-        </div>
+          </ul>
+        </SideCard>
+      )}
+    </>
+  );
+
+  return (
+    <ModePage
+      eyebrow="Atlas Quiz"
+      title="Ready for a round?"
+      intro="Four ways to play and four difficulty tiers. Your record and unfinished games are on the right."
+      side={side}
+    >
+      <SetupForm onSubmit={start}>
+        <ErrorBox message={loadError} retry={reload} />
+        {loadError.includes("AUTH_REQUIRED") && <GuestSessionRecovery retry={reload} />}
+        <Step n={1} title="Choose a mode">
+          <OptionCards
+            value={mode}
+            onChange={setMode}
+            options={modes.map((m) => ({
+              value: m,
+              icon: modeIcons[m],
+              title: modeNames[m],
+              text: modeDescriptions[m],
+              footer: m !== "practice" && data?.best[m] != null ? <span>Best: {data.best[m]!.toLocaleString()}</span> : undefined,
+            }))}
+          />
+        </Step>
+        <Step n={2} title={mode === "endless" ? "Starting difficulty" : "Difficulty"} hint={mode === "endless" ? "Endless unlocks the next tier after every five correct answers." : undefined}>
+          <div id="difficulty-picker">
+            <Chips
+              label="Difficulty"
+              value={difficulty}
+              onChange={setDifficulty}
+              options={difficulties.map((d) => ({ value: d, label: d[0].toUpperCase() + d.slice(1) }))}
+            />
+          </div>
+        </Step>
+        <Step n={3} title="Topic">
+          <Chips
+            label="Topic"
+            value={category}
+            onChange={setCategory}
+            options={[{ value: "all", label: "Everything" }, ...categories.map((c) => ({ value: c, label: c[0].toUpperCase() + c.slice(1) }))]}
+          />
+        </Step>
         {country && (
-          <p className="muted mt-3">
-            Country-focused practice: {country}. Four questions requested.{" "}
-            <Link className="text-mint underline" to="/home">
-              Clear country filter
+          <p className="muted text-sm">
+            Practising one country: <strong className="text-paper">{country}</strong>.{" "}
+            <Link className="text-mint underline" to="/quiz">
+              Practise everything instead
             </Link>
           </p>
         )}
-        <p className="text-sm muted mt-3">
-          Exact filters are respected. Empty or insufficient pools are reported, never replaced.
-          {isDemo && " The sample bank currently supports Easy; other tiers return an honest empty-pool message."}
-        </p>
+        <StartBar
+          count={roundSize.count}
+          unit={roundSize.unit}
+          busy={pending}
+          disabled={!!loadError}
+          label="Start game"
+          summary={`${modeNames[mode]} · ${difficulty} · ${category === "all" ? "all topics" : category}${mode === "practice" ? " · no XP" : ""}`}
+        />
         <ErrorBox message={error} />
-      </form>
-      {leaderboardOpen && (
-        <div
-          className="leaderboard-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setLeaderboardOpen(false);
-          }}
-        >
-          <section
-            ref={leaderboardDialogRef}
-            className="leaderboard-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="leaderboard-title"
-            aria-describedby="leaderboard-description"
-            tabIndex={-1}
-          >
-            <header className="leaderboard-header">
-              <div>
-                <p className="eyebrow">ATLAS ARENA · GLOBAL</p>
-                <h2 id="leaderboard-title" className="text-2xl font-black mt-1">
-                  Top 25 players
-                </h2>
-                <p id="leaderboard-description" className="muted text-sm mt-1">
-                  Players ranked by earned XP.
-                </p>
-              </div>
-              <button
-                ref={leaderboardCloseRef}
-                type="button"
-                className="leaderboard-close secondary"
-                aria-label="Close leaderboard"
-                onClick={() => setLeaderboardOpen(false)}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m6 6 12 12M18 6 6 18" />
-                </svg>
-              </button>
-            </header>
-            {leaderboard.error && <ErrorBox message={leaderboard.error} retry={leaderboard.reload} />}
-            {!leaderboard.data && !leaderboard.error && (
-              <div className="leaderboard-loading" role="status" aria-live="polite">
-                <span className="loading-indicator" aria-hidden="true" />
-                Loading leaderboard…
-              </div>
-            )}
-            {leaderboard.data && (
-              <>
-                {isDemo ? (
-                  <div className="empty-state mt-5">
-                    <span className="empty-icon" aria-hidden="true">
-                      ◎
-                    </span>
-                    <h3 className="font-bold mt-3">Server leaderboard unavailable</h3>
-                    <p className="muted mt-2">
-                      Local demo progress is stored in this browser and isn’t ranked on the server.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {leaderboard.data.currentRank && leaderboard.data.currentRank > 25 && (
-                      <p className="leaderboard-your-rank">
-                        Your rank: <strong>#{leaderboard.data.currentRank}</strong> · outside the top 25
-                      </p>
-                    )}
-                    {!leaderboard.data.currentRank && (
-                      <p className="leaderboard-your-rank">Complete a scored game to join the XP leaderboard.</p>
-                    )}
-                    {leaderboard.data.players.length ? (
-                      <div className="leaderboard-table-scroll" role="region" aria-label="Top 25 players" tabIndex={0}>
-                        <table className="leaderboard-table">
-                          <thead>
-                            <tr>
-                              <th scope="col">Rank</th>
-                              <th scope="col">Player</th>
-                              <th scope="col">XP</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {leaderboard.data.players.map((player) => (
-                              <tr
-                                key={`${player.rank}-${player.username}`}
-                                className={player.rank === leaderboard.data?.currentRank ? "is-you" : ""}
-                              >
-                                <td>
-                                  <span className="leaderboard-position">
-                                    {player.rank <= 3 ? ["①", "②", "③"][player.rank - 1] : `#${player.rank}`}
-                                  </span>
-                                </td>
-                                <td>
-                                  <span className="leaderboard-player">
-                                    <span aria-hidden="true">{avatars[player.avatar] ?? avatars[0]}</span>
-                                    <strong>{player.username}</strong>
-                                    {player.rank === leaderboard.data?.currentRank && (
-                                      <span className="leaderboard-you-tag">You</span>
-                                    )}
-                                  </span>
-                                </td>
-                                <td className="leaderboard-xp">{player.xp.toLocaleString()} XP</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="empty-state mt-5">
-                        <span className="empty-icon" aria-hidden="true">
-                          ◎
-                        </span>
-                        <h3 className="font-bold mt-3">No ranked players yet</h3>
-                        <p className="muted mt-2">Be the first to earn XP in a scored game.</p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-          </section>
-        </div>
-      )}
-    </div>
+      </SetupForm>
+    </ModePage>
   );
+}
+
+function friendlyQuizError(message: string) {
+  if (/not enough|insufficient|empty|no eligible|pool/i.test(message))
+    return "There aren't enough questions for that combination yet. Try another difficulty or topic.";
+  return message;
 }
 
 function Stat({ title, value }: { title: string; value: string | number }) {
@@ -1250,9 +985,6 @@ function GuestSessionRecovery({ retry }: { retry: () => void }) {
     </div>
   );
 }
-function accuracy(correct: number, incorrect: number) {
-  return correct + incorrect ? `${Math.round((100 * correct) / (correct + incorrect))}%` : "—";
-}
 
 function Game() {
   const { id = "" } = useParams();
@@ -1267,6 +999,8 @@ function Game() {
   const offset = useRef(0);
   const [now, setNow] = useState(Date.now());
   const finalizedEvent = useRef(false);
+  const prefs = usePrefs();
+  const lastFeedbackKey = useRef("");
 
   function accept(v: View) {
     offset.current = Date.parse(v.serverNow) - Date.now();
@@ -1386,6 +1120,24 @@ function Game() {
     }
   }
 
+  const feedbackKey = view?.status === "showing_feedback" && view.feedback ? `${view.id}:${view.answered}` : "";
+  useEffect(() => {
+    if (!feedbackKey || feedbackKey === lastFeedbackKey.current || !view?.feedback) return;
+    lastFeedbackKey.current = feedbackKey;
+    haptic(view.feedback.correct ? "correct" : "wrong");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedbackKey]);
+  const autoContinue = Boolean(feedbackKey && prefs.autoContinue && view?.feedback?.correct);
+  useEffect(() => {
+    if (!autoContinue) return;
+    const timer = window.setTimeout(() => void action("next"), AUTO_CONTINUE_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoContinue, feedbackKey]);
+  useEffect(() => {
+    if (view?.status === "completed") haptic("complete");
+  }, [view?.status]);
+
   useEffect(() => {
     function keydown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
@@ -1428,7 +1180,7 @@ function Game() {
       <div className="game-topline">
         <div>
           <p className="eyebrow">
-            {names[view.mode]} ·{" "}
+            {modeNames[view.mode]} ·{" "}
             <span className={`game-difficulty-tag ${view.current?.difficulty === "expert" ? "is-expert" : ""}`}>
               {view.current?.difficulty ?? view.difficulty}
             </span>
@@ -1447,6 +1199,7 @@ function Game() {
             <section
               className={`card game-question map-grid ${view.status === "showing_feedback" && view.feedback?.correct ? "has-correct-answer" : ""} ${view.status === "showing_feedback" && view.feedback && !view.feedback.correct ? "has-incorrect-answer" : ""}`}
             >
+              <StreakBadge streak={view.stats.streak} />
               <h1 tabIndex={-1} className="game-prompt mt-6">
                 {view.current.prompt}
               </h1>
@@ -1454,7 +1207,15 @@ function Game() {
                 {view.current.options.map((o, i) => (
                   <button
                     key={o.id}
-                    className="answer text-left"
+                    className={`answer text-left ${
+                      view.status === "showing_feedback" && view.feedback
+                        ? o.label === view.feedback.correctAnswer
+                          ? "is-correct"
+                          : o.label === view.feedback.chosen && !view.feedback.correct
+                            ? "is-wrong"
+                            : "is-dimmed"
+                        : ""
+                    }`}
                     disabled={pending || view.status !== "awaiting_answer" || remaining === 0}
                     onClick={() => void action("answer", o.id)}
                   >
@@ -1465,13 +1226,15 @@ function Game() {
                   </button>
                 ))}
               </div>
-              <p className="keyboard-hint muted text-sm mt-5">
-                <span className="keycap">1</span>–<span className="keycap">4</span> to answer
-              </p>
+              {prefs.keyboardHints && (
+                <p className="keyboard-hint muted text-sm mt-5">
+                  <span className="keycap">1</span>–<span className="keycap">4</span> to answer
+                </p>
+              )}
             </section>
           )}
           <ErrorBox message={error} retry={refresh} />
-          {view.feedback && (
+          {view.feedback && prefs.keyboardHints && (
             <p className="game-keyboard-hint muted text-sm mt-3">
               Press <kbd>Enter</kbd> or <kbd>Space</kbd> for the next question
             </p>
@@ -1593,6 +1356,7 @@ function Game() {
               >
                 {pending ? "Loading…" : "Next question →"}
               </button>
+              {autoContinue && !pending && <AutoContinueBar ms={AUTO_CONTINUE_MS} onSkip={() => void action("next")} />}
             </section>
           )}
           {!view.feedback && (
@@ -1624,7 +1388,7 @@ function Game() {
                 <path d="m9 12 2 2 4-4" />
               </svg>
             </span>
-            <p className="eyebrow">YOUR RUN · {names[view.mode]}</p>
+            <p className="eyebrow">YOUR RUN · {modeNames[view.mode]}</p>
             <h2 id="leave-run-title">Leave this run?</h2>
             <p id="leave-run-description" className="muted">
               Save your progress to resume from Home later, or delete this run and its progress.
@@ -1722,11 +1486,13 @@ function Results() {
     <div className="results-shell">
       <section className={`results-hero map-grid ${newBest ? "has-new-best" : ""}`}>
         <div className="results-hero-copy">
-          <p className="eyebrow">ADVENTURE COMPLETE · {names[v.mode]}</p>
+          <p className="eyebrow">ADVENTURE COMPLETE · {modeNames[v.mode]}</p>
           <h1 tabIndex={-1} className="heading mt-3">
-            Run complete.
+            {v.stats.incorrect === 0 && v.stats.correct > 0 ? "Flawless!" : accuracyLine(v.stats.correct, v.stats.incorrect)}
           </h1>
-          <p className="muted mt-3">Here’s how this adventure unfolded.</p>
+          <p className="muted mt-3">
+            {v.stats.correct} correct · {v.stats.incorrect} wrong · best streak {v.stats.bestStreak}
+          </p>
           {newBest && (
             <div className="new-best-badge" role="status">
               <span className="new-best-icon" aria-hidden="true">
@@ -1746,7 +1512,7 @@ function Results() {
         <div className="results-selection" aria-label="Completed challenge settings">
           <span className="results-selection-label">Your selection</span>
           <strong>
-            {names[v.mode]} <i aria-hidden="true">·</i> {v.difficulty}
+            {modeNames[v.mode]} <i aria-hidden="true">·</i> {v.difficulty}
           </strong>
           <span>
             {v.contextSaved
@@ -1774,8 +1540,8 @@ function Results() {
         <Link className="secondary" to={`${setupUrl}#difficulty-picker`}>
           Change difficulty
         </Link>
-        <Link className="secondary" to={`${setupUrl}#challenge-mode-picker`}>
-          Change mode
+        <Link className="secondary" to="/home">
+          Other games
         </Link>
       </div>
       {!v.contextSaved && (
@@ -1794,10 +1560,7 @@ function Results() {
         <Stat title="Average response" value={v.answered ? `${(v.stats.averageMs / 1000).toFixed(1)}s` : "—"} />
         <Stat title="Best streak" value={v.stats.bestStreak} />
       </div>
-      <p className="muted text-sm">
-        Average response time is the sum of accepted answer response times divided by accepted answers. It excludes
-        explanation screens and unanswered questions. Practice earns no competitive XP.
-      </p>
+      {v.mode === "practice" && <p className="muted text-sm">Practice games don't earn XP.</p>}
       <div className="section-heading mt-9 mb-4">
         <h2 className="text-2xl font-bold">Your answer review</h2>
         <span className="muted text-sm">
@@ -1938,7 +1701,7 @@ function ProfilePage() {
           <h3 className="font-bold mt-6 mb-2">Best scores by mode</h3>
           {(["classic", "timed", "endless"] as Mode[]).map((m) => (
             <p key={m} className="flex justify-between py-2 border-b border-line/15">
-              <span>{names[m]}</span>
+              <span>{modeNames[m]}</span>
               <strong>{data.best[m] ?? "—"}</strong>
             </p>
           ))}
@@ -1981,7 +1744,7 @@ function ProfilePage() {
         {data.sessions.map((s) => (
           <div key={s.id} className="card flex flex-wrap justify-between gap-3">
             <div>
-              <strong>{names[s.mode]}</strong>
+              <strong>{modeNames[s.mode]}</strong>
               <p className="muted text-sm">
                 {new Date(s.createdAt).toLocaleString()} · {s.status}
               </p>
@@ -2588,13 +2351,31 @@ function Protected({ children }: { children: JSX.Element }) {
   return children;
 }
 
+function SettingToggle({ id, title, text, checked, onChange }: {
+  id: keyof Prefs | string; title: string; text: string; checked: boolean; onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="setting-row">
+      <div>
+        <label htmlFor={`setting-${id}`} className="font-bold">{title}</label>
+        <p className="muted text-sm">{text}</p>
+      </div>
+      <button id={`setting-${id}`} type="button" role="switch" aria-checked={checked} className="switch" onClick={() => onChange(!checked)}>
+        <span aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 function Settings() {
   const navigate = useNavigate();
+  const prefs = usePrefs();
   const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);
   const [consent, setConsent] = useState(analyticsEnabled());
   const [motion, setMotion] = useState(localStorage.getItem("atlas-motion") === "reduce");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const canVibrate = typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
   useEffect(() => {
     api
       .currentUser()
@@ -2616,55 +2397,60 @@ function Settings() {
     <div className="settings-shell">
       <div className="page-intro">
         <div>
-          <p className="eyebrow">PREFERENCES</p>
+          <p className="eyebrow">Settings</p>
           <h1 tabIndex={-1} className="heading mt-2">
-            Make yourself at home.
+            Play your way.
           </h1>
         </div>
-        <p className="muted">Tune the arena to the way you play.</p>
+        <p className="muted">Saved on this device.</p>
       </div>
-      <section className="card mt-6 space-y-5">
-        <h2 className="text-xl font-bold">Appearance and comfort</h2>
-        <ThemeControl />
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={motion}
-            onChange={(e) => {
-              setMotion(e.target.checked);
-              localStorage.setItem("atlas-motion", e.target.checked ? "reduce" : "system");
-              document.documentElement.dataset.motion = e.target.checked ? "reduce" : "system";
-            }}
-          />
-          Reduce motion in addition to the system preference
-        </label>
-        <p className="muted">No sound effects are enabled. For untimed play, choose Classic or Practice.</p>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => {
-              setConsent(e.target.checked);
-              setAnalytics(e.target.checked);
-            }}
-          />
-          Keep a local diagnostic event log (optional)
-        </label>
-        <p className="muted text-sm">
-          Up to 100 events, on this device only. No advertising, tracking cookies, or analytics transmission.
-        </p>
-        <button className="secondary" onClick={() => download("atlas-diagnostics.json", readEvents())}>
-          Export local diagnostics
-        </button>
+
+      <section className="card mt-6">
+        <h2 className="text-xl font-bold">Gameplay</h2>
+        <div className="setting-list">
+          <SettingToggle id="autoContinue" title="Continue automatically after a correct answer"
+            text="In Quiz, Flags and Capitals, the next question follows after a short pause. Wrong answers always wait so you can read the solution."
+            checked={prefs.autoContinue} onChange={(value) => setPref("autoContinue", value)} />
+          <SettingToggle id="rememberSetup" title="Remember my last setup"
+            text="Each game opens with the choices you used last time."
+            checked={prefs.rememberSetup} onChange={(value) => { setPref("rememberSetup", value); if (!value) clearSavedSetups(); }} />
+          <SettingToggle id="confirmGiveUp" title="Ask before giving up or discarding"
+            text="A quick confirmation before a round is ended or thrown away."
+            checked={prefs.confirmGiveUp} onChange={(value) => setPref("confirmGiveUp", value)} />
+          <SettingToggle id="keyboardHints" title="Show keyboard shortcuts"
+            text="Hints like 1–4 to answer and Enter to continue."
+            checked={prefs.keyboardHints} onChange={(value) => setPref("keyboardHints", value)} />
+          <SettingToggle id="haptics" title="Vibration"
+            text={canVibrate ? "A short buzz for right and wrong answers." : "Not supported by this browser (iPhone Safari never vibrates)."}
+            checked={prefs.haptics && canVibrate} onChange={(value) => { setPref("haptics", value); if (value) haptic("tap"); }} />
+        </div>
       </section>
-      <section className="card mt-5 space-y-4">
-        <h2 className="text-xl font-bold">Your data</h2>
-        <p className="muted">
-          Progress is retained until you delete it. Demo data is device-local. Server records belong to your
-          authenticated identity. Anonymous progress can be lost if browser credentials are cleared before linking an
-          account.
+
+      <section className="card mt-5">
+        <h2 className="text-xl font-bold">Appearance</h2>
+        <div className="setting-list">
+          <ThemeControl />
+          <SettingToggle id="motion" title="Reduce motion"
+            text="Fewer animations, in addition to your system setting."
+            checked={motion}
+            onChange={(value) => {
+              setMotion(value);
+              localStorage.setItem("atlas-motion", value ? "reduce" : "system");
+              document.documentElement.dataset.motion = value ? "reduce" : "system";
+            }} />
+        </div>
+      </section>
+
+      <section className="card mt-5">
+        <h2 className="text-xl font-bold">Account & data</h2>
+        <p className="muted mt-2">
+          {isDemo
+            ? "This is the local demo: everything stays in this browser."
+            : isAnonymous
+              ? "You're playing as a guest. Create an account from the player menu so you don't lose your progress."
+              : "Your progress is saved to your account."}
         </p>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 mt-4">
           <button
             className="secondary"
             disabled={pending}
@@ -2674,7 +2460,7 @@ function Settings() {
               })
             }
           >
-            Export my data
+            Download my data
           </button>
           {isAnonymous === false && (
             <button
@@ -2706,20 +2492,28 @@ function Settings() {
             Delete {isDemo ? "demo data" : "account"}
           </button>
         </div>
-        <p role="status">{message}</p>
+        <p role="status" className="mt-2">{message}</p>
       </section>
-      <section className="card mt-5">
-        <h2 className="text-xl font-bold">Install and offline use</h2>
-        <p className="muted mt-3">
-          Use your browser's install command when available. On iPhone/iPad, use Safari's Share → Add to Home Screen.
-          After a production build has loaded and cached, the app shell and local demo can work offline. Supabase games,
-          sign-in, and administration require connectivity. Browser storage may be evicted.
-        </p>
-        <p className="muted mt-3">
-          This software is not a legal compliance certification. A deployed service needs a reviewed privacy notice,
-          operator contact details, retention policy, hosting agreements, and age/consent assessment.
-        </p>
-      </section>
+
+      <details className="card mt-5 settings-about">
+        <summary className="text-xl font-bold">About, offline use & diagnostics</summary>
+        <div className="mt-4 space-y-4">
+          <p className="muted">
+            Install Atlas Arena from your browser's menu, or on iPhone/iPad via Safari's Share → Add to Home Screen.
+            After the first visit the app opens offline; games, sign-in and saving need a connection.
+          </p>
+          <SettingToggle id="diagnostics" title="Local diagnostic log"
+            text="Keeps the last 100 app events on this device only, to help with bug reports. Nothing is sent anywhere."
+            checked={consent} onChange={(value) => { setConsent(value); setAnalytics(value); }} />
+          <button className="secondary" onClick={() => download("atlas-diagnostics.json", readEvents())}>
+            Download diagnostic log
+          </button>
+          <p className="muted text-sm">
+            Before running Atlas Arena as a public service it still needs a privacy notice, operator contact details,
+            a retention policy and a legal review.
+          </p>
+        </div>
+      </details>
     </div>
   );
 }
@@ -2739,7 +2533,15 @@ export default function App() {
           path="home"
           element={
             <Protected>
-              <Home />
+              <Hub />
+            </Protected>
+          }
+        />
+        <Route
+          path="quiz"
+          element={
+            <Protected>
+              <QuizSetup />
             </Protected>
           }
         />

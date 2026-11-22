@@ -45,7 +45,7 @@ describe("results and replay selection",()=>{
   });
   it("keeps the exact saved selection in setup navigation",()=>{
     const selection={mode:"classic" as const,difficulty:"hard" as const,categories:["countries"],country:"DEU",questionCount:10};
-    expect(challengeSetupUrl(selection)).toBe("/home?mode=classic&difficulty=hard&category=countries&country=DEU&count=10");
+    expect(challengeSetupUrl(selection)).toBe("/quiz?mode=classic&difficulty=hard&category=countries&country=DEU&count=10");
   });
   it("supports explicitly changed mode and difficulty in setup navigation",()=>{
     const selection={mode:"classic" as const,difficulty:"easy" as const,categories:[] as string[],country:null,questionCount:10};

@@ -1,7 +1,9 @@
-import { FormEvent, KeyboardEvent, RefObject, useEffect, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
+import { AUTO_CONTINUE_MS, getPrefs, haptic, loadSetup, saveSetup, usePrefs } from "./prefs";
+import { Chips, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, Step, StreakBadge } from "./setup-ui";
 import {
   FlagsAnswerOption,
   FlagsBestBoard,
@@ -246,62 +248,37 @@ function Setup() {
   const { data, error, reload } = useFlagsSetup();
   const navigate = useNavigate();
   const replayParams = new URLSearchParams(window.location.search);
+  const saved = useMemo(() => (replayParams.toString() ? {} : loadSetup("flags")), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [direction, setDirection] = useState<FlagsDirection>(
-    replayParams.get("direction") === "flag_to_country" ? "flag_to_country" : "country_to_flag",
+    replayParams.get("direction") === "flag_to_country" || saved.direction === "flag_to_country" ? "flag_to_country" : "country_to_flag",
   );
-  const [region, setRegion] = useState(replayParams.get("region") ?? "");
+  const [region, setRegion] = useState(replayParams.get("region") ?? (typeof saved.region === "string" ? saved.region : ""));
   const [tier, setTier] = useState<FlagsPoolTier>(
-    (replayParams.get("difficulty") ?? replayParams.get("pool")) === "all" ? "all" : "easy",
+    (replayParams.get("difficulty") ?? replayParams.get("pool") ?? saved.tier) === "all" ? "all" : "easy",
   );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showBests, setShowBests] = useState(false);
   const selected = data?.regions.find((r) => r.id === region);
-  const count =
-    (region
-      ? tier === "easy"
-        ? selected?.easyCount
-        : selected?.allCount
-      : tier === "easy"
-        ? data?.summary.easyCount
-        : data?.summary.allCount) ?? 0;
-  const easyCount = (region ? selected?.easyCount : data?.summary.easyCount) ?? 0;
-  const allCount = (region ? selected?.allCount : data?.summary.allCount) ?? 0;
+  const countFor = (which: FlagsPoolTier, scope = selected) =>
+    (scope ? (which === "easy" ? scope.easyCount : scope.allCount) : which === "easy" ? data?.summary.easyCount : data?.summary.allCount) ?? 0;
+  const count = countFor(tier);
   const missing =
     (region
-      ? tier === "easy"
-        ? selected?.easyMissingAssets
-        : selected?.allMissingAssets
-      : tier === "easy"
-        ? data?.summary.easyMissingAssets
-        : data?.summary.allMissingAssets) ?? 0;
-  const excluded =
-    (region
-      ? tier === "easy"
-        ? selected?.easyTierExcluded
-        : 0
-      : tier === "easy"
-        ? data?.summary.easyTierExcluded
-        : 0) ?? 0;
-  const unsupported = (region ? selected?.unsupportedDifficulty : data?.summary.unsupportedDifficulty) ?? 0;
-  const regionOptions = [
-    {
-      value: "",
-      label: "All regions",
-      count: (tier === "easy" ? data?.summary.easyCount : data?.summary.allCount) ?? 0,
-    },
-    ...(data?.regions ?? []).map((item) => ({
-      value: item.id,
-      label: item.name,
-      count: tier === "easy" ? item.easyCount : item.allCount,
-    })),
-  ];
+      ? tier === "easy" ? selected?.easyMissingAssets : selected?.allMissingAssets
+      : tier === "easy" ? data?.summary.easyMissingAssets : data?.summary.allMissingAssets) ?? 0;
+
+  useEffect(() => {
+    if (data && region && !data.regions.some((item) => item.id === region)) setRegion("");
+  }, [data, region]);
+
   async function start(e: FormEvent) {
     e.preventDefault();
     if (!count) return;
     setBusy(true);
     setMessage("");
+    saveSetup("flags", { direction, tier, region });
     try {
       const result = await api.flagsStart(direction, region || null, tier, requestId());
       navigate(`/flags/session/${result.id}`);
@@ -313,170 +290,110 @@ function Setup() {
   }
   if (error)
     return (
-      <div className="flags-shell">
+      <div className="mode-shell">
         <ErrorBox message={error} retry={reload} />
       </div>
     );
   if (!data) return <Loading />;
+
+  const side = (
+    <>
+      <SideCard title="Unfinished rounds">
+        <ResumeList
+          empty="None – rounds are saved automatically, so you can stop any time."
+          items={data.activeSessions.map((s) => ({
+            id: s.id,
+            title: directionName(s.direction),
+            detail: `${s.region || "All regions"} · ${s.poolTier === "easy" ? "Well-known flags" : "All flags"}${s.paused ? " · paused" : ""}`,
+            to: `/flags/session/${s.id}`,
+            done: s.answered,
+            total: s.total,
+            onDiscard: () => (getPrefs().confirmGiveUp ? setDeleteId(s.id) : void discard(s.id)),
+          }))}
+        />
+      </SideCard>
+      <SideCard title="Personal bests">
+        <p className="muted text-sm mt-2">Your fastest and most accurate completed rounds, per setup.</p>
+        <button type="button" className="secondary mt-3" onClick={() => setShowBests(true)}>
+          Show personal bests
+        </button>
+      </SideCard>
+    </>
+  );
+
+  async function discard(id: string) {
+    try {
+      await api.flagsDelete(id, requestId());
+      setDeleteId(null);
+      reload();
+    } catch (e) {
+      setMessage((e as Error).message);
+      setDeleteId(null);
+    }
+  }
+
   return (
-    <div className="flags-shell">
-      <header className="flags-heading flags-setup-hero">
-        <div className="flags-hero-copy">
-          <p className="eyebrow">ATLAS ARENA · LEARNING MODE</p>
-          <h1 tabIndex={-1}>Flags</h1>
-          <p className="muted">
-            Build your round, explore the world one flag at a time, and track your progress as you learn.
-          </p>
-        </div>
-        <div className="flags-hero-mark" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-          <i />
-        </div>
-      </header>
-      <div className="flags-setup-grid">
-        <form className="card flags-setup-card" onSubmit={start}>
-          <div className="flags-setup-card-heading">
-            <span className="eyebrow">YOUR NEXT ROUND</span>
-            <h2>Build your challenge</h2>
-            <p>Choose how you want to practice. Your round uses the full matching catalog pool.</p>
-          </div>
-          <fieldset className="flags-setup-section">
-            <legend>
-              <span className="flags-step-number">01</span>Choose a direction
-            </legend>
-            <div className="flags-direction-grid">
-              <label className={`flags-choice-card ${direction === "country_to_flag" ? "selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="direction"
-                  checked={direction === "country_to_flag"}
-                  onChange={() => setDirection("country_to_flag")}
-                />
-                <span>
-                  <strong>Country → Flag</strong>
-                  <small>Find the flag that matches a country name.</small>
-                </span>
-              </label>
-              <label className={`flags-choice-card ${direction === "flag_to_country" ? "selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="direction"
-                  checked={direction === "flag_to_country"}
-                  onChange={() => setDirection("flag_to_country")}
-                />
-                <span>
-                  <strong>Flag → Country</strong>
-                  <small>Identify a flag by typing its country name or code.</small>
-                </span>
-              </label>
-            </div>
-          </fieldset>
-          <fieldset className="flags-setup-section">
-            <legend>
-              <span className="flags-step-number">02</span>Choose difficulty
-            </legend>
-            <div className="flags-difficulty-grid">
-              <label className={`flags-difficulty-card ${tier === "easy" ? "selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="difficulty"
-                  value="easy"
-                  checked={tier === "easy"}
-                  onChange={() => setTier("easy")}
-                />
-                <span className="flags-difficulty-copy">
-                  <strong>Easy flags</strong>
-                  <small>Countries and territories rated easy or medium.</small>
-                  <b>
-                    {easyCount} eligible {easyCount === 1 ? "flag" : "flags"}
-                  </b>
-                </span>
-                <span className="flags-radio-mark" aria-hidden="true" />
-              </label>
-              <label className={`flags-difficulty-card ${tier === "all" ? "selected" : ""}`}>
-                <input
-                  type="radio"
-                  name="difficulty"
-                  value="all"
-                  checked={tier === "all"}
-                  onChange={() => setTier("all")}
-                />
-                <span className="flags-difficulty-copy">
-                  <strong>All flags</strong>
-                  <small>Every catalog entry with a supported difficulty.</small>
-                  <b>
-                    {allCount} eligible {allCount === 1 ? "flag" : "flags"}
-                  </b>
-                </span>
-                <span className="flags-radio-mark" aria-hidden="true" />
-              </label>
-            </div>
-          </fieldset>
-          <fieldset className="flags-setup-section flags-region-section">
-            <legend>
-              <span className="flags-step-number">03</span>Choose a region
-            </legend>
-            <div className="flags-region-grid" role="radiogroup" aria-label="Choose a region">
-              {regionOptions.map((option) => (
-                <label
-                  key={option.value || "all-regions"}
-                  className={`flags-region-card ${region === option.value ? "selected" : ""} ${option.count === 0 ? "unavailable" : ""}`}
-                >
-                  <input
-                    type="radio"
-                    name="flags-region"
-                    value={option.value}
-                    checked={region === option.value}
-                    disabled={option.count === 0}
-                    onChange={() => setRegion(option.value)}
-                  />
-                  <span className="flags-region-card-content">
-                    <strong>{option.label}</strong>
-                    <small>
-                      {option.count} eligible {option.count === 1 ? "flag" : "flags"}
-                    </small>
-                  </span>
-                  <span className="flags-region-indicator" aria-hidden="true">
-                    {region === option.value ? "✓" : ""}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          {direction === "flag_to_country" && region && (
-            <p className="flags-hint-note flags-single-region-note">
-              The selected region is already known, so region hints are unavailable in this round.
-            </p>
-          )}
-          <section className="flags-pool-summary" aria-live="polite">
-            <div className="flags-pool-count">
-              <span>Round size</span>
-              <strong>{count}</strong>
-              <small>eligible {count === 1 ? "flag" : "flags"}</small>
-            </div>
-            <div className="flags-pool-details">
-              <span>Full catalog pool · randomized once · no time limit</span>
-              {count > 30 && <span className="flags-long-round">This will be a long round with {count} flags.</span>}
-              {missing > 0 && (
-                <span>
-                  {missing} catalog {missing === 1 ? "entry is" : "entries are"} excluded because no usable flag asset
-                  is available.
-                </span>
-              )}
-              {excluded > 0 && <span>{excluded} hard/expert entries are outside Easy flags.</span>}
-              {unsupported > 0 && (
-                <span>
-                  {unsupported} catalog {unsupported === 1 ? "entry uses" : "entries use"} an unsupported difficulty and
-                  cannot be included.
-                </span>
-              )}
-            </div>
-          </section>
+    <>
+      <ModePage
+        eyebrow="Atlas Flags"
+        title="Know your flags?"
+        intro="Every flag in your set comes up once. Get it right, use a hint, or skip – your round is saved as you go."
+        side={side}
+      >
+        <SetupForm onSubmit={start}>
+          <Step n={1} title="How do you want to play?">
+            <OptionCards
+              value={direction}
+              onChange={setDirection}
+              options={[
+                { value: "country_to_flag", icon: "🏳️", title: "Country → Flag", text: "See a country name and pick its flag." },
+                { value: "flag_to_country", icon: "🔎", title: "Flag → Country", text: "See a flag and type the country it belongs to." },
+              ]}
+            />
+          </Step>
+          <Step n={2} title="Which flags?">
+            <Chips
+              label="Flag pool"
+              value={tier}
+              onChange={setTier}
+              options={[
+                { value: "easy", label: "Well-known", count: countFor("easy") },
+                { value: "all", label: "All flags", count: countFor("all") },
+              ]}
+            />
+          </Step>
+          <Step
+            n={3}
+            title="Region"
+            hint={direction === "flag_to_country" && region ? "Region hints are switched off when you play a single region." : undefined}
+          >
+            <Chips
+              label="Region"
+              value={region}
+              onChange={setRegion}
+              options={[
+                { value: "", label: "Whole world", count: countFor(tier, undefined) },
+                ...data.regions.map((item) => ({
+                  value: item.id,
+                  label: item.name,
+                  count: tier === "easy" ? item.easyCount : item.allCount,
+                  disabled: (tier === "easy" ? item.easyCount : item.allCount) === 0,
+                })),
+              ]}
+            />
+          </Step>
+          <StartBar
+            count={count}
+            unit={count === 1 ? "flag" : "flags"}
+            busy={busy}
+            disabled={!count}
+            label="Start round"
+            summary={`${directionName(direction)} · ${selected?.name ?? "Whole world"} · no time limit`}
+            extra={missing > 0 ? `${missing} ${missing === 1 ? "place has" : "places have"} no flag image yet and ${missing === 1 ? "is" : "are"} left out.` : undefined}
+          />
           {!count && (
-            <p className="flags-empty" role="status">
-              No entries with usable flag assets match this selection. Choose another region or pool.
+            <p className="muted" role="status">
+              No flags match this choice – try another region or "All flags".
             </p>
           )}
           {message && (
@@ -484,89 +401,26 @@ function Setup() {
               {message}
             </p>
           )}
-          <div className="flags-start-action">
-            <button className="primary" disabled={!count || busy}>
-              {busy ? "Preparing round…" : "Start full round"}
-              <span aria-hidden="true">→</span>
-            </button>
-            <p className="flags-footnote">
-              No speed bonus. Elapsed time includes the entire round, including feedback and time away.
-            </p>
-          </div>
-        </form>
-        <aside className="card flags-resume-card">
-          <p className="eyebrow">YOUR ROUNDS</p>
-          <h2>Resume a saved round</h2>
-          {data.activeSessions.length ? (
-            data.activeSessions.map((s) => (
-              <div className="flags-resume-row" key={s.id}>
-                <Link to={`/flags/session/${s.id}`}>
-                  <span>
-                    <strong>{directionName(s.direction)}</strong>
-                    <small>
-                      {s.region || "All regions"} · {s.poolTier === "easy" ? "Easy flags" : "All flags"}
-                      {s.paused ? " · Paused" : " · In progress"}
-                    </small>
-                  </span>
-                  <span>
-                    {s.answered}/{s.total}
-                    <b aria-hidden="true"> →</b>
-                  </span>
-                </Link>
-                <button type="button" className="flags-delete-link" onClick={() => setDeleteId(s.id)}>
-                  Delete
-                </button>
-              </div>
-            ))
-          ) : (
-            <p className="muted">Your saved rounds will appear here.</p>
-          )}
-          <button type="button" className="flags-bests-trigger" onClick={() => setShowBests(true)}>
-            <span>
-              <strong>Personal bests</strong>
-              <small>Review your strongest completed rounds</small>
-            </span>
-            <span aria-hidden="true">↗</span>
-          </button>
-          <div className="flags-score-note">
-            <strong>Learning mode</strong>
-            <p>
-              Answers and flag assets come from the accessible catalog. These scores are personal learning records, not
-              cheat-proof competition.
-            </p>
-          </div>
-        </aside>
-      </div>
+        </SetupForm>
+      </ModePage>
       {showBests && <FlagsBestsDialog onClose={() => setShowBests(false)} />}
       {deleteId && (
         <div className="flags-dialog-backdrop">
           <section role="dialog" aria-modal="true" aria-labelledby="flags-delete-title" className="card flags-confirm">
-            <h2 id="flags-delete-title">Delete this saved round?</h2>
-            <p>This permanently removes the saved round and its question history.</p>
+            <h2 id="flags-delete-title">Discard this round?</h2>
+            <p>Your answers in this round will be removed.</p>
             <div>
               <button className="secondary" onClick={() => setDeleteId(null)}>
                 Keep round
               </button>
-              <button
-                className="danger"
-                onClick={async () => {
-                  try {
-                    await api.flagsDelete(deleteId, requestId());
-                    setDeleteId(null);
-                    reload();
-                  } catch (e) {
-                    setMessage((e as Error).message);
-                    setDeleteId(null);
-                  }
-                }}
-              >
-                Delete round
+              <button className="danger" onClick={() => void discard(deleteId)}>
+                Discard
               </button>
             </div>
           </section>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -798,6 +652,7 @@ function Game() {
   const [answer, setAnswer] = useState("");
   const [feedback, setFeedback] = useState("");
   const [confirmAbandon, setConfirmAbandon] = useState(false);
+  const prefs = usePrefs();
   const [focusedChoice, setFocusedChoice] = useState(0);
   const [unavailableAssets, setUnavailableAssets] = useState<string[]>([]);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -875,6 +730,21 @@ function Game() {
     }
   }, [session?.current?.id]);
   const current = session?.current;
+  const streak = useMemo(() => {
+    const done = [...(session?.entries ?? [])]
+      .filter((entry) => entry.outcome !== "pending")
+      .sort((a, b) => a.position - b.position);
+    let count = 0;
+    for (let i = done.length - 1; i >= 0 && done[i].outcome === "correct"; i--) count++;
+    return count;
+  }, [session?.entries]);
+  const autoContinue = Boolean(prefs.autoContinue && current && current.outcome === "correct" && session?.state === "active");
+  useEffect(() => {
+    if (!autoContinue) return;
+    const timer = window.setTimeout(() => void next(), AUTO_CONTINUE_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoContinue, current?.id]);
   const choices = current?.choices ?? session?.choices ?? [];
   const latestWrongChoice = choices.find(
     (choice) => choice.id === current?.wrongChoiceIds[current.wrongChoiceIds.length - 1],
@@ -929,6 +799,8 @@ function Game() {
       if (Object.keys(resolved).length) setRoundOutcomes((previous) => ({ ...previous, ...resolved }));
       if (s.actionResult) {
         const a = s.actionResult;
+        if (a.outcome === "correct") haptic("correct");
+        else if (a.outcome !== "ambiguous" && a.outcome !== "duplicate_choice") haptic("wrong");
         setFeedback(
           a.outcome === "wrong_choice"
             ? `Incorrect. ${a.remainingAttempts} ${a.remainingAttempts === 1 ? "attempt" : "attempts"} remaining.`
@@ -1024,8 +896,20 @@ function Game() {
     if (!session) return;
     const s = await api.flagsNext(session.id, requestId());
     latestSession.current = s;
-    if (s.state === "completed") navigate(`/flags/results/${session.id}`);
+    if (s.state === "completed") {
+      haptic("complete");
+      navigate(`/flags/results/${session.id}`);
+    }
     else setSession(s);
+  }
+  function abandonNow() {
+    if (!session) return;
+    return act(async () => {
+      const s = await api.flagsAbandon(session.id, requestId());
+      setConfirmAbandon(false);
+      navigate("/flags");
+      return s;
+    });
   }
   async function saveAndLeave() {
     if (!session) return;
@@ -1070,9 +954,10 @@ function Game() {
           <h1 tabIndex={-1} ref={headingRef}>
             {session.current?.position ?? session.answered + 1} <span>of {session.total}</span>
           </h1>
+          <StreakBadge streak={streak} />
         </div>
         <div className="flags-game-actions">
-          <button className="flags-abandon" type="button" disabled={busy} onClick={() => setConfirmAbandon(true)}>
+          <button className="flags-abandon" type="button" disabled={busy} onClick={() => (prefs.confirmGiveUp ? setConfirmAbandon(true) : void abandonNow())}>
             Abandon round
           </button>
           <button className="secondary" disabled={busy} onClick={() => void saveAndLeave()}>
@@ -1259,14 +1144,7 @@ function Game() {
               </button>
               <button
                 className="danger"
-                onClick={() =>
-                  void act(async () => {
-                    const s = await api.flagsAbandon(session.id, requestId());
-                    setConfirmAbandon(false);
-                    navigate("/flags");
-                    return s;
-                  })
-                }
+                onClick={() => void abandonNow()}
               >
                 Abandon round
               </button>

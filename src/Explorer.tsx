@@ -151,7 +151,7 @@ function CountryCard({ country, countriesByAlpha3, eagerFlag = false, priorityFl
         <footer className="explorer-country-footer">
         {canPractice ? <>
           <p className="muted text-xs mb-2">{questionCount} published questions · {country.difficulty}</p>
-          <Link className="secondary country-action w-full" to={`/home?${practiceParams.toString()}`}>Practice this place <span aria-hidden="true">→</span></Link>
+          <Link className="secondary country-action w-full" to={`/quiz?${practiceParams.toString()}`}>Practice this place <span aria-hidden="true">→</span></Link>
         </> : <p className="muted text-xs">{availabilityKnown ? `Practice needs ${PRACTICE_QUESTION_COUNT} published questions at this difficulty; ${questionCount} available.` : "Practice availability is not available."}</p>}
         </footer>
       </div>

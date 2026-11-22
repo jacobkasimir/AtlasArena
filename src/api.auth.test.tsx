@@ -121,8 +121,24 @@ describe("authenticated dashboard loading", () => {
 
     render(<MemoryRouter initialEntries={["/home"]}><App/></MemoryRouter>);
 
-    expect(await screen.findByText("Choose your challenge")).toBeTruthy();
-    expect(authState.rpc).toHaveBeenCalledTimes(4); // route gate, home dashboard, and leaderboard
+    expect(await screen.findByText("Games")).toBeTruthy();
+    // route gate (2), quiz dashboard, flags setup + bests, capitals setup, recall setup
+    expect(authState.rpc).toHaveBeenCalledTimes(7);
+  });
+
+  it("opens the quiz setup on /quiz", async () => {
+    authState.session = { access_token: "restored-session" };
+    authState.rpc.mockResolvedValue({ data: {
+      profile: { username: "Returning Guest", avatar: 0, favorites: [], xp: 0, admin: false },
+      totals: { games: 0, correct: 0, incorrect: 0 },
+      best: { classic: null, timed: null, endless: null },
+      sessions: []
+    }, error: null });
+
+    render(<MemoryRouter initialEntries={["/quiz"]}><App/></MemoryRouter>);
+
+    expect(await screen.findByText("Ready for a round?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Start game" })).toBeTruthy();
   });
 
   it("redirects an unauthenticated direct private link to sign-in without a protected RPC", async () => {

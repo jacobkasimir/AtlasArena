@@ -12,7 +12,8 @@ selection → playable session → feedback → results → saved progress.
 
 | Mode | Route | State |
 |---|---|---|
-| Classic / Practice / Timed / Endless quiz | `/home`, `/play/:id`, `/results/:id` | End to end (server + demo) |
+| Home hub (all games, continue, progress) | `/home` (`src/Hub.tsx`) | Done |
+| Classic / Practice / Timed / Endless quiz | `/quiz`, `/play/:id`, `/results/:id` | End to end (server + demo) |
 | Flags | `/flags/*` | End to end (server + demo) |
 | Capitals | `/capitals/*` | End to end (server + demo) |
 | Explorer | `/explorer` | Read-only atlas |
@@ -25,6 +26,10 @@ Do not add a new mode or multiplayer while a mode is half-finished.
 ## Stack and layout
 - React 18 + TypeScript (strict) + React Router 6 + Tailwind 3, built with Vite 6.
 - Supabase (Postgres, Auth, RPC, one Edge Function) is the backend. Vercel hosts static files only.
+- `src/setup-ui.tsx` — shared setup building blocks (ModePage, Step, OptionCards, Chips, StartBar, ResumeList,
+  StreakBadge). Every mode's setup screen uses them; don't build a one-off setup layout.
+- `src/prefs.ts` — device-local game preferences (auto-continue, remembered setups, confirmations, keyboard
+  hints, vibration) edited in Settings. New gameplay must respect them (`usePrefs`, `haptic`, `loadSetup`/`saveSetup`).
 - `src/api.ts` — the only place that talks to Supabase. Every call has a demo branch.
 - `src/domain.ts` — shared types, scoring, eligibility and state rules. `*-domain.ts` per mode.
 - `src/demo.ts`, `flags-demo.ts`, `capitals-demo.ts` — device-local demo engines (localStorage).

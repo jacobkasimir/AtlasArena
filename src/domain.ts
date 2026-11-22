@@ -108,7 +108,7 @@ export function challengeSetupUrl(selection: Pick<ResultView, "mode" | "difficul
   if (selection.categories?.length) params.set("category", selection.categories[0]);
   if (selection.country) params.set("country", selection.country);
   if (selection.questionCount) params.set("count", String(selection.questionCount));
-  return `/home?${params.toString()}`;
+  return `/quiz?${params.toString()}`;
 }
 
 export type Summary = {

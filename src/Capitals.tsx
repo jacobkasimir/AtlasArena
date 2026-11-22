@@ -2,6 +2,8 @@ import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useSta
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
+import { AUTO_CONTINUE_MS, haptic, loadSetup, oneOf, saveSetup, usePrefs } from "./prefs";
+import { Chips, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, StreakBadge, Step } from "./setup-ui";
 import {
   CapitalCountry,
   CapitalDirection,
@@ -32,16 +34,21 @@ function Setup() {
   const { data, error, reload } = useCapitalSetup();
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const saved = useMemo(() => (params.toString() ? {} : loadSetup("capitals")), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [direction, setDirection] = useState<CapitalDirection>(
-    params.get("direction") === "capital_to_country" ? "capital_to_country" : "country_to_capital",
+    (params.get("direction") ?? saved.direction) === "capital_to_country" ? "capital_to_country" : "country_to_capital",
   );
   const [poolMode, setPoolMode] = useState<CapitalPoolMode>(
-    (["all", "easy", "manual"].includes(params.get("pool") ?? "") ? params.get("pool") : "all") as CapitalPoolMode,
+    oneOf(params.get("pool") ?? saved.poolMode, ["all", "easy", "manual"] as const, "all"),
   );
   const [selectedCodes, setSelectedCodes] = useState<string[]>(
-    params.get("selected") ? params.get("selected")!.split(",").filter(Boolean) : [],
+    params.get("selected")
+      ? params.get("selected")!.split(",").filter(Boolean)
+      : Array.isArray(saved.selectedCodes)
+        ? saved.selectedCodes.filter((code): code is string => typeof code === "string")
+        : [],
   );
-  const [region, setRegion] = useState(params.get("region") ?? "");
+  const [region, setRegion] = useState(params.get("region") ?? (typeof saved.region === "string" ? saved.region : ""));
   const [countrySearch, setCountrySearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -50,24 +57,21 @@ function Setup() {
   const countries = data?.countries ?? [];
   const eligible = (country: CapitalCountry) =>
     direction === "country_to_capital" ? country.countryToCapitalEligible : country.capitalToCountryEligible;
-  const reason = (country: CapitalCountry) =>
-    direction === "country_to_capital" ? country.countryToCapitalReason : country.capitalToCountryReason;
   const filteredPool = capitalPool(countries, direction, poolMode, selectedCodes, region || null);
   const outsideRegion = filteredPool.outsideRegion;
-  const excluded = filteredPool.excluded;
   const eligiblePool = filteredPool.countries;
   const search = normalize(countrySearch);
   const matchingCountries = countries.filter(
     (country) =>
       (!search ||
-        normalize(
-          [country.name, country.officialName ?? "", country.code, country.codeAlpha3 ?? ""].join(" "),
-        ).includes(search)) &&
+        normalize([country.name, country.officialName ?? "", country.code, country.codeAlpha3 ?? ""].join(" ")).includes(
+          search,
+        )) &&
       (!region || country.region === region),
   );
-  const easyExcluded = filteredPool.easyTierExcluded.length;
   const modeLabel = directions.find((item) => item.id === direction)!.title;
-  const exclusionReasons = [...new Set(excluded.map(reason).filter((value): value is string => Boolean(value)))];
+  const poolSize = (mode: CapitalPoolMode) => capitalPool(countries, direction, mode, selectedCodes, region || null).countries.length;
+  const regionSize = (name: string) => capitalPool(countries, direction, poolMode, selectedCodes, name || null).countries.length;
 
   useEffect(() => {
     if (!pendingReplay || !data) return;
@@ -79,10 +83,9 @@ function Setup() {
     setPendingReplay(null);
     setMessage("That saved Capitals round could not be found. Choose settings and start a new round.");
   }, [pendingReplay, data, navigate]);
-  function setPool(value: CapitalPoolMode) {
-    setPoolMode(value);
-    if (value !== "manual") setSelectedCodes([]);
-  }
+  useEffect(() => {
+    if (data && region && !data.regions.includes(region)) setRegion("");
+  }, [data, region]);
   function toggle(code: string) {
     setSelectedCodes((current) =>
       current.includes(code) ? current.filter((value) => value !== code) : [...current, code],
@@ -96,6 +99,7 @@ function Setup() {
     if (!eligiblePool.length) return;
     setBusy(true);
     setMessage("");
+    saveSetup("capitals", { direction, poolMode, region, selectedCodes: poolMode === "manual" ? selectedCodes : [] });
     try {
       const session = await api.capitalsStart(
         direction,
@@ -113,291 +117,149 @@ function Setup() {
   }
   if (error)
     return (
-      <div className="capitals-shell">
+      <div className="mode-shell">
         <ErrorBox message={error} retry={reload} />
       </div>
     );
   if (!data) return <Loading />;
+
+  const side = (
+    <SideCard title="Unfinished rounds">
+      <ResumeList
+        empty="None – rounds are saved automatically, so you can stop any time."
+        items={data.activeSessions.map((session) => ({
+          id: session.id,
+          title: directions.find((item) => item.id === session.direction)?.title ?? "Capitals",
+          detail: `${session.poolMode === "manual" ? "Your picks" : session.poolMode === "easy" ? "Well-known" : "All countries"} · ${session.region ?? "Whole world"} · ${session.score} pts`,
+          to: "/capitals/session/" + session.id,
+          done: session.answered,
+          total: session.total,
+        }))}
+      />
+    </SideCard>
+  );
+
   return (
-    <div className="capitals-shell">
-      <header className="capitals-hero card">
-        <div>
-          <p className="eyebrow">ATLAS ARENA · LEARNING MODE</p>
-          <h1 tabIndex={-1}>Capitals</h1>
-          <p>Build a round around the places you want to learn. Every eligible country or territory appears once.</p>
-        </div>
-        <div className="capitals-hero-mark" aria-hidden="true">
-          <span>CAPITALS</span>
-          <i />
-        </div>
-      </header>
-      <div className="capitals-setup-layout">
-        <form className="card capitals-setup" onSubmit={start}>
-          <div className="capitals-setup-heading">
-            <span className="eyebrow">YOUR NEXT ROUND</span>
-            <h2>Choose your challenge</h2>
-            <p>Use the catalog as a learning resource. API data has not necessarily received editorial review.</p>
-          </div>
-          <fieldset className="capitals-step">
-            <legend>
-              <b>01</b> Direction
-            </legend>
-            <div className="capitals-direction-grid">
-              {directions.map((option) => (
-                <label
-                  key={option.id}
-                  className={"capitals-direction-card " + (direction === option.id ? "is-selected" : "")}
-                >
+    <ModePage
+      eyebrow="Atlas Capitals"
+      title="Capital cities, one by one."
+      intro="Each country (or capital) in your set comes up once. Type your answer – spelling help appears as you type."
+      side={side}
+    >
+      <SetupForm onSubmit={start}>
+        <Step n={1} title="How do you want to play?">
+          <OptionCards
+            value={direction}
+            onChange={setDirection}
+            options={directions.map((option) => ({
+              value: option.id,
+              icon: option.id === "country_to_capital" ? "🏛️" : "🗺️",
+              title: option.title,
+              text: option.description,
+            }))}
+          />
+        </Step>
+        <Step n={2} title="Which countries?">
+          <Chips
+            label="Country pool"
+            value={poolMode}
+            onChange={(value) => setPoolMode(value)}
+            options={[
+              { value: "all", label: "All", count: poolSize("all") },
+              { value: "easy", label: "Well-known", count: poolSize("easy") },
+              { value: "manual", label: "Pick my own" },
+            ]}
+          />
+          {poolMode === "manual" && (
+            <div className="capitals-country-picker">
+              <div className="capitals-picker-toolbar">
+                <label className="capitals-search-label">
+                  Search countries and territories
                   <input
-                    type="radio"
-                    name="capital-direction"
-                    value={option.id}
-                    checked={direction === option.id}
-                    onChange={() => setDirection(option.id)}
+                    type="search"
+                    value={countrySearch}
+                    onChange={(event) => setCountrySearch(event.target.value)}
+                    placeholder="Search by name or code"
+                    autoComplete="off"
                   />
-                  <span>
-                    <strong>{option.title}</strong>
-                    <small>{option.description}</small>
-                  </span>
-                  <i aria-hidden="true" />
                 </label>
-              ))}
-            </div>
-          </fieldset>
-          <fieldset className="capitals-step">
-            <legend>
-              <b>02</b> Country pool
-            </legend>
-            <div className="capitals-pool-options">
-              {(["all", "easy", "manual"] as CapitalPoolMode[]).map((option) => (
-                <button
-                  type="button"
-                  key={option}
-                  className={"capitals-pool-card " + (poolMode === option ? "is-selected" : "")}
-                  aria-pressed={poolMode === option}
-                  onClick={() => setPool(option)}
-                >
-                  <strong>
-                    {option === "all" ? "All countries" : option === "easy" ? "Easy countries" : "Choose countries"}
-                  </strong>
-                  <small>
-                    {option === "all"
-                      ? "Every eligible catalog entry."
-                      : option === "easy"
-                        ? "Stored difficulty is easy or medium."
-                        : "Build a round from a searchable selection."}
-                  </small>
-                </button>
-              ))}
-            </div>
-            {poolMode === "manual" && (
-              <div className="capitals-country-picker">
-                <div className="capitals-picker-toolbar">
-                  <label className="capitals-search-label">
-                    Search countries and territories
-                    <input
-                      type="search"
-                      value={countrySearch}
-                      onChange={(event) => setCountrySearch(event.target.value)}
-                      placeholder="Search by name or code"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <div className="capitals-picker-actions">
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={selectAllMatching}
-                      disabled={!matchingCountries.length}
-                    >
-                      Select all matching results ({matchingCountries.length})
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => setSelectedCodes([])}
-                      disabled={!selectedCodes.length}
-                    >
-                      Clear selection
-                    </button>
-                  </div>
-                </div>
-                <p className="capitals-selected-count" aria-live="polite">
-                  {selectedCodes.length} selected · entries outside the region filter remain selected
-                </p>
-                {!!selectedCodes.length && (
-                  <div className="capitals-chips" aria-label="Selected catalog entries">
-                    {selectedCodes.map((code) => {
-                      const country = countries.find((item) => item.code === code);
-                      return country ? (
-                        <button
-                          type="button"
-                          key={code}
-                          className="capitals-chip"
-                          onClick={() => toggle(code)}
-                          aria-label={"Remove " + country.name}
-                        >
-                          {country.name}
-                          <span aria-hidden="true">×</span>
-                        </button>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-                <div className="capitals-country-options" role="group" aria-label="Select countries and territories">
-                  {matchingCountries.map((country) => {
-                    const flag = countryFlag(country);
-                    return (
-                      <label
-                        key={country.code}
-                        className={"capitals-country-option " + (selectedSet.has(country.code) ? "is-selected" : "")}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSet.has(country.code)}
-                          onChange={() => toggle(country.code)}
-                        />
-                        {flag ? (
-                          <img src={flag} width="32" height="22" loading="lazy" alt="" />
-                        ) : (
-                          <span className="capitals-flag-placeholder" aria-hidden="true" />
-                        )}
-                        <span className="capitals-country-option-copy">
-                          <strong>{country.name}</strong>
-                          <small>
-                            {country.catalogKind === "non_iso"
-                              ? "Catalog entry · internal identifier"
-                              : (country.codeAlpha2 ?? country.code)}
-                            {!eligible(country) ? " · " + (reason(country) ?? "No usable capital data") : ""}
-                          </small>
-                        </span>
-                      </label>
-                    );
-                  })}
-                  {!matchingCountries.length && <p className="muted">No entries match this search.</p>}
+                <div className="capitals-picker-actions">
+                  <button type="button" className="secondary" onClick={selectAllMatching} disabled={!matchingCountries.length}>
+                    Select all {matchingCountries.length}
+                  </button>
+                  <button type="button" className="secondary" onClick={() => setSelectedCodes([])} disabled={!selectedCodes.length}>
+                    Clear
+                  </button>
                 </div>
               </div>
-            )}
-          </fieldset>
-          <fieldset className="capitals-step">
-            <legend>
-              <b>03</b> Region
-            </legend>
-            <label className="capitals-region-label" htmlFor="capitals-region">
-              Limit the pool by region
-            </label>
-            <div className="capitals-region-control">
-              <select id="capitals-region" value={region} onChange={(event) => setRegion(event.target.value)}>
-                <option value="">All regions</option>
-                {data.regions.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="capitals-region-note">
-              Region filters intersect with your country pool. Changing this filter never removes manual selections.
-            </p>
-            {poolMode === "manual" && outsideRegion.length > 0 && (
-              <p className="capitals-exclusion capitals-exclusion-info">
-                {outsideRegion.length} selected {outsideRegion.length === 1 ? "entry is" : "entries are"} outside this
-                region and will be excluded from this round. They remain selected.
+              <p className="capitals-selected-count" aria-live="polite">
+                {selectedCodes.length} selected
               </p>
-            )}
-          </fieldset>
-          <section className="capitals-round-summary" aria-live="polite">
-            <div className="capitals-round-total">
-              <small>ELIGIBLE COUNTRIES</small>
-              <strong>{eligiblePool.length}</strong>
-              <span>
-                {eligiblePool.length} questions · {eligiblePool.length * 100} maximum points
-              </span>
+              <div className="capitals-country-options" role="group" aria-label="Select countries and territories">
+                {matchingCountries.map((country) => {
+                  const flag = countryFlag(country);
+                  return (
+                    <label
+                      key={country.code}
+                      className={"capitals-country-option " + (selectedSet.has(country.code) ? "is-selected" : "")}
+                    >
+                      <input type="checkbox" checked={selectedSet.has(country.code)} onChange={() => toggle(country.code)} />
+                      {flag ? (
+                        <img src={flag} width="32" height="22" loading="lazy" alt="" />
+                      ) : (
+                        <span className="capitals-flag-placeholder" aria-hidden="true" />
+                      )}
+                      <span className="capitals-country-option-copy">
+                        <strong>{country.name}</strong>
+                        {!eligible(country) && <small>No usable capital data</small>}
+                      </span>
+                    </label>
+                  );
+                })}
+                {!matchingCountries.length && <p className="muted">No entries match this search.</p>}
+              </div>
             </div>
-            <div className="capitals-round-details">
-              <b>{modeLabel}</b>
-              <span>
-                {poolMode === "easy"
-                  ? "Easy countries means stored difficulty easy or medium."
-                  : poolMode === "manual"
-                    ? selectedCodes.length + " selected catalog entries · region intersection applied."
-                    : "All catalog entries with usable capital data."}
-              </span>
-              {poolMode === "easy" && easyExcluded > 0 && (
-                <span>{easyExcluded} entries are excluded because their stored difficulty is not easy or medium.</span>
-              )}
-              {outsideRegion.length > 0 && poolMode !== "manual" && (
-                <span>{outsideRegion.length} entries are outside the chosen region.</span>
-              )}
-              {excluded.length > 0 && (
-                <div className="capitals-exclusion">
-                  <strong>
-                    {excluded.length} entries are excluded because capital data is incomplete or ambiguous.
-                  </strong>
-                  {exclusionReasons.map((value) => (
-                    <small key={value}>{value}</small>
-                  ))}
-                </div>
-              )}
-              {eligiblePool.length > 30 && (
-                <span className="capitals-long-round">This is a long round with {eligiblePool.length} questions.</span>
-              )}
-            </div>
-          </section>
-          {!eligiblePool.length && (
-            <p className="capitals-empty" role="status">
-              No eligible countries match these settings. Choose another direction, region, or country selection.
-            </p>
           )}
-          {message && (
-            <p className="error" role="alert">
-              {message}
-            </p>
-          )}
-          <div className="capitals-start-actions">
-            <button className="primary" disabled={busy || !eligiblePool.length}>
-              {busy ? "Preparing round…" : "Start full round"}
-              <span aria-hidden="true">→</span>
-            </button>
-            <p>No timer or speed bonus. Elapsed time is calculated from server timestamps through completion.</p>
-          </div>
-        </form>
-        <aside className="card capitals-rounds">
-          <p className="eyebrow">YOUR ROUNDS</p>
-          <h2>Resume a saved round</h2>
-          {data.activeSessions.length ? (
-            data.activeSessions.map((session) => (
-              <Link className="capitals-resume-row" key={session.id} to={"/capitals/session/" + session.id}>
-                <span>
-                  <strong>{directions.find((item) => item.id === session.direction)?.title}</strong>
-                  <small>
-                    {session.poolMode === "manual"
-                      ? "Selected countries"
-                      : session.poolMode === "easy"
-                        ? "Easy countries"
-                        : "All countries"}{" "}
-                    · {session.region ?? "All regions"}
-                  </small>
-                </span>
-                <span>
-                  {session.answered}/{session.total}
-                  <b aria-hidden="true">→</b>
-                </span>
-              </Link>
-            ))
-          ) : (
-            <p className="muted">Saved rounds will appear here.</p>
-          )}
-          <div className="capitals-learning-note">
-            <strong>Catalog learning mode</strong>
-            <p>
-              Capital names come from imported API data and may need editorial review. Import time is not a reference
-              year. Wikipedia links do not verify each capital claim. Capitals scores are separate from competitive XP.
-            </p>
-          </div>
-        </aside>
-      </div>
-    </div>
+        </Step>
+        <Step
+          n={3}
+          title="Region"
+          hint={
+            poolMode === "manual" && outsideRegion.length > 0
+              ? `${outsideRegion.length} of your picks ${outsideRegion.length === 1 ? "is" : "are"} outside this region and will be left out.`
+              : undefined
+          }
+        >
+          <Chips
+            label="Region"
+            value={region}
+            onChange={setRegion}
+            options={[
+              { value: "", label: "Whole world", count: regionSize("") },
+              ...data.regions.map((value) => ({ value, label: value, count: regionSize(value), disabled: regionSize(value) === 0 })),
+            ]}
+          />
+        </Step>
+        <StartBar
+          count={eligiblePool.length}
+          unit={eligiblePool.length === 1 ? "question" : "questions"}
+          busy={busy}
+          disabled={!eligiblePool.length}
+          label="Start round"
+          summary={`${modeLabel} · ${region || "Whole world"} · 100 points each`}
+        />
+        {!eligiblePool.length && (
+          <p className="muted" role="status">
+            Nothing matches this choice yet – pick countries, or try another region.
+          </p>
+        )}
+        {message && (
+          <p className="error" role="alert">
+            {message}
+          </p>
+        )}
+      </SetupForm>
+    </ModePage>
   );
 }
 
@@ -543,6 +405,7 @@ function Game() {
   const [busy, setBusy] = useState(false);
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const prefs = usePrefs();
   const inputRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const submitLock = useRef(false);
@@ -565,6 +428,19 @@ function Game() {
   }, []);
   const current = session?.current;
   const finalized = Boolean(current && current.outcome !== "pending");
+  const streak = useMemo(() => {
+    const done = [...(session?.entries ?? [])].filter((entry) => entry.outcome !== "pending").sort((a, b) => a.position - b.position);
+    let count = 0;
+    for (let i = done.length - 1; i >= 0 && done[i].outcome === "correct"; i--) count++;
+    return count;
+  }, [session?.entries]);
+  const autoContinue = Boolean(prefs.autoContinue && current?.outcome === "correct" && session?.state === "active");
+  useEffect(() => {
+    if (!autoContinue) return;
+    const timer = window.setTimeout(() => void next(), AUTO_CONTINUE_MS);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoContinue, current?.id]);
   useEffect(() => {
     setAnswer("");
     setCandidateId(null);
@@ -596,8 +472,14 @@ function Game() {
       if (result.actionResult?.outcome === "ambiguous") {
         setMessage("That name matches more than one catalog entry. Please be more specific; no attempt was used.");
         inputRef.current?.focus();
-      } else if (result.actionResult?.outcome === "correct") setMessage("Correct · 100 points.");
-      else if (result.actionResult?.outcome === "incorrect") setMessage("Not quite · 0 points.");
+      } else if (result.actionResult?.outcome === "correct") {
+        haptic("correct");
+        setMessage("Correct · 100 points.");
+      }
+      else if (result.actionResult?.outcome === "incorrect") {
+        haptic("wrong");
+        setMessage("Not quite · 0 points.");
+      }
       else if (result.actionResult?.outcome === "skipped") setMessage("Skipped · 0 points.");
     } catch (cause) {
       setError((cause as Error).message);
@@ -627,12 +509,24 @@ function Game() {
     try {
       const result = await api.capitalsNext(session.id, requestId());
       setSession(result);
-      if (result.state === "completed") navigate("/capitals/results/" + session.id);
+      if (result.state === "completed") {
+        haptic("complete");
+        navigate("/capitals/results/" + session.id);
+      }
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+  function abandonNow() {
+    if (!session) return;
+    return act(async () => {
+      const result = await api.capitalsAbandon(session.id, requestId());
+      setConfirmAbandon(false);
+      navigate("/capitals");
+      return result;
+    });
   }
   async function leave() {
     if (!session) return;
@@ -686,12 +580,13 @@ function Game() {
           <h1 tabIndex={-1} ref={headingRef}>
             Question {current?.position ?? session.answered} <span>of {session.total}</span>
           </h1>
+          <StreakBadge streak={streak} />
         </div>
         <div>
           <button className="secondary" type="button" disabled={busy} onClick={() => void leave()}>
             Save and leave
           </button>
-          <button className="capitals-abandon" type="button" disabled={busy} onClick={() => setConfirmAbandon(true)}>
+          <button className="capitals-abandon" type="button" disabled={busy} onClick={() => (prefs.confirmGiveUp ? setConfirmAbandon(true) : void abandonNow())}>
             Abandon round
           </button>
         </div>
@@ -886,14 +781,7 @@ function Game() {
               </button>
               <button
                 className="danger"
-                onClick={() =>
-                  void act(async () => {
-                    const result = await api.capitalsAbandon(session.id, requestId());
-                    setConfirmAbandon(false);
-                    navigate("/capitals");
-                    return result;
-                  })
-                }
+                onClick={() => void abandonNow()}
               >
                 Abandon round
               </button>

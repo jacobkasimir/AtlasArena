@@ -2,6 +2,8 @@ import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useS
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
+import { getPrefs, haptic, loadSetup, oneOf, saveSetup, usePrefs } from "./prefs";
+import { Chips, Meter, ModePage, OptionCards, ResumeList, SetupForm, SideCard, StartBar, Step } from "./setup-ui";
 import {
   RecallAnswerResult, RecallChoice, RecallEntry, RecallKind, RecallLang, RecallScope, RecallSession, RecallSetup,
   buildRecallIndex, classifyRecall, formatClock, langLabel, normalizeRecall, poolCount, recallHash, recallPercent, sameSet
@@ -55,11 +57,12 @@ function LangTag({ lang }: { lang: RecallLang | null }) {
 function Setup() {
   const { data, error, reload } = useLoad<RecallSetup>(() => api.recallSetup());
   const navigate = useNavigate();
-  const [kind, setKind] = useState<RecallKind>("countries");
-  const [scope, setScope] = useState<RecallScope>("un");
-  const [region, setRegion] = useState<string | null>(null);
-  const [size, setSize] = useState<number | null>(null);
-  const [limit, setLimit] = useState<number | null>(null);
+  const saved = useMemo(() => loadSetup("recall"), []);
+  const [kind, setKind] = useState<RecallKind>(oneOf(saved.kind, ["countries", "capitals"] as const, "countries"));
+  const [scope, setScope] = useState<RecallScope>(oneOf(saved.scope, ["un", "all"] as const, "un"));
+  const [region, setRegion] = useState<string | null>(typeof saved.region === "string" ? saved.region : null);
+  const [size, setSize] = useState<number | null>(oneOf(saved.size, [null, ...SIZES], null));
+  const [limit, setLimit] = useState<number | null>(oneOf(saved.limit, LIMITS.map((item) => item.value), null));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -72,8 +75,8 @@ function Setup() {
   const choice: RecallChoice = { kind, scope, region, size, timeLimitSeconds: limit };
   const best = size === null ? data?.bests.find(item => sameSet(item, choice)) : undefined;
 
-  useEffect(() => { if (region && !regions.some(item => item.name === region)) setRegion(null); }, [regions, region]);
-  useEffect(() => { if (kind === "countries" || (size !== null && size >= total)) setSize(null); }, [kind, size, total]);
+  useEffect(() => { if (data && region && !regions.some(item => item.name === region)) setRegion(null); }, [data, regions, region]);
+  useEffect(() => { if (data && (kind === "countries" || (size !== null && size >= total))) setSize(null); }, [data, kind, size, total]);
 
   if (!data) return error ? <ErrorBox message={error} retry={reload} /> : <Loading />;
 
@@ -87,6 +90,7 @@ function Setup() {
     event.preventDefault();
     if (!total) return;
     setBusy(true); setMessage("");
+    saveSetup("recall", { kind, scope, region, size, limit });
     try {
       const session = await api.recallStart(choice, requestId());
       navigate(`/recall/play/${session.id}`);
@@ -95,143 +99,84 @@ function Setup() {
   }
 
   async function discard(id: string) {
+    if (getPrefs().confirmGiveUp && !window.confirm("Discard this unfinished round?")) return;
     try { await api.recallAbandon(id); reload(); } catch (cause) { setMessage(friendlyError((cause as Error).message)); }
   }
 
+  const side = (
+    <>
+      <SideCard title="Unfinished rounds">
+        <ResumeList empty="None – every round you start is saved until you finish it."
+          items={data.activeSessions.map(item => ({
+            id: item.id, title: setTitle(item.kind, item.scope, item.region),
+            detail: `${item.found}/${item.total} found${item.deadlineAt ? " · timed" : ""}`,
+            to: `/recall/play/${item.id}`, done: item.found, total: item.total, onDiscard: () => void discard(item.id),
+          }))} />
+      </SideCard>
+      <SideCard title="Personal bests">
+        {data.bests.length ? (
+          <ul className="side-list">
+            {data.bests.map((item, index) => (
+              <li key={index}>
+                <div>
+                  <p className="font-semibold">{setTitle(item.kind, item.scope, item.region)}</p>
+                  <p className="muted text-sm">{item.timeLimitSeconds ? `${item.timeLimitSeconds / 60} min limit` : "No limit"}</p>
+                </div>
+                <p className="best-score">{item.found}/{item.total}<span>{formatClock(item.elapsedMs)}</span></p>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="muted text-sm mt-2">Finish a full set to record your first best.</p>}
+      </SideCard>
+    </>
+  );
+
   return (
-    <div className="recall-shell">
-      <header className="recall-hero">
-        <p className="eyebrow">Atlas Recall</p>
-        <h1 className="heading mt-2" tabIndex={-1}>How many can you name?</h1>
-        <p className="muted mt-3 max-w-2xl">
-          Pick a set, then type every place in it from memory – in English, German or French.
-          Each correct answer drops into your list the moment you finish typing it.
-        </p>
-      </header>
-
-      <div className="recall-setup-grid">
-        <form className="card recall-setup" onSubmit={start}>
-          <fieldset className="recall-step">
-            <legend><span className="recall-step-number">1</span> What do you want to recall?</legend>
-            <div className="recall-kind-grid">
-              {(["countries", "capitals"] as const).map(value => {
-                const progress = recalledIn(value);
-                return (
-                  <button key={value} type="button" className="recall-kind" aria-pressed={kind === value} onClick={() => setKind(value)}>
-                    <span className="recall-kind-icon" aria-hidden="true">{value === "countries" ? "🌍" : "🏛️"}</span>
-                    <span className="recall-kind-title">{value === "countries" ? "Countries" : "Capitals"}</span>
-                    <span className="recall-kind-text">{value === "countries"
-                      ? "Every name in the set, no clues."
-                      : "The country is shown – name its capital."}</span>
-                    <span className="recall-kind-progress" aria-label={`${progress.done} of ${progress.of} recalled at least once`}>
-                      <span className="recall-meter"><span style={{ width: `${recallPercent(progress.done, progress.of)}%` }} /></span>
-                      <span>{progress.done}/{progress.of} ever recalled</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <fieldset className="recall-step">
-            <legend><span className="recall-step-number">2</span> Choose the set</legend>
-            <div className="recall-segmented" role="group" aria-label="Catalog">
-              <button type="button" aria-pressed={scope === "un"} onClick={() => setScope("un")}>UN member states</button>
-              <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")}>All countries & territories</button>
-            </div>
-            <div className="recall-chips mt-4" role="group" aria-label="Region">
-              <button type="button" className="recall-chip" aria-pressed={region === null} onClick={() => setRegion(null)}>
-                Whole world <span>{poolCount(catalog, { kind, scope, region: null })}</span>
-              </button>
-              {regions.map(item => (
-                <button key={item.name} type="button" className="recall-chip" aria-pressed={region === item.name} onClick={() => setRegion(item.name)}>
-                  {item.name} <span>{item.count}</span>
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className="recall-step">
-            <legend><span className="recall-step-number">3</span> How many?</legend>
-            {kind === "capitals" ? (
-              <div className="recall-chips" role="group" aria-label="Number of capitals">
-                <button type="button" className="recall-chip" aria-pressed={size === null} onClick={() => setSize(null)}>
-                  All <span>{total}</span>
-                </button>
-                {SIZES.map(value => (
-                  <button key={value} type="button" className="recall-chip" aria-pressed={size === value}
-                    disabled={value >= total} onClick={() => setSize(value)}>
-                    {value} random
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="muted text-sm">Countries rounds always cover the whole set – that's the challenge. Pick a region above to make it smaller.</p>
-            )}
-            {size !== null && <p className="muted text-sm mt-3">Random selections are practice rounds and don't count for personal bests.</p>}
-          </fieldset>
-
-          <fieldset className="recall-step">
-            <legend><span className="recall-step-number">4</span> Time limit</legend>
-            <div className="recall-chips" role="group" aria-label="Time limit">
-              {LIMITS.map(item => (
-                <button key={item.label} type="button" className="recall-chip" aria-pressed={limit === item.value} onClick={() => setLimit(item.value)}>
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="recall-start-bar">
-            <div>
-              <p className="recall-start-count"><strong>{effective}</strong> {noun(kind, effective)}</p>
-              <p className="muted text-sm">{setTitle(kind, scope, region)}{limit ? ` · ${limit / 60} min` : ""}</p>
-              {best && <p className="recall-best-line">Your best: {best.found}/{best.total} in {formatClock(best.elapsedMs)}</p>}
-            </div>
-            <button className="primary recall-start-button" disabled={busy || !total}>{busy ? "Preparing…" : "Start recall"}</button>
+    <ModePage eyebrow="Atlas Recall" title="How many can you name?" side={side}
+      intro="Pick a set, then type every place in it from memory – in English, German or French. Each correct answer drops into your list the moment you finish typing it.">
+      <SetupForm onSubmit={start}>
+        <Step n={1} title="What do you want to recall?">
+          <OptionCards value={kind} onChange={setKind} options={(["countries", "capitals"] as const).map(value => {
+            const progress = recalledIn(value);
+            return {
+              value, icon: value === "countries" ? "🌍" : "🏛️",
+              title: value === "countries" ? "Countries" : "Capitals",
+              text: value === "countries" ? "Every name in the set, no clues." : "The country is shown – name its capital.",
+              footer: <><Meter done={progress.done} total={progress.of} label={`${progress.done} of ${progress.of} recalled at least once`} /><span>{progress.done}/{progress.of} ever recalled</span></>,
+            };
+          })} />
+        </Step>
+        <Step n={2} title="Choose the set">
+          <div className="segmented" role="group" aria-label="Catalog">
+            <button type="button" aria-pressed={scope === "un"} onClick={() => setScope("un")}>UN member states</button>
+            <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")}>All countries & territories</button>
           </div>
-          <ErrorBox message={message} />
-        </form>
-
-        <aside className="recall-side">
-          <section className="card">
-            <h2 className="font-bold">Unfinished rounds</h2>
-            {data.activeSessions.length ? (
-              <ul className="recall-side-list">
-                {data.activeSessions.map(item => (
-                  <li key={item.id}>
-                    <div>
-                      <p className="font-semibold">{setTitle(item.kind, item.scope, item.region)}</p>
-                      <p className="muted text-sm">{item.found}/{item.total} found{item.deadlineAt ? " · timed" : ""}</p>
-                    </div>
-                    <div className="recall-side-actions">
-                      <Link className="secondary" to={`/recall/play/${item.id}`}>Resume</Link>
-                      <button type="button" className="recall-text-button" onClick={() => discard(item.id)}>Discard</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="muted text-sm mt-2">None – every round you start is saved until you finish it.</p>}
-          </section>
-          <section className="card">
-            <h2 className="font-bold">Personal bests</h2>
-            {data.bests.length ? (
-              <ul className="recall-side-list">
-                {data.bests.map((item, index) => (
-                  <li key={index}>
-                    <div>
-                      <p className="font-semibold">{setTitle(item.kind, item.scope, item.region)}</p>
-                      <p className="muted text-sm">{item.timeLimitSeconds ? `${item.timeLimitSeconds / 60} min limit` : "No limit"}</p>
-                    </div>
-                    <p className="recall-best-score">{item.found}/{item.total}<span>{formatClock(item.elapsedMs)}</span></p>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="muted text-sm mt-2">Finish a full set to record your first best.</p>}
-          </section>
-        </aside>
-      </div>
-    </div>
+          <div className="mt-4">
+            <Chips label="Region" value={region} onChange={setRegion} options={[
+              { value: null, label: "Whole world", count: poolCount(catalog, { kind, scope, region: null }) },
+              ...regions.map(item => ({ value: item.name, label: item.name, count: item.count })),
+            ]} />
+          </div>
+        </Step>
+        <Step n={3} title="How many?" hint={size !== null ? "Random selections are practice rounds and don't count for personal bests." : undefined}>
+          {kind === "capitals" ? (
+            <Chips label="Number of capitals" value={size} onChange={setSize} options={[
+              { value: null, label: "All", count: total },
+              ...SIZES.map(value => ({ value, label: `${value} random`, disabled: value >= total })),
+            ]} />
+          ) : (
+            <p className="muted text-sm">Countries rounds always cover the whole set – that's the challenge. Pick a region above to make it smaller.</p>
+          )}
+        </Step>
+        <Step n={4} title="Time limit">
+          <Chips label="Time limit" value={limit} onChange={setLimit} options={LIMITS.map(item => ({ value: item.value, label: item.label }))} />
+        </Step>
+        <StartBar count={effective} unit={noun(kind, effective)} busy={busy} disabled={!total} label="Start recall"
+          summary={`${setTitle(kind, scope, region)}${limit ? ` · ${limit / 60} min` : ""}`}
+          extra={best ? `Your best: ${best.found}/${best.total} in ${formatClock(best.elapsedMs)}` : undefined} />
+        <ErrorBox message={message} />
+      </SetupForm>
+    </ModePage>
   );
 }
 
@@ -268,6 +213,7 @@ function Play() {
   const [shaking, setShaking] = useState(false);
   const [confirmGiveUp, setConfirmGiveUp] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const prefs = usePrefs();
   const inputRef = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
   const waitTimer = useRef<number>();
@@ -312,6 +258,7 @@ function Play() {
     setFound(current => new Map(current).set(position, { name: null, alpha2: entry.alpha2, matched: typed, lang }));
     setFeed(current => [{ position, text: typed, name: null, lang, at: Date.now() }, ...current].slice(0, 8));
     setText("");
+    haptic("correct");
     setHint({ tone: "ok", text: `✓ ${typed}${lang !== "en" ? ` (${langLabel[lang]})` : ""}` });
     api.recallAnswer(active.id, position, typed).then((result: RecallAnswerResult) => {
       if (result.status === "found" || result.status === "already_found") {
@@ -335,6 +282,7 @@ function Play() {
   async function finishWithResults() {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    haptic("complete");
     window.setTimeout(() => navigate(`/recall/results/${active.id}`, { replace: true }), 900);
   }
 
@@ -362,6 +310,7 @@ function Play() {
     } else if (commit) {
       setHint({ tone: "bad", text: `“${value.trim()}” isn't in this set.` });
       setShaking(true);
+      haptic("wrong");
       inputRef.current?.select();
     } else {
       setHint(null);
@@ -382,7 +331,7 @@ function Play() {
   const lowTime = remaining !== null && remaining < 60_000;
 
   return (
-    <div className="recall-shell recall-play">
+    <div className="mode-shell recall-play">
       <section className="card recall-console">
         <div className="recall-console-head">
           <div>
@@ -431,8 +380,8 @@ function Play() {
             </>
           ) : (
             <>
-              <Link to="/recall" className="recall-text-button">Pause & leave</Link>
-              <button type="button" className="secondary" onClick={() => setConfirmGiveUp(true)}>Give up</button>
+              <Link to="/recall" className="text-button">Pause & leave</Link>
+              <button type="button" className="secondary" onClick={() => prefs.confirmGiveUp ? setConfirmGiveUp(true) : void finish()}>Give up</button>
             </>
           )}
         </div>
@@ -505,7 +454,7 @@ function Results() {
 
   const list = tab === "missed" ? missed : hits;
   return (
-    <div className="recall-shell">
+    <div className="mode-shell">
       <section className={`card recall-result-hero ${done.badge === "new_best" ? "is-best" : ""}`}>
         <div className="recall-ring" style={ring} role="img" aria-label={`${percent} percent`}>
           <div><strong>{percent}%</strong><span>{done.found}/{done.total}</span></div>
@@ -528,7 +477,7 @@ function Results() {
       </section>
 
       <section className="card mt-5">
-        <div className="recall-segmented" role="tablist" aria-label="Answers">
+        <div className="segmented" role="tablist" aria-label="Answers">
           <button type="button" role="tab" aria-selected={tab === "missed"} aria-pressed={tab === "missed"} onClick={() => setTab("missed")}>Missed · {missed.length}</button>
           <button type="button" role="tab" aria-selected={tab === "found"} aria-pressed={tab === "found"} onClick={() => setTab("found")}>Found · {hits.length}</button>
         </div>
