@@ -7,6 +7,8 @@ import { ErrorBox, Feedback, Loading, useLoad } from "./components";
 import {
   Difficulty,
   Mode,
+  PlayableQuestion,
+  Review,
   View,
   categories,
   challengeSetupUrl,
@@ -265,6 +267,8 @@ export function Game() {
   const finalizedEvent = useRef(false);
   const prefs = usePrefs();
   const lastFeedbackKey = useRef("");
+  // The last answer finishes the run on the server; keep its feedback on screen until the player finishes the round.
+  const [finalHold, setFinalHold] = useState<{ current: PlayableQuestion; feedback: Review } | null>(null);
 
   function accept(v: View) {
     offset.current = Date.parse(v.serverNow) - Date.now();
@@ -325,10 +329,17 @@ export function Game() {
     };
   }, [leaveDialogOpen]);
 
+  // While the final answer is held on screen, show the finished run as if it were still giving feedback.
+  const shown: View | undefined =
+    view && finalHold && view.status === "completed"
+      ? { ...view, status: "showing_feedback", current: finalHold.current, feedback: finalHold.feedback }
+      : view;
+  const finalAnswer = Boolean(finalHold && view?.status === "completed");
+
   // Timed runs pause at accepted answers while the player reads feedback.
   const remaining =
-    view?.deadline && view.status !== "showing_feedback"
-      ? Math.max(0, Date.parse(view.deadline) - now - offset.current)
+    shown?.deadline && shown.status !== "showing_feedback"
+      ? Math.max(0, Date.parse(shown.deadline) - now - offset.current)
       : null;
 
   useEffect(() => {
@@ -351,9 +362,13 @@ export function Game() {
           responseDurationMs: Math.round(view.stats.averageMs * view.answered),
         });
       }
-      navigate("/results/" + view.id, { replace: true });
+      if (!finalHold) navigate("/results/" + view.id, { replace: true });
     }
-  }, [view, navigate]);
+  }, [view, navigate, finalHold]);
+
+  function finishRound() {
+    if (view) navigate("/results/" + view.id, { replace: true });
+  }
 
   async function action(kind: "answer" | "next", option?: string) {
     if (!view || pendingRef.current) return;
@@ -362,7 +377,12 @@ export function Game() {
     setPending(true);
     setError("");
     try {
+      const before = view.current;
       const next = kind === "answer" ? await api.answer(id, view.current!.id, option!) : await api.next(id);
+      if (kind === "answer" && next.status === "completed" && before) {
+        const review = next.reviews.find((item) => item.questionId === before.id) ?? next.feedback ?? next.reviews.at(-1);
+        if (review) setFinalHold({ current: before, feedback: review });
+      }
       accept(next);
     } catch (e) {
       setError((e as Error).message + " If the connection failed, reload state before retrying.");
@@ -385,36 +405,40 @@ export function Game() {
     }
   }
 
-  const feedbackKey = view?.status === "showing_feedback" && view.feedback ? `${view.id}:${view.answered}` : "";
+  function continueOn() {
+    if (finalAnswer) finishRound();
+    else void action("next");
+  }
+  const feedbackKey = shown?.status === "showing_feedback" && shown.feedback ? `${shown.id}:${shown.answered}` : "";
   useEffect(() => {
-    if (!feedbackKey || feedbackKey === lastFeedbackKey.current || !view?.feedback) return;
+    if (!feedbackKey || feedbackKey === lastFeedbackKey.current || !shown?.feedback) return;
     lastFeedbackKey.current = feedbackKey;
-    haptic(view.feedback.correct ? "correct" : "wrong");
+    haptic(shown.feedback.correct ? "correct" : "wrong");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedbackKey]);
-  const autoContinue = Boolean(feedbackKey && prefs.autoContinue && view?.feedback?.correct);
+  const autoContinue = Boolean(feedbackKey && prefs.autoContinue && shown?.feedback?.correct);
   useEffect(() => {
     if (!autoContinue) return;
-    const timer = window.setTimeout(() => void action("next"), AUTO_CONTINUE_MS);
+    const timer = window.setTimeout(() => continueOn(), AUTO_CONTINUE_MS);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoContinue, feedbackKey]);
   useEffect(() => {
-    if (view?.status === "completed") haptic("complete");
-  }, [view?.status]);
+    if (shown?.status === "completed") haptic("complete");
+  }, [shown?.status]);
 
   useEffect(() => {
     function keydown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (target.closest("input,textarea,select,[contenteditable=true]") || e.altKey || e.ctrlKey || e.metaKey) return;
-      if (view?.status === "showing_feedback" && (e.key === "Enter" || e.code === "Space") && !target.closest("a")) {
+      if (shown?.status === "showing_feedback" && (e.key === "Enter" || e.code === "Space") && !target.closest("a")) {
         e.preventDefault();
-        if (!pending) void action("next");
+        if (!pending) continueOn();
         return;
       }
-      if (e.repeat || view?.status !== "awaiting_answer" || remaining === 0) return;
+      if (e.repeat || shown?.status !== "awaiting_answer" || remaining === 0) return;
       const index = Number(e.key) - 1;
-      const option = view.current?.options[index];
+      const option = shown.current?.options[index];
       if (option) {
         e.preventDefault();
         void action("answer", option.id);
@@ -424,8 +448,8 @@ export function Game() {
     return () => window.removeEventListener("keydown", keydown);
   });
 
-  if (!view) return error ? <ErrorBox message={error} retry={refresh} /> : <Loading />;
-  if (view.status === "abandoned")
+  if (!shown) return error ? <ErrorBox message={error} retry={refresh} /> : <Loading />;
+  if (shown.status === "abandoned")
     return (
       <section className="card">
         <h1 tabIndex={-1} className="heading">
@@ -437,54 +461,56 @@ export function Game() {
       </section>
     );
 
-  const questionNumber = Math.min(view.answered + 1, view.total);
-  const progressPercent = view.total ? Math.min(100, (view.answered / view.total) * 100) : 0;
-  const remainingLives = Math.max(0, 3 - view.stats.incorrect);
+  const questionNumber = Math.min(shown.answered + 1, shown.total);
+  const progressPercent = shown.total ? Math.min(100, (shown.answered / shown.total) * 100) : 0;
+  const remainingLives = Math.max(0, 3 - shown.stats.incorrect);
   return (
     <div className="game-shell">
       <div className="game-topline">
         <div>
           <p className="eyebrow">
-            {modeNames[view.mode]} ·{" "}
-            <span className={`game-difficulty-tag ${view.current?.difficulty === "expert" ? "is-expert" : ""}`}>
-              {view.current?.difficulty ?? view.difficulty}
+            {modeNames[shown.mode]} ·{" "}
+            <span className={`game-difficulty-tag ${shown.current?.difficulty === "expert" ? "is-expert" : ""}`}>
+              {shown.current?.difficulty ?? shown.difficulty}
             </span>
           </p>
           <p className="muted mt-1">
-            Question {questionNumber} of {view.total}
+            Question {questionNumber} of {shown.total}
           </p>
         </div>
         <div className="game-topline-actions">
-          {isAdmin && view.current && <EditQuestionButton key={view.current.id} questionId={view.current.id} />}
-          <button className="secondary" disabled={pending} onClick={() => setLeaveDialogOpen(true)}>
-            Leave run
-          </button>
+          {isAdmin && shown.current && <EditQuestionButton key={shown.current.id} questionId={shown.current.id} />}
+          {!finalAnswer && (
+            <button className="secondary" disabled={pending} onClick={() => setLeaveDialogOpen(true)}>
+              Leave run
+            </button>
+          )}
         </div>
       </div>
       <div className="game-layout mt-5">
         <div className="game-main">
-          {view.current && (
+          {shown.current && (
             <section
-              className={`card game-question map-grid ${view.status === "showing_feedback" && view.feedback?.correct ? "has-correct-answer" : ""} ${view.status === "showing_feedback" && view.feedback && !view.feedback.correct ? "has-incorrect-answer" : ""}`}
+              className={`card game-question map-grid ${shown.status === "showing_feedback" && shown.feedback?.correct ? "has-correct-answer" : ""} ${shown.status === "showing_feedback" && shown.feedback && !shown.feedback.correct ? "has-incorrect-answer" : ""}`}
             >
-              <StreakBadge streak={view.stats.streak} />
+              <StreakBadge streak={shown.stats.streak} />
               <h1 tabIndex={-1} className="game-prompt mt-6">
-                {view.current.prompt}
+                {shown.current.prompt}
               </h1>
               <div className="answer-grid grid gap-3 sm:grid-cols-2 mt-7">
-                {view.current.options.map((o, i) => (
+                {shown.current.options.map((o, i) => (
                   <button
                     key={o.id}
                     className={`answer text-left ${
-                      view.status === "showing_feedback" && view.feedback
-                        ? o.label === view.feedback.correctAnswer
+                      shown.status === "showing_feedback" && shown.feedback
+                        ? o.label === shown.feedback.correctAnswer
                           ? "is-correct"
-                          : o.label === view.feedback.chosen && !view.feedback.correct
+                          : o.label === shown.feedback.chosen && !shown.feedback.correct
                             ? "is-wrong"
                             : "is-dimmed"
                         : ""
                     }`}
-                    disabled={pending || view.status !== "awaiting_answer" || remaining === 0}
+                    disabled={pending || shown.status !== "awaiting_answer" || remaining === 0}
                     onClick={() => void action("answer", o.id)}
                   >
                     <span className="keycap" aria-hidden="true">
@@ -502,12 +528,12 @@ export function Game() {
             </section>
           )}
           <ErrorBox message={error} retry={refresh} />
-          {view.feedback && prefs.keyboardHints && (
+          {shown.feedback && prefs.keyboardHints && (
             <p className="game-keyboard-hint muted text-sm mt-3">
-              Press <kbd>Enter</kbd> or <kbd>Space</kbd> for the next question
+              Press <kbd>Enter</kbd> or <kbd>Space</kbd> {finalAnswer ? "to finish the round" : "for the next question"}
             </p>
           )}
-          {remaining === 0 && view.status !== "completed" && (
+          {remaining === 0 && shown.status !== "completed" && (
             <p className="game-notice mt-4" role="status">
               Time is up. Confirming the final result…
             </p>
@@ -517,15 +543,15 @@ export function Game() {
           <div className="game-live-stats">
             <div>
               <span>Score</span>
-              <strong>{view.stats.score.toLocaleString()}</strong>
+              <strong>{shown.stats.score.toLocaleString()}</strong>
             </div>
             <div>
               <span>Streak</span>
-              <strong>{view.stats.streak}</strong>
+              <strong>{shown.stats.streak}</strong>
             </div>
             <div>
-              <span>{view.mode === "endless" ? "Lives" : "Progress"}</span>
-              {view.mode === "endless" ? (
+              <span>{shown.mode === "endless" ? "Lives" : "Progress"}</span>
+              {shown.mode === "endless" ? (
                 <strong className="game-hearts" aria-label={`${remainingLives} of 3 lives remaining`}>
                   {[0, 1, 2].map((index) => (
                     <svg
@@ -539,11 +565,11 @@ export function Game() {
                   ))}
                 </strong>
               ) : (
-                <strong>{`${view.answered}/${view.total}`}</strong>
+                <strong>{`${shown.answered}/${shown.total}`}</strong>
               )}
             </div>
           </div>
-          {view.total > 1 && (
+          {shown.total > 1 && (
             <div className="game-progress-card">
               <div className="game-progress-caption">
                 <span>Run progress</span>
@@ -554,14 +580,14 @@ export function Game() {
                 role="progressbar"
                 aria-label="Question progress"
                 aria-valuemin={0}
-                aria-valuemax={view.total}
-                aria-valuenow={view.answered}
+                aria-valuemax={shown.total}
+                aria-valuenow={shown.answered}
               >
                 <span style={{ width: `${progressPercent}%` }} />
               </div>
             </div>
           )}
-          {view.deadline &&
+          {shown.deadline &&
             (remaining !== null ? (
               <div className="game-stat timer-stat">
                 <div className="timer-label-row">
@@ -585,52 +611,52 @@ export function Game() {
                 <strong>Paused while you review</strong>
               </div>
             ))}
-          {view.feedback && (
+          {shown.feedback && (
             <section className="game-review">
               <div className="game-review-heading">
                 <span
-                  className={`game-result-mark ${view.feedback.correct ? "is-correct" : "is-incorrect"}`}
+                  className={`game-result-mark ${shown.feedback.correct ? "is-correct" : "is-incorrect"}`}
                   aria-hidden="true"
                 >
-                  {view.feedback.correct ? "✓" : "×"}
+                  {shown.feedback.correct ? "✓" : "×"}
                 </span>
                 <div>
                   <p className="eyebrow">ANSWER REVIEW</p>
-                  <h2>{view.feedback.correct ? "Correct" : "Not quite"}</h2>
+                  <h2>{shown.feedback.correct ? "Correct" : "Not quite"}</h2>
                 </div>
                 <strong className="game-review-points">
-                  +{view.feedback.points} <small>pts</small>
+                  +{shown.feedback.points} <small>pts</small>
                 </strong>
               </div>
               <p className="game-correct-answer">
                 <span>Correct answer</span>
-                <strong>{view.feedback.correctAnswer}</strong>
+                <strong>{shown.feedback.correctAnswer}</strong>
               </p>
-              {!view.feedback.correct && (
+              {!shown.feedback.correct && (
                 <p className="game-chosen-answer">
                   <span>Your answer</span>
-                  {view.feedback.chosen}
+                  {shown.feedback.chosen}
                 </p>
               )}
-              <p className="game-review-explanation">{view.feedback.explanation}</p>
-              <a className="game-review-source" href={view.feedback.source} target="_blank" rel="noopener noreferrer">
+              <p className="game-review-explanation">{shown.feedback.explanation}</p>
+              <a className="game-review-source" href={shown.feedback.source} target="_blank" rel="noopener noreferrer">
                 Source reference <span aria-hidden="true">↗</span>
               </a>
               <button
                 autoFocus
                 className="primary game-next-button mt-3"
                 disabled={pending}
-                onClick={() => void action("next")}
+                onClick={() => continueOn()}
               >
-                {pending ? "Loading…" : "Next question →"}
+                {pending ? "Loading…" : finalAnswer ? "Finish round · See results →" : "Next question →"}
               </button>
-              {autoContinue && !pending && <AutoContinueBar ms={AUTO_CONTINUE_MS} onSkip={() => void action("next")} />}
+              {autoContinue && !pending && <AutoContinueBar ms={AUTO_CONTINUE_MS} onSkip={() => continueOn()} />}
             </section>
           )}
-          {!view.feedback && (
+          {!shown.feedback && (
             <div className="game-stats-footnote">
               <span>Best streak</span>
-              <strong>{view.stats.bestStreak}</strong>
+              <strong>{shown.stats.bestStreak}</strong>
             </div>
           )}
         </aside>
@@ -656,12 +682,12 @@ export function Game() {
                 <path d="m9 12 2 2 4-4" />
               </svg>
             </span>
-            <p className="eyebrow">YOUR RUN · {modeNames[view.mode]}</p>
+            <p className="eyebrow">YOUR RUN · {modeNames[shown.mode]}</p>
             <h2 id="leave-run-title">Leave this run?</h2>
             <p id="leave-run-description" className="muted">
               Save your progress to resume from Home later, or delete this run and its progress.
             </p>
-            {view.deadline && (
+            {shown.deadline && (
               <p className="leave-run-timer-note">This timed challenge keeps running while you are away.</p>
             )}
             {error && <ErrorBox message={error} />}
