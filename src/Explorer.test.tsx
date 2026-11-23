@@ -30,31 +30,33 @@ const catalog: ExplorerCountry[] = [
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-it("shows compact cards, grouped catalog details and navigable neighbors", async () => {
+const openCard = (name: string) => fireEvent.click(screen.getByRole("button", { name: `${name} – show details` }));
+
+it("shows flag cards and opens a detail view with facts, neighbours, links and practice", async () => {
   explore.mockResolvedValue(catalog);
   render(<MemoryRouter><Explorer /></MemoryRouter>);
 
   expect(await screen.findByText("Showing 1–2 of 2 places")).toBeInTheDocument();
   expect(screen.getByText("Ottawa")).toBeInTheDocument();
-  expect(screen.getByText("CA")).toBeInTheDocument();
-  const summary = document.querySelector("details summary")!;
-  const countryBlock = document.querySelector("details.country-card")!;
-  expect(screen.queryByText(/^Details for/)).not.toBeInTheDocument();
-  fireEvent.click(summary);
-  expect(countryBlock).toHaveAttribute("open");
-  fireEvent.click(summary);
-  expect(countryBlock).not.toHaveAttribute("open");
-  fireEvent.click(summary);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  openCard("Canada");
+  const dialog = screen.getByRole("dialog");
+  expect(dialog).toHaveTextContent("Canada");
   expect(screen.getByText("Practice this place")).toBeInTheDocument();
-
-  expect(screen.getAllByText("People and place")).toHaveLength(2);
   expect(screen.getByText("9,984,670 km²")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Find United States in the catalog (USA)" })).toHaveAttribute("href", "/explorer?q=US");
-  expect(screen.getByRole("link", { name: "Open in Google Maps" })).toHaveAttribute("href", "https://www.google.com/maps/place/Canada");
-  expect(screen.queryByRole("link", { name: /Imported data source/ })).not.toBeInTheDocument();
-  expect(screen.getAllByText(/not been independently verified/)).toHaveLength(2);
+  expect(screen.getByText("40,000,000")).toBeInTheDocument();
+  expect(screen.getByText("UN member")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: /Open in Google Maps/ })).toHaveAttribute("href", "https://www.google.com/maps/place/Canada");
+  expect(screen.getByText(/not been independently verified/)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Flags of North America" })).toHaveAttribute("href", "/flags?mode=flag_to_country&region=North%20America");
+
+  fireEvent.click(screen.getByRole("button", { name: "Show United States (USA)" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("United States of America");
   expect(screen.getByText(/Practice needs 4 published questions/)).toBeInTheDocument();
-  const sortRegion = screen.getByRole("button", { name: "Sort by region, then name" });
+  fireEvent.keyDown(window, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+  const sortRegion = screen.getByRole("button", { name: "Sort by region" });
   fireEvent.click(sortRegion);
   expect(sortRegion).toHaveAttribute("aria-pressed", "true");
 });
@@ -72,7 +74,7 @@ it("keeps every catalog entry searchable and gives only the first visible flag h
   expect(screen.getByText("United States")).toBeInTheDocument();
 });
 
-it("resolves neighbor codes from the full catalog and navigates within Explorer", async () => {
+it("resolves neighbour codes from the full catalog and steps through places", async () => {
   const fullCatalog = [
     { ...catalog[0], borders: ["FRA", "ZZZ"] },
     ...Array.from({ length: 23 }, (_, index): ExplorerCountry => ({
@@ -80,43 +82,33 @@ it("resolves neighbor codes from the full catalog and navigates within Explorer"
       name: `Catalog entry ${String(index).padStart(2, "0")}`, officialName: "Catalog entry",
       capital: null, region: "Test region", currency: null, flag: null, difficulty: "easy",
     })),
-    { ...catalog[1], code: "FR", codeAlpha3: "FRA", name: "France", borders: null },
+    { ...catalog[1], code: "FR", codeAlpha3: "FRA", name: "France", officialName: "French Republic", borders: null },
   ];
   explore.mockResolvedValue(fullCatalog);
   render(<MemoryRouter initialEntries={["/explorer"]}><Explorer /></MemoryRouter>);
 
   expect(await screen.findByText("Showing 1–24 of 25 places")).toBeInTheDocument();
-  const canada = document.querySelector("details.country-card")!;
-  fireEvent.click(canada.querySelector("summary")!);
-  const franceLink = screen.getByRole("link", { name: "Find France in the catalog (FRA)" });
-  expect(franceLink).toHaveAttribute("href", "/explorer?q=FR");
+  openCard("Canada");
   expect(screen.getByText("ZZZ")).toBeInTheDocument();
-  fireEvent.click(franceLink);
-  await waitFor(() => expect(screen.getByPlaceholderText("Try Canada, Ottawa, or CA…")).toHaveValue("FR"));
-  expect(await screen.findByText("Showing 1–1 of 1 places")).toBeInTheDocument();
-  expect(screen.getByText("France")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Show France (FRA)" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("French Republic");
+  expect(screen.getByText("Border data not available")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Previous place" }));
+  expect(screen.getByRole("dialog")).toHaveTextContent("Catalog entry 22");
 });
 
-it("uses q on direct open and distinguishes missing border data from no land borders", async () => {
+it("uses q and place on direct open and distinguishes missing border data from no land borders", async () => {
   explore.mockResolvedValue([
     { ...catalog[0], codeAlpha3: "CAN", borders: null },
     { ...catalog[1], code: "FR", codeAlpha3: "FRA", name: "France", borders: [] },
   ]);
-  render(<MemoryRouter initialEntries={["/explorer?q=FR"]}><Explorer /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/explorer?q=FR&place=FR"]}><Explorer /></MemoryRouter>);
 
   expect(await screen.findByText("Showing 1–1 of 1 places")).toBeInTheDocument();
   expect(screen.getByPlaceholderText("Try Canada, Ottawa, or CA…")).toHaveValue("FR");
-  expect(screen.getByText("France")).toBeInTheDocument();
-  const franceCard = [...document.querySelectorAll("details.country-card")]
-    .find(card => card.textContent?.includes("France"))!;
-  fireEvent.click(franceCard.querySelector("summary")!);
+  expect(screen.getByRole("dialog")).toHaveTextContent("France");
   expect(screen.getByText("No land borders")).toBeInTheDocument();
-
-  fireEvent.change(screen.getByPlaceholderText("Try Canada, Ottawa, or CA…"), { target: { value: "Canada" } });
-  const canadaCard = [...document.querySelectorAll("details.country-card")]
-    .find(card => card.textContent?.includes("Canada"))!;
-  fireEvent.click(canadaCard.querySelector("summary")!);
-  expect(screen.getByText("Border data not available")).toBeInTheDocument();
 });
 
 it("shows recognized country names for known Alpha-3 codes missing from the catalog", async () => {
@@ -125,7 +117,7 @@ it("shows recognized country names for known Alpha-3 codes missing from the cata
   }]);
   render(<MemoryRouter><Explorer /></MemoryRouter>);
   expect(await screen.findByText("Showing 1–1 of 1 places")).toBeInTheDocument();
-  fireEvent.click(document.querySelector("details.country-card summary")!);
+  openCard("Canada");
   for (const neighbor of ["Iran (IRN)", "Pakistan (PAK)", "Turkmenistan (TKM)", "Uzbekistan (UZB)", "Tajikistan (TJK)", "China (CHN)"]) {
     expect(screen.getByText(neighbor)).toBeInTheDocument();
   }

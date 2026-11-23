@@ -255,7 +255,7 @@ function Layout() {
       <OfflineBanner />
       <main id="main" className="shell py-8 md:py-12">
         <Suspense fallback={<Loading />}>
-          <Outlet context={{ onProfileUpdated: updateProfileIdentity }} />
+          <Outlet context={{ onProfileUpdated: updateProfileIdentity, isAdmin: Boolean(identity?.isAdmin) }} />
         </Suspense>
       </main>
       <footer className="shell py-8 text-sm muted border-t border-line/15">

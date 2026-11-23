@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { EditQuestionButton } from "./QuestionEditor";
 import { track } from "./analytics";
 import { api } from "./api";
 import { ErrorBox, Feedback, Loading, useLoad } from "./components";
@@ -27,6 +28,12 @@ import {
   Step,
   StreakBadge,
 } from "./setup-ui";
+
+/** True for signed-in admins; the server checks again on every admin call. */
+function useIsAdmin() {
+  const context = useOutletContext<{ isAdmin?: boolean } | undefined>();
+  return Boolean(context?.isAdmin);
+}
 
 function accuracyLine(correct: number, incorrect: number) {
   const total = correct + incorrect;
@@ -244,6 +251,7 @@ export function GuestSessionRecovery({ retry }: { retry: () => void }) {
 
 export function Game() {
   const { id = "" } = useParams();
+  const isAdmin = useIsAdmin();
   const navigate = useNavigate();
   const [view, setView] = useState<View>();
   const [error, setError] = useState("");
@@ -446,9 +454,12 @@ export function Game() {
             Question {questionNumber} of {view.total}
           </p>
         </div>
-        <button className="secondary" disabled={pending} onClick={() => setLeaveDialogOpen(true)}>
-          Leave run
-        </button>
+        <div className="game-topline-actions">
+          {isAdmin && view.current && <EditQuestionButton key={view.current.id} questionId={view.current.id} />}
+          <button className="secondary" disabled={pending} onClick={() => setLeaveDialogOpen(true)}>
+            Leave run
+          </button>
+        </div>
       </div>
       <div className="game-layout mt-5">
         <div className="game-main">
@@ -698,6 +709,7 @@ export function Game() {
 
 export function Results() {
   const { id = "" } = useParams();
+  const isAdmin = useIsAdmin();
   const navigate = useNavigate();
   const { data: v, error, reload } = useLoad(() => api.result(id), id);
   const [replayPending, setReplayPending] = useState(false);
@@ -848,6 +860,7 @@ export function Results() {
                 </strong>
               </div>
               <Feedback review={review} />
+              {isAdmin && <EditQuestionButton questionId={review.questionId} className="mt-3" />}
             </article>
           ))}
       </div>

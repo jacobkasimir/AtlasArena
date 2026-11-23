@@ -7,6 +7,7 @@ import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalBest, Capital
 import type { RoundOptions } from "./domain";
 import type { GameStats, PersonalBest } from "./game-setup";
 import { demoGameStats, demoPersonalBests } from "./bests-demo";
+import type { AdminQuestionInfo } from "./QuestionEditor";
 import { flagsDemo } from "./flags-demo";
 import { capitalsDemo } from "./capitals-demo";
 
@@ -228,6 +229,9 @@ export const api = {
     "arena_admin_import",
     { p_records: records, p_dry_run: dryRun, p_policy: policy, p_publish: publish }
   ),
+  adminQuestion: (questionId: string) => isDemo
+    ? Promise.reject(new Error("Editing questions is not available in the demo."))
+    : rpc<AdminQuestionInfo>("arena_admin_question", { p_question_id: questionId }),
   unpublish: (stableId: string) =>
     rpc<void>("arena_admin_unpublish", { p_stable_id: stableId })
 };

@@ -71,6 +71,14 @@ If you could not run them, say so explicitly.
    from `.env.local` or `information.txt`.
 6. Admin rights come only from `auth.users.raw_app_meta_data.atlas_admin`, never from profile fields.
 
+### Editing questions in the game (admins)
+- `src/QuestionEditor.tsx`: admins see "Edit question" in the quiz game and on each result review item. It loads the
+  latest version with `arena_admin_question(question_id)` and saves through `arena_admin_import` (policy `version`), so
+  every edit is validated like an import and creates a new version. "Save and publish" requires the admin to tick that
+  they checked the question against the source (this sets reviewed/sourceVerified/lastReviewed for that one question –
+  a human review, never a bulk change); "Save as draft" leaves the live version unchanged. The running game keeps the
+  version it was shown. The button is hidden for non-admins and the server re-checks `private.require_admin()`.
+
 ### Capitals answer matching
 - Capitals has no autocomplete or suggestions: players type from memory. `private.capitals_match()` accepts English,
   German and French names – the same names Recall uses (`private.recall_catalog()`, incl. `private.recall_aliases`) –
