@@ -1,5 +1,6 @@
 // Admin review queue: work through draft questions one at a time.
 // Nothing is published automatically – "Approve and publish" needs the admin to confirm they checked the source.
+import { Icon } from "./icons";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
@@ -65,7 +66,7 @@ export function ReviewQueue() {
   if (!item)
     return (
       <section className="card review-queue-empty">
-        <span aria-hidden="true">✅</span>
+        <Icon name="checkCircle" size={36} />
         <h2>All caught up</h2>
         <p className="muted">There are no draft questions waiting for review.</p>
       </section>
@@ -117,7 +118,7 @@ export function ReviewQueue() {
         </a>
         {hints.length > 0 && (
           <ul className="review-queue-hints">
-            {hints.map((hint) => <li key={hint}>⚠️ {hint}</li>)}
+            {hints.map((hint) => <li key={hint}><Icon name="warning" size={15} /> {hint}</li>)}
           </ul>
         )}
 

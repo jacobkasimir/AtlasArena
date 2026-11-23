@@ -402,5 +402,10 @@ export type ReviewItem = {
   answered: boolean; answer: string | null; correct: boolean | null; solution: string | null; explanation: string | null; correctOption: string | null;
 };
 export type ReviewSession = { id: string; total: number; correct: number; answered: number; completed: boolean; createdAt: string; items: ReviewItem[] };
-export type Achievement = { id: string; icon: string; title: string; description: string; current: number; target: number; earned: boolean };
+export type AchievementTier = "bronze" | "silver" | "gold" | "platinum";
+export type AchievementCategory = "quiz" | "progress" | "daily" | "flags" | "capitals" | "recall" | "review";
+export type Achievement = {
+  id: string; category: AchievementCategory; tier: AchievementTier; icon: string;
+  title: string; description: string; current: number; target: number; earned: boolean;
+};
 export type QuizCatalogRow = { topic: string; difficulty: Difficulty; kind: "mc" | "tf"; count: number };

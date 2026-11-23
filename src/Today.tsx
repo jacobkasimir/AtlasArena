@@ -5,6 +5,8 @@ import { api } from "./api";
 import type { Achievement, DailyStatus, ReviewSummary } from "./domain";
 import { avatars } from "./domain";
 import { Meter } from "./setup-ui";
+import { Icon, IconTile, games } from "./icons";
+import { Badge } from "./Achievements";
 
 const online = "Available with an online account – not in the local demo.";
 
@@ -29,13 +31,13 @@ export function DailyCard({ status }: { status: DailyStatus | null }) {
   return (
     <article className="today-card is-daily">
       <header>
-        <span className="today-icon" aria-hidden="true">📅</span>
+        <IconTile name={games.daily.icon} tone={games.daily.tone} />
         <div>
           <h3>Daily challenge</h3>
           <p>10 questions – the same for everyone today. One try.</p>
         </div>
         {status && status.streak.current > 0 && (
-          <span className="today-streak" title={`Best streak: ${status.streak.best} days`}>🔥 {status.streak.current}</span>
+          <span className="today-streak" title={`Best streak: ${status.streak.best} days`}><Icon name="flame" size={15} /> {status.streak.current}</span>
         )}
       </header>
       {!status ? <p className="muted text-sm">{online}</p> : !status.available ? (
@@ -81,7 +83,7 @@ export function ReviewCard({ summary }: { summary: ReviewSummary | null }) {
   return (
     <article className="today-card">
       <header>
-        <span className="today-icon" aria-hidden="true">🔁</span>
+        <IconTile name={games.review.icon} tone={games.review.tone} />
         <div>
           <h3>Review my mistakes</h3>
           <p>Get them right once and they're cleared for good.</p>
@@ -109,7 +111,7 @@ export function AchievementsCard({ achievements }: { achievements: Achievement[]
   return (
     <article className="today-card">
       <header>
-        <span className="today-icon" aria-hidden="true">🏅</span>
+        <IconTile name={games.achievements.icon} tone={games.achievements.tone} />
         <div>
           <h3>Achievements</h3>
           <p>{achievements ? `${earned.length} of ${achievements.length} badges earned` : "Badges for milestones in every game."}</p>
@@ -118,13 +120,14 @@ export function AchievementsCard({ achievements }: { achievements: Achievement[]
       {!achievements ? <p className="muted text-sm">{online}</p> : (
         <>
           {earned.length > 0 && (
-            <p className="today-badges" aria-label="Earned badges">
-              {earned.map((item) => <span key={item.id} title={item.title}>{item.icon}</span>)}
+            <p className="today-badges" aria-label={`Earned badges: ${earned.map((item) => item.title).join(", ")}`}>
+              {earned.slice(-8).map((item) => <Badge key={item.id} item={item} size="sm" />)}
+              {earned.length > 8 && <span className="today-badges-more">+{earned.length - 8}</span>}
             </p>
           )}
           {next.map((item) => (
             <div key={item.id} className="today-next">
-              <span aria-hidden="true">{item.icon}</span>
+              <Badge item={item} size="sm" />
               <div>
                 <strong>{item.title}</strong>
                 <Meter done={item.current} total={item.target} label={`${item.current} of ${item.target}`} />
@@ -136,25 +139,5 @@ export function AchievementsCard({ achievements }: { achievements: Achievement[]
         </>
       )}
     </article>
-  );
-}
-
-export function AchievementsGrid({ achievements }: { achievements: Achievement[] }) {
-  return (
-    <ul className="achievements-grid">
-      {achievements.map((item) => (
-        <li key={item.id} className={item.earned ? "is-earned" : undefined}>
-          <span className="achievement-icon" aria-hidden="true">{item.icon}</span>
-          <strong>{item.title}</strong>
-          <p>{item.description}</p>
-          {item.earned ? <span className="achievement-done">Earned</span> : (
-            <>
-              <Meter done={item.current} total={item.target} label={`${item.current} of ${item.target}`} />
-              <small>{item.current} / {item.target}</small>
-            </>
-          )}
-        </li>
-      ))}
-    </ul>
   );
 }

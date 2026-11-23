@@ -1,5 +1,6 @@
 // Shared building blocks for every mode's setup screen and in-game feedback,
 // so Quiz, Flags, Capitals and Recall look and behave the same way.
+import { Icon } from "./icons";
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -140,7 +141,7 @@ export function StreakBadge({ streak }: { streak: number }) {
   if (streak < 3) return null;
   return (
     <span key={pop} className="streak-badge" role="status" aria-live="polite">
-      <span aria-hidden="true">🔥</span> {streak} in a row
+      <Icon name="flame" size={15} /> {streak} in a row
     </span>
   );
 }

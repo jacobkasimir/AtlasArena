@@ -1,3 +1,4 @@
+import { Icon, IconTile } from "./icons";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { GuestSessionRecovery } from "./Auth";
@@ -169,7 +170,7 @@ export function QuizSetup() {
             onChange={setMode}
             options={modes.map((m) => ({
               value: m,
-              icon: modeIcons[m],
+              icon: <IconTile name={modeIcons[m]} tone="quiz" />,
               title: modeNames[m],
               text: modeDescriptions[m],
               footer:
@@ -803,7 +804,7 @@ export function Results() {
           {newBest && (
             <div className="new-best-badge" role="status">
               <span className="new-best-icon" aria-hidden="true">
-                ✦
+                <Icon name="trophy" size={22} />
               </span>
               <span>
                 <strong>New personal best</strong>

@@ -23,7 +23,7 @@ it("shows the podium, the ranked list with level and streaks, and your pinned st
   render(<LeaderboardBody board={board} />);
   const top = screen.getByRole("list", { name: "Top three" });
   expect(within(top).getByText("Ana")).toBeInTheDocument();
-  expect(within(top).getByText("🔥 28")).toBeInTheDocument();
+  expect(within(top).getAllByTitle("Best answer streak")[0]).toHaveTextContent("28");
   const rest = screen.getByRole("list", { name: "Ranks 4 to 25" });
   expect(within(rest).getAllByRole("listitem")).toHaveLength(2);
   const mine = screen.getByRole("region", { name: "Your standing" });

@@ -1,4 +1,5 @@
 import { FormEvent, useRef, useState } from "react";
+import { Icon } from "./icons";
 import { Link, useOutletContext } from "react-router-dom";
 import { api, isDemo } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
@@ -207,7 +208,7 @@ export function ProfilePage() {
       {!data.sessions.length && (
         <div className="empty-state">
           <span className="empty-icon" aria-hidden="true">
-            ◎
+            <Icon name="gamepad" size={30} />
           </span>
           <h3 className="font-bold mt-3">Your first run is waiting</h3>
           <p className="muted mt-2">Complete an adventure and your latest results will appear here.</p>

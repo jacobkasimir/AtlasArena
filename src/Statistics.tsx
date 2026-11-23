@@ -6,12 +6,13 @@ import { ErrorBox, Loading, useLoad } from "./components";
 import { BestsList, GameId, GameStats, PersonalBest, formatClock, gameNames } from "./game-setup";
 import { Chips } from "./setup-ui";
 import type { Achievement } from "./domain";
-import { AchievementsGrid } from "./Today";
+import { AchievementsGrid } from "./Achievements";
+import { IconTile, games as gameIcons } from "./icons";
 
-const games: { id: GameId; icon: string; to: string; unit: string }[] = [
-  { id: "flags", icon: "🏳️", to: "/flags", unit: "flags recognised" },
-  { id: "capitals", icon: "🏛️", to: "/capitals", unit: "countries answered right" },
-  { id: "recall", icon: "🧠", to: "/recall", unit: "places named" },
+const games: { id: GameId & keyof typeof gameIcons; to: string; unit: string }[] = [
+  { id: "flags", to: "/flags", unit: "flags recognised" },
+  { id: "capitals", to: "/capitals", unit: "countries answered right" },
+  { id: "recall", to: "/recall", unit: "places named" },
 ];
 
 const emptyStat = { rounds: 0, correct: 0, answered: 0, timeMs: 0, lastPlayedAt: null, places: 0 };
@@ -57,7 +58,7 @@ export function Statistics() {
               return (
                 <article key={item.id} className="card stats-card">
                   <header>
-                    <span aria-hidden="true">{item.icon}</span>
+                    <IconTile name={gameIcons[item.id].icon} tone={gameIcons[item.id].tone} size="sm" />
                     <h3>{gameNames[item.id]}</h3>
                     <Link className="text-link" to={item.to}>Play →</Link>
                   </header>
@@ -93,7 +94,6 @@ export function Statistics() {
             <div className="card mt-4" id="achievements">
               <div className="stats-bests-head">
                 <h3 className="font-bold">Achievements</h3>
-                <span className="muted text-sm">{data.achievements.filter((item) => item.earned).length} of {data.achievements.length} earned</span>
               </div>
               <AchievementsGrid achievements={data.achievements} />
             </div>

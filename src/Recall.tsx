@@ -1,3 +1,4 @@
+import { IconTile } from "./icons";
 import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
@@ -86,7 +87,7 @@ function Setup() {
       modes={(["countries", "capitals"] as const).map((value) => {
         const progress = recalledIn(value);
         return {
-          value, icon: value === "countries" ? "🌍" : "🏛️",
+          value, icon: <IconTile name={value === "countries" ? "globe" : "capital"} tone="recall" />,
           title: value === "countries" ? "Countries" : "Capitals",
           text: value === "countries" ? "Every name in the set, no clues." : "The country is shown – name its capital.",
           fixedSet: value === "countries"

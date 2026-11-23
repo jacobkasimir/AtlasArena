@@ -1,4 +1,5 @@
 import { FormEvent, Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Icon, type IconName } from "./icons";
 import { Link, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api, configurationError, isDemo, supabase } from "./api";
 import { ErrorBox, Loading, OfflineBanner, useLoad } from "./components";
@@ -21,13 +22,13 @@ const Game = lazy(() => import("./Quiz").then((module) => ({ default: module.Gam
 const Results = lazy(() => import("./Quiz").then((module) => ({ default: module.Results })));
 
 const tabs = [
-  { to: "/home", label: "Home", icon: "⌂" },
-  { to: "/quiz", label: "Quiz", icon: "◎" },
-  { to: "/flags", label: "Flags", icon: "⚑" },
-  { to: "/capitals", label: "Capitals", icon: "◆" },
-  { to: "/recall", label: "Recall", icon: "✦" },
-  { to: "/explorer", label: "Explorer", icon: "◍" },
-];
+  { to: "/home", label: "Home", icon: "home" },
+  { to: "/quiz", label: "Quiz", icon: "quiz" },
+  { to: "/flags", label: "Flags", icon: "flag" },
+  { to: "/capitals", label: "Capitals", icon: "capital" },
+  { to: "/recall", label: "Recall", icon: "recall" },
+  { to: "/explorer", label: "Explorer", icon: "explorer" },
+] satisfies { to: string; label: string; icon: IconName }[];
 
 function Layout() {
   const location = useLocation();
@@ -249,7 +250,7 @@ function Layout() {
         <nav className="bottom-tabs" aria-label="Games">
           {tabs.slice(0, 5).map((tab) => (
             <NavLink key={tab.to} to={tab.to}>
-              <span aria-hidden="true">{tab.icon}</span>
+              <Icon name={tab.icon} size={21} />
               {tab.label}
             </NavLink>
           ))}

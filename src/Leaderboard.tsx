@@ -1,4 +1,5 @@
 // Global leaderboard dialog: podium, ranked list with level/XP/streaks and a pinned card for the signed-in player.
+import { Icon } from "./icons";
 import { useEffect, useRef, useState } from "react";
 import { api, isDemo } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
@@ -9,7 +10,6 @@ const periods: { id: LeaderboardPeriod; label: string }[] = [
   { id: "all", label: "All time" },
   { id: "week", label: "This week" }
 ];
-const medals = ["🥇", "🥈", "🥉"];
 
 export function activeLabel(iso: string | null, now = Date.now()) {
   if (!iso) return "Not played yet";
@@ -28,10 +28,10 @@ function Avatar({ player, size = "md" }: { player: LeaderboardPlayer; size?: "md
 function StatChips({ player }: { player: LeaderboardPlayer }) {
   return (
     <span className="lb-chips">
-      <span title="Best answer streak in one game">🔥 <strong>{player.bestStreak}</strong> best streak</span>
-      <span title="Daily challenge streak">📅 <strong>{player.dailyStreak}</strong> daily streak</span>
-      <span title="Correct answers in scored games">🎯 <strong>{player.accuracy == null ? "–" : `${player.accuracy}%`}</strong></span>
-      <span title="Finished games">🎮 <strong>{player.games}</strong> {player.games === 1 ? "game" : "games"}</span>
+      <span title="Best answer streak in one game"><Icon name="flame" size={14} /> <strong>{player.bestStreak}</strong> best streak</span>
+      <span title="Daily challenge streak"><Icon name="calendar" size={14} /> <strong>{player.dailyStreak}</strong> daily streak</span>
+      <span title="Correct answers in scored games"><Icon name="target" size={14} /> <strong>{player.accuracy == null ? "–" : `${player.accuracy}%`}</strong></span>
+      <span title="Finished games"><Icon name="gamepad" size={14} /> <strong>{player.games}</strong> {player.games === 1 ? "game" : "games"}</span>
     </span>
   );
 }
@@ -83,13 +83,13 @@ function Podium({ players, week }: { players: LeaderboardPlayer[]; week: boolean
     <ol className="lb-podium" aria-label="Top three">
       {players.map((player) => (
         <li key={player.rank} className={`lb-step lb-step-${player.rank}${player.isYou ? " is-you" : ""}`} style={{ order: player.rank === 1 ? 2 : player.rank === 2 ? 1 : 3 }}>
-          <span className="lb-medal" aria-label={`Rank ${player.rank}`}>{medals[(player.rank ?? 1) - 1]}</span>
+          <span className="lb-medal" aria-label={`Rank ${player.rank}`}>{player.rank === 1 && <Icon name="crown" size={13} />}{player.rank}</span>
           <Avatar player={player} size="lg" />
           <strong className="lb-step-name" title={player.username}>{player.username}</strong>
           {player.isYou && <span className="leaderboard-you-tag">You</span>}
           <span className="lb-step-level">Level {player.level}</span>
           <span className="lb-step-xp">{player.points.toLocaleString()} XP{week ? " this week" : ""}</span>
-          <span className="lb-step-streak" title="Best answer streak">🔥 {player.bestStreak}</span>
+          <span className="lb-step-streak" title="Best answer streak"><Icon name="flame" size={13} /> {player.bestStreak}</span>
         </li>
       ))}
     </ol>

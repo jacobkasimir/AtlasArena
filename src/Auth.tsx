@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { Icon, IconTile, games } from "./icons";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, isDemo, supabase } from "./api";
 import { ErrorBox, Loading } from "./components";
@@ -38,7 +39,7 @@ function Welcome() {
           {!isDemo && (
             <Link className="primary action-card action-card-featured" to="/auth?mode=guest">
               <span className="action-icon" aria-hidden="true">
-                ✦
+                <Icon name="zap" size={20} />
               </span>
               <span>
                 <strong>Play as guest</strong>
@@ -52,7 +53,7 @@ function Welcome() {
           {isDemo && (
             <button className="primary action-card action-card-featured" disabled={pending} onClick={start}>
               <span className="action-icon" aria-hidden="true">
-                ✦
+                <Icon name="zap" size={20} />
               </span>
               <span>
                 <strong>{pending ? "Preparing…" : "Play as guest"}</strong>
@@ -66,7 +67,7 @@ function Welcome() {
           {!isDemo && (
             <Link className="secondary action-card" to="/auth?mode=signin">
               <span className="action-icon" aria-hidden="true">
-                ↗
+                <Icon name="lock" size={20} />
               </span>
               <span>
                 <strong>Sign in</strong>
@@ -80,7 +81,7 @@ function Welcome() {
           {!isDemo && (
             <Link className="secondary action-card" to="/auth?mode=signup">
               <span className="action-icon" aria-hidden="true">
-                ＋
+                <Icon name="sparkles" size={20} />
               </span>
               <span>
                 <strong>Create account</strong>
@@ -108,17 +109,17 @@ function Welcome() {
         <ul className="welcome-game-grid">
           {welcomeGames.map((game) => (
             <li key={game.title}>
-              <span aria-hidden="true">{game.icon}</span>
+              <IconTile name={games[game.game].icon} tone={games[game.game].tone} />
               <strong>{game.title}</strong>
               <p>{game.text}</p>
             </li>
           ))}
         </ul>
         <ul className="welcome-points">
-          <li><span aria-hidden="true">📅</span> A daily challenge – the same ten questions for everyone</li>
-          <li><span aria-hidden="true">🔁</span> Your mistakes come back until you get them right</li>
-          <li><span aria-hidden="true">🏅</span> Personal bests, statistics and badges for every game</li>
-          <li><span aria-hidden="true">🗣️</span> Answers in English, German or French</li>
+          <li><IconTile name="calendar" tone="daily" size="sm" /> A daily challenge – the same ten questions for everyone</li>
+          <li><IconTile name="review" tone="review" size="sm" /> Your mistakes come back until you get them right</li>
+          <li><IconTile name="medal" tone="awards" size="sm" /> Personal bests, statistics and badges for every game</li>
+          <li><IconTile name="languages" tone="explorer" size="sm" /> Answers in English, German or French</li>
         </ul>
       </section>
     </div>
@@ -126,12 +127,12 @@ function Welcome() {
 }
 
 const welcomeFlags = ["jp", "br", "ca", "ke", "no", "in", "mx", "za", "kr", "it", "ar", "ch", "ng", "nz", "se", "tr"];
-const welcomeGames = [
-  { icon: "◎", title: "Quiz", text: "Multiple choice in four modes – classic, practice, timed and endless." },
-  { icon: "🏳️", title: "Flags", text: "Match flags and countries, region by region, with hints when you're stuck." },
-  { icon: "🏛️", title: "Capitals", text: "Name the capital – or the country behind it – from memory." },
-  { icon: "🧠", title: "Recall", text: "How many countries of Africa can you name? Type every one you know." },
-  { icon: "🧭", title: "Explorer", text: "Browse every country: flags, capitals, languages and neighbours." },
+const welcomeGames: { game: keyof typeof games; title: string; text: string }[] = [
+  { game: "quiz", title: "Quiz", text: "Multiple choice in four modes – classic, practice, timed and endless." },
+  { game: "flags", title: "Flags", text: "Match flags and countries, region by region, with hints when you're stuck." },
+  { game: "capitals", title: "Capitals", text: "Name the capital – or the country behind it – from memory." },
+  { game: "recall", title: "Recall", text: "How many countries of Africa can you name? Type every one you know." },
+  { game: "explorer", title: "Explorer", text: "Browse every country: flags, capitals, languages and neighbours." },
 ];
 
 export function authMessage(message: string) {
@@ -335,7 +336,7 @@ export function Auth() {
         <div className="auth-choices mt-6">
           <button className="primary action-card action-card-featured" onClick={() => choose("guest")}>
             <span className="action-icon" aria-hidden="true">
-              ✦
+              <Icon name="zap" size={20} />
             </span>
             <span>
               <strong>Play as guest</strong>
@@ -349,7 +350,7 @@ export function Auth() {
             <>
               <button className="secondary action-card" onClick={() => choose("signin")}>
                 <span className="action-icon" aria-hidden="true">
-                  ↗
+                  <Icon name="lock" size={20} />
                 </span>
                 <span>
                   <strong>Sign in</strong>
@@ -361,7 +362,7 @@ export function Auth() {
               </button>
               <button className="secondary action-card" onClick={() => choose("signup")}>
                 <span className="action-icon" aria-hidden="true">
-                  ＋
+                  <Icon name="sparkles" size={20} />
                 </span>
                 <span>
                   <strong>Create account</strong>

@@ -30,7 +30,7 @@ the whole set or 10 / 25 / 50 at random, and an optional **time limit** of 5–2
 
 - **Daily challenge** – the same ten questions for everyone, one try per day, with a rank, a top 10 and a daily streak.
 - **Review my mistakes** – everything you got wrong comes back until you answer it correctly once.
-- **Personal bests** for every setup, **statistics** per game and **13 achievements**.
+- **Personal bests** for every setup, **statistics** per game and **42 achievements** in bronze, silver, gold and platinum.
 - **Levels and XP** from quiz games, plus a global leaderboard.
 - Unfinished rounds are saved; continue them from Home or the game's setup.
 
@@ -74,7 +74,8 @@ browser before they are needed (Recall uses salted hashes of the accepted spelli
 | `src/api.ts` | The only module that talks to Supabase; every call also has a local demo branch |
 | `src/game-setup.tsx` | The shared setup screen, personal bests, timer and round tags |
 | `src/Quiz.tsx`, `src/Flags.tsx`, `src/Capitals.tsx`, `src/Recall.tsx`, `src/Explorer.tsx` | The games |
-| `src/Hub.tsx`, `src/Today.tsx`, `src/Review.tsx`, `src/Statistics.tsx` | Home, daily challenge, mistake review, statistics and achievements |
+| `src/Hub.tsx`, `src/Today.tsx`, `src/Review.tsx`, `src/Statistics.tsx`, `src/Achievements.tsx`, `src/Leaderboard.tsx` | Home, daily challenge, mistake review, statistics, achievements and leaderboard |
+| `src/icons.tsx` | The app's SVG icon set and per-game accent colours |
 | `src/Admin.tsx`, `src/AdminReview.tsx`, `src/QuestionEditor.tsx` | Admin tools |
 | `src/*-domain.ts`, `src/*demo*.ts` | Pure, unit-tested game logic and the device-local demo engines |
 | `supabase/migrations/` | The schema and every server function – the only source of truth for the database |

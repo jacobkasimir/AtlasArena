@@ -1,3 +1,4 @@
+import type { IconName } from "./icons";
 import type { Mode } from "./domain";
 
 export const modeNames: Record<Mode, string> = {
@@ -14,7 +15,7 @@ export const modeDescriptions: Record<Mode, string> = {
   endless: "Three lives. Every five correct answers unlock a tougher tier.",
 };
 
-export const modeIcons: Record<Mode, string> = { classic: "◎", practice: "◇", timed: "◷", endless: "∞" };
+export const modeIcons: Record<Mode, IconName> = { classic: "target", practice: "practice", timed: "timer", endless: "infinity" };
 
 export function accuracy(correct: number, incorrect: number) {
   return correct + incorrect ? `${Math.round((100 * correct) / (correct + incorrect))}%` : "—";

@@ -1,3 +1,4 @@
+import { IconTile } from "./icons";
 import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
@@ -276,8 +277,8 @@ function Setup() {
       title="Know your flags?"
       intro="Every flag in your set comes up once. Get it right, use a hint, or skip – your round is saved as you go."
       modes={[
-        { value: "country_to_flag", icon: "🏳️", title: "Country → Flag", text: "See a country name and pick its flag." },
-        { value: "flag_to_country", icon: "🔎", title: "Flag → Country", text: "See a flag and type the country it belongs to." },
+        { value: "country_to_flag", icon: <IconTile name="flag" tone="flags" />, title: "Country → Flag", text: "See a country name and pick its flag." },
+        { value: "flag_to_country", icon: <IconTile name="search" tone="flags" />, title: "Flag → Country", text: "See a flag and type the country it belongs to." },
       ]}
       places={places}
       regions={data.regions.map((region) => ({ id: region.id, name: region.name }))}

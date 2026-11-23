@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Icon } from "./icons";
 import { useNavigate } from "react-router-dom";
 import { analyticsEnabled, readEvents, setAnalytics } from "./analytics";
 import { api, isDemo } from "./api";
@@ -34,9 +35,9 @@ export function ThemeControl() {
       <div className="theme-choice-list" role="radiogroup" aria-label="Color theme">
         {(
           [
-            ["system", "System", "◐"],
-            ["light", "Light", "☼"],
-            ["dark", "Dark", "◑"],
+            ["system", "System", "monitor"],
+            ["light", "Light", "sun"],
+            ["dark", "Dark", "moon"],
           ] as const
         ).map(([value, label, icon]) => (
           <button
@@ -47,7 +48,7 @@ export function ThemeControl() {
             className={`theme-choice ${theme === value ? "is-selected" : ""}`}
             onClick={() => choose(value)}
           >
-            <span aria-hidden="true">{icon}</span>
+            <Icon name={icon} size={17} />
             {label}
           </button>
         ))}

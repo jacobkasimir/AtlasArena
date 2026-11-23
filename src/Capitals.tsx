@@ -1,3 +1,4 @@
+import { IconTile } from "./icons";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
@@ -73,7 +74,7 @@ function Setup() {
       intro="Each country (or capital) in your set comes up once. Type your answer – spelling help appears as you type."
       modes={directions.map((option) => ({
         value: option.id,
-        icon: option.id === "country_to_capital" ? "🏛️" : "🗺️",
+        icon: <IconTile name={option.id === "country_to_capital" ? "capital" : "map"} tone="capitals" />,
         title: option.title,
         text: option.description,
       }))}

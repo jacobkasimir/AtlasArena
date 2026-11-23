@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Icon, type IconName } from "./icons";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
@@ -79,9 +80,9 @@ function CountryCard({ country, eagerFlag, onOpen }: { country: ExplorerCountry;
         <span className="explorer-card-region">{displayText(country.region)}</span>
         <span className="explorer-card-name">{country.name}</span>
         <span className="explorer-card-facts">
-          <span><span aria-hidden="true">🏛</span> {displayText(country.capital)}</span>
+          <span><Icon name="capital" size={14} /> {displayText(country.capital)}</span>
           {country.population != null && Number.isFinite(country.population) && (
-            <span><span aria-hidden="true">👥</span> {compactFormat.format(country.population)}</span>
+            <span><Icon name="users" size={14} /> {compactFormat.format(country.population)}</span>
           )}
         </span>
       </span>
@@ -90,10 +91,10 @@ function CountryCard({ country, eagerFlag, onOpen }: { country: ExplorerCountry;
   );
 }
 
-function Fact({ label, value, icon }: { label: string; value: string; icon: string }) {
+function Fact({ label, value, icon }: { label: string; value: string; icon: IconName }) {
   return (
     <div className="explorer-fact">
-      <span className="explorer-fact-icon" aria-hidden="true">{icon}</span>
+      <span className="explorer-fact-icon" aria-hidden="true"><Icon name={icon} size={18} /></span>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
@@ -148,12 +149,12 @@ function CountryDetail({ country, countriesByAlpha3, onClose, onOpen, onStep, po
   const borders = country.borders;
   const region = country.region ? encodeURIComponent(country.region) : "";
   const facts = [
-    { icon: "🏛", label: "Capital", value: displayText(country.capital) },
-    { icon: "👥", label: "Population", value: country.population != null && Number.isFinite(country.population) ? numberFormat.format(country.population) : "" },
-    { icon: "📐", label: "Area", value: country.areaKm2 != null && Number.isFinite(country.areaKm2) ? `${numberFormat.format(country.areaKm2)} km²` : "" },
-    { icon: "🗣", label: "Languages", value: country.languages?.length ? country.languages.join(", ") : "" },
-    { icon: "💰", label: "Currency", value: "" },
-    { icon: "📞", label: "Calling code", value: country.callingCodes?.length ? country.callingCodes.join(", ") : "" },
+    { icon: "capital" as const, label: "Capital", value: displayText(country.capital) },
+    { icon: "users" as const, label: "Population", value: country.population != null && Number.isFinite(country.population) ? numberFormat.format(country.population) : "" },
+    { icon: "ruler" as const, label: "Area", value: country.areaKm2 != null && Number.isFinite(country.areaKm2) ? `${numberFormat.format(country.areaKm2)} km²` : "" },
+    { icon: "languages" as const, label: "Languages", value: country.languages?.length ? country.languages.join(", ") : "" },
+    { icon: "coins" as const, label: "Currency", value: "" },
+    { icon: "phone" as const, label: "Calling code", value: country.callingCodes?.length ? country.callingCodes.join(", ") : "" },
   ];
   const currencies = country.currencies?.length
     ? country.currencies.map(item => [item.name, item.symbol].filter(Boolean).join(" ")).join(", ")

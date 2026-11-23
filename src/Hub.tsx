@@ -12,6 +12,7 @@ import { Meter } from "./setup-ui";
 import type { Achievement, DailyStatus, ReviewSummary } from "./domain";
 import { AchievementsCard, DailyCard, ReviewCard } from "./Today";
 import LeaderboardDialog from "./Leaderboard";
+import { Icon, IconTile, games } from "./icons";
 
 type HubData = {
   quiz: Dashboard;
@@ -79,13 +80,13 @@ function continueItems(data: HubData): Continue[] {
   return items;
 }
 
-function GameCard({ to, icon, title, text, stat, children, wide }: {
-  to: string; icon: string; title: string; text: string; stat?: React.ReactNode; children?: React.ReactNode; wide?: boolean;
+function GameCard({ to, game, title, text, stat, children, wide }: {
+  to: string; game: keyof typeof games; title: string; text: string; stat?: React.ReactNode; children?: React.ReactNode; wide?: boolean;
 }) {
   return (
     <article className={`hub-card ${wide ? "is-wide" : ""}`}>
       <Link to={to} className="hub-card-link">
-        <span className="hub-card-icon" aria-hidden="true">{icon}</span>
+        <IconTile name={games[game].icon} tone={games[game].tone} size="lg" />
         <span className="hub-card-title">{title}</span>
         <span className="hub-card-text">{text}</span>
       </Link>
@@ -191,7 +192,7 @@ export default function Hub() {
       <section aria-labelledby="hub-games">
         <h2 id="hub-games" className="hub-section-title">Games</h2>
         <div className="hub-grid">
-          <GameCard wide to="/quiz" icon="◎" title="Quiz" text="Multiple-choice geography questions in four modes and four difficulty tiers."
+          <GameCard wide to="/quiz" game="quiz" title="Quiz" text="Multiple-choice geography questions in four modes and four difficulty tiers."
             stat={<>
               <span><strong>{data.quiz.totals.games}</strong> games</span>
               <span><strong>{accuracy(data.quiz.totals.correct, data.quiz.totals.incorrect)}</strong> accuracy</span>
@@ -200,21 +201,21 @@ export default function Hub() {
             <div className="hub-modes">
               {modes.map((mode) => (
                 <Link key={mode} to={`/quiz?mode=${mode}`} className="chip">
-                  <span aria-hidden="true">{modeIcons[mode]}</span> {modeNames[mode].replace(" Quiz", "").replace(" Challenge", "")}
+                  <Icon name={modeIcons[mode]} size={15} /> {modeNames[mode].replace(" Quiz", "").replace(" Challenge", "")}
                 </Link>
               ))}
             </div>
           </GameCard>
-          <GameCard to="/flags" icon="🏳️" title="Flags" text="Match flags and countries, region by region. Hints when you're stuck."
+          <GameCard to="/flags" game="flags" title="Flags" text="Match flags and countries, region by region. Hints when you're stuck."
             stat={gameStat("flags", data.stats?.flags)} />
-          <GameCard to="/capitals" icon="🏛️" title="Capitals" text="Name the capital – or the country behind it – from memory, in English, German or French."
+          <GameCard to="/capitals" game="capitals" title="Capitals" text="Name the capital – or the country behind it – from memory, in English, German or French."
             stat={gameStat("capitals", data.stats?.capitals)} />
-          <GameCard to="/recall" icon="🧠" title="Recall" text="Type every country or capital of a region from memory. English, German or French."
+          <GameCard to="/recall" game="recall" title="Recall" text="Type every country or capital of a region from memory. English, German or French."
             stat={recallCatalog.length ? <>
               <span><strong>{unCountries}/{recallCatalog.length}</strong> countries named</span>
               <span><strong>{unCapitals}/{recallCatalog.length}</strong> capitals named</span>
             </> : undefined} />
-          <GameCard to="/explorer" icon="🧭" title="Explorer" text="Browse every country: flags, capitals, languages, neighbours and more."
+          <GameCard to="/explorer" game="explorer" title="Explorer" text="Browse every country: flags, capitals, languages, neighbours and more."
             stat={<span>Practice any country with one click</span>} />
         </div>
       </section>

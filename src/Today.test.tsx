@@ -20,7 +20,7 @@ it("shows a finished daily challenge with rank, streak and today's top list", ()
   render(<MemoryRouter><DailyCard status={daily} /></MemoryRouter>);
   expect(screen.getByText("#2")).toBeInTheDocument();
   expect(screen.getByText("of 5")).toBeInTheDocument();
-  expect(screen.getByText("🔥 3")).toBeInTheDocument();
+  expect(screen.getByTitle("Best streak: 4 days")).toHaveTextContent("3");
   fireEvent.click(screen.getByRole("button", { name: /today's top 10/ }));
   expect(screen.getByText("Jacob (you)")).toBeInTheDocument();
 });
@@ -38,8 +38,8 @@ it("links to the review and shows the closest badges", () => {
   render(<MemoryRouter>
     <ReviewCard summary={{ open: 75, byKind: { flag: 61 }, activeId: null, cleared: 3 }} />
     <AchievementsCard achievements={[
-      { id: "a", icon: "🎯", title: "First steps", description: "", current: 1, target: 1, earned: true },
-      { id: "b", icon: "🏛️", title: "Capital collector", description: "", current: 40, target: 50, earned: false },
+      { id: "a", category: "quiz", tier: "bronze", icon: "quiz", title: "First steps", description: "", current: 1, target: 1, earned: true },
+      { id: "b", category: "capitals", tier: "silver", icon: "capital", title: "Capital collector", description: "", current: 40, target: 50, earned: false },
     ]} />
   </MemoryRouter>);
   expect(screen.getByRole("link", { name: "Review 10 mistakes →" })).toHaveAttribute("href", "/review");
