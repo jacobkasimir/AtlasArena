@@ -374,3 +374,19 @@ export type CapitalSession = RoundExtras & {
   selectedCodes: string[]; rulesVersion: number;
   actionResult?: { outcome: "correct" | "incorrect" | "skipped" | "ambiguous"; lang?: "en" | "de" | "fr" | null };
 };
+
+// Daily challenge, Review my mistakes and Achievements (server-only features).
+export type DailyStatus = {
+  day: string; available: boolean; sessionId: string | null; state: State | null; score: number | null; correct: number | null;
+  rank: number | null; players: number; streak: { current: number; best: number };
+  top: { rank: number; username: string; avatar: number; score: number; correct: number; isYou: boolean }[];
+};
+export type ReviewSummary = { open: number; byKind: Partial<Record<"quiz" | "flag" | "capital", number>>; activeId: string | null; cleared: number };
+export type ReviewItem = {
+  position: number; kind: "quiz" | "flag" | "capital"; prompt: string; options?: Option[]; difficulty?: Difficulty;
+  alpha2?: string | null; flagSvgUrl?: string | null; country?: string;
+  answered: boolean; answer: string | null; correct: boolean | null; solution: string | null; explanation: string | null; correctOption: string | null;
+};
+export type ReviewSession = { id: string; total: number; correct: number; answered: number; completed: boolean; createdAt: string; items: ReviewItem[] };
+export type Achievement = { id: string; icon: string; title: string; description: string; current: number; target: number; earned: boolean };
+export type QuizCatalogRow = { topic: string; difficulty: Difficulty; kind: "mc" | "tf"; count: number };

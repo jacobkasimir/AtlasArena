@@ -7,7 +7,6 @@ import { accuracy, modeNames } from "./quiz-meta";
 
 import { Auth, AuthRedirect, Onboarding, Protected, authMessage } from "./Auth";
 import { AvatarPicker, ProfilePage } from "./Profile";
-import { Game, QuizSetup, Results } from "./Quiz";
 import { Settings, ThemeControl } from "./Settings";
 
 const Admin = lazy(() => import("./Admin"));
@@ -16,6 +15,10 @@ const Flags = lazy(() => import("./Flags"));
 const Capitals = lazy(() => import("./Capitals"));
 const Recall = lazy(() => import("./Recall"));
 const Hub = lazy(() => import("./Hub"));
+const Review = lazy(() => import("./Review"));
+const QuizSetup = lazy(() => import("./Quiz").then((module) => ({ default: module.QuizSetup })));
+const Game = lazy(() => import("./Quiz").then((module) => ({ default: module.Game })));
+const Results = lazy(() => import("./Quiz").then((module) => ({ default: module.Results })));
 
 const tabs = [
   { to: "/home", label: "Home", icon: "⌂" },
@@ -260,7 +263,7 @@ function Layout() {
       </main>
       <footer className="shell py-8 text-sm muted border-t border-line/15">
         Built for curious minds. No ads. No public chat.
-        <span className="block mt-2">Maps and multiplayer are planned, not playable features.</span>
+        <span className="block mt-2">Every quiz question is checked against a source before it goes live.</span>
       </footer>
     </>
   );
@@ -722,6 +725,14 @@ export default function App() {
           element={
             <Protected>
               <Recall />
+            </Protected>
+          }
+        />
+        <Route
+          path="review/*"
+          element={
+            <Protected>
+              <Review />
             </Protected>
           }
         />

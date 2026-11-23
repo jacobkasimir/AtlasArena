@@ -5,6 +5,8 @@ import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
 import { BestsList, GameId, GameStats, PersonalBest, formatClock, gameNames } from "./game-setup";
 import { Chips } from "./setup-ui";
+import type { Achievement } from "./domain";
+import { AchievementsGrid } from "./Today";
 
 const games: { id: GameId; icon: string; to: string; unit: string }[] = [
   { id: "flags", icon: "🏳️", to: "/flags", unit: "flags recognised" },
@@ -14,10 +16,14 @@ const games: { id: GameId; icon: string; to: string; unit: string }[] = [
 
 const emptyStat = { rounds: 0, correct: 0, answered: 0, timeMs: 0, lastPlayedAt: null, places: 0 };
 
-async function loadStatistics(): Promise<{ stats: GameStats; bests: PersonalBest[] }> {
-  const [stats, bests] = await Promise.all([api.gameStats(), api.personalBests()]);
+async function loadStatistics(): Promise<{ stats: GameStats; bests: PersonalBest[]; achievements: Achievement[] | null }> {
+  const [stats, bests, achievements] = await Promise.all([api.gameStats(), api.personalBests(), api.achievements().catch(() => null)]);
   const read = (game: GameId) => ({ ...emptyStat, ...(stats && typeof stats === "object" ? stats[game] : null) });
-  return { stats: { flags: read("flags"), capitals: read("capitals"), recall: read("recall") }, bests: Array.isArray(bests) ? bests : [] };
+  return {
+    stats: { flags: read("flags"), capitals: read("capitals"), recall: read("recall") },
+    bests: Array.isArray(bests) ? bests : [],
+    achievements: Array.isArray(achievements) ? achievements : null,
+  };
 }
 
 export function Statistics() {
@@ -26,7 +32,9 @@ export function Statistics() {
   const location = useLocation();
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (data && location.hash === "#statistics") ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!data) return;
+    if (location.hash === "#statistics") ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (location.hash === "#achievements") document.getElementById("achievements")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [data, location.hash]);
 
   const bests = (data?.bests ?? []).filter((best) => !game || best.game === game);
@@ -81,6 +89,15 @@ export function Statistics() {
               One best per setup: game, direction, catalog, region, difficulty and time limit. Ties go to the faster round.
             </p>
           </div>
+          {data.achievements && (
+            <div className="card mt-4" id="achievements">
+              <div className="stats-bests-head">
+                <h3 className="font-bold">Achievements</h3>
+                <span className="muted text-sm">{data.achievements.filter((item) => item.earned).length} of {data.achievements.length} earned</span>
+              </div>
+              <AchievementsGrid achievements={data.achievements} />
+            </div>
+          )}
         </>
       )}
     </section>

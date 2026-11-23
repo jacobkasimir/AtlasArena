@@ -5,8 +5,7 @@ import { ErrorBox, Loading, useLoad } from "./components";
 import { Mode, avatarLabels, avatars, categories, countryFlagAvatarCount, level } from "./domain";
 import { accuracy, modeNames } from "./quiz-meta";
 
-import { AccountActions, authMessage } from "./Auth";
-import { GuestSessionRecovery } from "./Quiz";
+import { AccountActions, GuestSessionRecovery, authMessage } from "./Auth";
 import { Statistics } from "./Statistics";
 
 export function AvatarPicker({ value }: { value: number }) {

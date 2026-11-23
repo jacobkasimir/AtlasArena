@@ -55,7 +55,7 @@ function Welcome() {
                 ✦
               </span>
               <span>
-                <strong>{pending ? "Wird vorbereitet …" : "Play as guest"}</strong>
+                <strong>{pending ? "Preparing…" : "Play as guest"}</strong>
                 <small>Start now, no account needed</small>
               </span>
               <span className="action-arrow" aria-hidden="true">
@@ -92,16 +92,47 @@ function Welcome() {
             </Link>
           )}
         </div>
-        <p className="text-sm muted mt-4">Guest access works without registration.</p>
+        <p className="text-sm muted mt-4">Guest access works without registration. Create an account later to keep your progress on every device.</p>
         <ErrorBox message={error} />
       </section>
-      <div className="globe-card map-grid" aria-hidden="true">
-        <img className="marketing-icon" src="/icons/marketing_icon.png" alt="" />
+      <div className="globe-card map-grid welcome-flags" aria-hidden="true">
+        <div className="welcome-flag-wall">
+          {welcomeFlags.map((code, index) => (
+            <img key={code} src={`/flags/${code}.svg`} alt="" style={{ animationDelay: `${index * 90}ms` }} />
+          ))}
+        </div>
         <p className="text-center font-mono text-sm muted">EXPLORE · LEARN · LEVEL UP</p>
       </div>
+      <section className="welcome-games md:col-span-2" aria-labelledby="welcome-games-title">
+        <h2 id="welcome-games-title" className="hub-section-title">Five ways to learn the world</h2>
+        <ul className="welcome-game-grid">
+          {welcomeGames.map((game) => (
+            <li key={game.title}>
+              <span aria-hidden="true">{game.icon}</span>
+              <strong>{game.title}</strong>
+              <p>{game.text}</p>
+            </li>
+          ))}
+        </ul>
+        <ul className="welcome-points">
+          <li><span aria-hidden="true">📅</span> A daily challenge – the same ten questions for everyone</li>
+          <li><span aria-hidden="true">🔁</span> Your mistakes come back until you get them right</li>
+          <li><span aria-hidden="true">🏅</span> Personal bests, statistics and badges for every game</li>
+          <li><span aria-hidden="true">🗣️</span> Answers in English, German or French</li>
+        </ul>
+      </section>
     </div>
   );
 }
+
+const welcomeFlags = ["jp", "br", "ca", "ke", "no", "in", "mx", "za", "kr", "it", "ar", "ch", "ng", "nz", "se", "tr"];
+const welcomeGames = [
+  { icon: "◎", title: "Quiz", text: "Multiple choice in four modes – classic, practice, timed and endless." },
+  { icon: "🏳️", title: "Flags", text: "Match flags and countries, region by region, with hints when you're stuck." },
+  { icon: "🏛️", title: "Capitals", text: "Name the capital – or the country behind it – from memory." },
+  { icon: "🧠", title: "Recall", text: "How many countries of Africa can you name? Type every one you know." },
+  { icon: "🧭", title: "Explorer", text: "Browse every country: flags, capitals, languages and neighbours." },
+];
 
 export function authMessage(message: string) {
   const m = message.toLowerCase();
@@ -645,4 +676,33 @@ export function Protected({ children }: { children: JSX.Element }) {
       />
     );
   return children;
+}
+
+export function GuestSessionRecovery({ retry }: { retry: () => void }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  async function restore() {
+    setPending(true);
+    setError("");
+    try {
+      await api.guest();
+      retry();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPending(false);
+    }
+  }
+  return (
+    <div className="mt-3">
+      <p className="muted">
+        Your existing guest session is restored when available. A new guest is created only if this browser has no
+        session.
+      </p>
+      <button className="secondary mt-3" disabled={pending} onClick={restore}>
+        {pending ? "Restoring…" : "Continue as guest"}
+      </button>
+      <ErrorBox message={error} />
+    </div>
+  );
 }

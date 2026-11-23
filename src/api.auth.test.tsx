@@ -107,7 +107,7 @@ describe("authenticated dashboard loading", () => {
     render(<MemoryRouter initialEntries={["/profile"]}><App/></MemoryRouter>);
 
     expect(await screen.findByText("Your explorer profile")).toBeTruthy();
-    expect(authState.rpc).toHaveBeenCalledTimes(5); // + game stats and personal bests; route gate (profile and onboarding status) plus profile load
+    expect(authState.rpc).toHaveBeenCalledTimes(6); // + game stats, personal bests and achievements; route gate (profile and onboarding status) plus profile load
   });
 
   it("loads /home directly with a restored guest session", async () => {
@@ -123,7 +123,7 @@ describe("authenticated dashboard loading", () => {
 
     expect(await screen.findByText("Games")).toBeTruthy();
     // route gate (2), quiz dashboard, flags setup + bests, capitals setup + bests, recall setup
-    expect(authState.rpc).toHaveBeenCalledTimes(8);
+    expect(authState.rpc).toHaveBeenCalledTimes(11);
   });
 
   it("opens the quiz setup on /quiz", async () => {

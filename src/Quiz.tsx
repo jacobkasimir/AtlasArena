@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { GuestSessionRecovery } from "./Auth";
 import { EditQuestionButton } from "./QuestionEditor";
 import { track } from "./analytics";
 import { api } from "./api";
@@ -13,6 +14,7 @@ import {
   categories,
   challengeSetupUrl,
   difficulties,
+  rank,
   modes,
   setsNewPersonalBest,
 } from "./domain";
@@ -57,6 +59,7 @@ export function QuizSetup() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const { data, error: loadError, reload } = useLoad(() => api.dashboard());
+  const catalog = useLoad(() => api.quizCatalog().catch(() => null));
   const country = params.get("country") ?? undefined;
   const countParam = Number(params.get("count"));
   const questionCount =
@@ -89,6 +92,21 @@ export function QuizSetup() {
 
   const unfinished =
     data?.sessions.filter((s) => s.status === "awaiting_answer" || s.status === "showing_feedback") ?? [];
+  // Published question counts per topic, difficulty and type (null until loaded or when unavailable).
+  const rows = Array.isArray(catalog.data) ? catalog.data : null;
+  const needed = mode === "classic" ? 10 : mode === "practice" ? questionCount : 1;
+  const available = (topic: string, level: Difficulty) =>
+    rows
+      ? rows
+          .filter((row) => (topic === "all" || row.topic === topic)
+            && (mode === "endless" ? rank(row.difficulty) >= rank(level) : row.difficulty === level)
+            && (mode !== "classic" || row.kind === "mc"))
+          .reduce((sum, row) => sum + row.count, 0)
+      : null;
+  const enough = (topic: string, level: Difficulty) => {
+    const count = available(topic, level);
+    return count === null || count >= needed;
+  };
   const roundSize =
     mode === "timed"
       ? { count: 60, unit: "seconds" }
@@ -139,7 +157,7 @@ export function QuizSetup() {
     <ModePage
       eyebrow="Atlas Quiz"
       title="Ready for a round?"
-      intro="Four ways to play, four difficulty tiers, fifteen topics."
+      intro="Four ways to play, four difficulty tiers and a topic of your choice."
       side={side}
     >
       <SetupForm onSubmit={start}>
@@ -171,18 +189,34 @@ export function QuizSetup() {
               label="Difficulty"
               value={difficulty}
               onChange={setDifficulty}
-              options={difficulties.map((d) => ({ value: d, label: d[0].toUpperCase() + d.slice(1) }))}
+              options={difficulties.map((d) => ({
+                value: d,
+                label: d[0].toUpperCase() + d.slice(1),
+                count: available(category, d) ?? undefined,
+                disabled: !enough(category, d) && d !== difficulty,
+              }))}
             />
           </div>
         </Step>
-        <Step n={3} title="Topic">
+        <Step
+          n={3}
+          title="Topic"
+          hint={rows && !country ? `Numbers show the published questions for this mode and difficulty${needed > 1 ? ` – a round needs ${needed}` : ""}.` : undefined}
+        >
           <Chips
             label="Topic"
             value={category}
             onChange={setCategory}
             options={[
-              { value: "all", label: "Everything" },
-              ...categories.map((c) => ({ value: c, label: c[0].toUpperCase() + c.slice(1) })),
+              { value: "all", label: "Everything", count: available("all", difficulty) ?? undefined },
+              ...categories
+                .filter((c) => !rows || c === category || rows.some((row) => row.topic === c))
+                .map((c) => ({
+                  value: c,
+                  label: c[0].toUpperCase() + c.slice(1),
+                  count: available(c, difficulty) ?? undefined,
+                  disabled: !enough(c, difficulty) && c !== category,
+                })),
             ]}
           />
         </Step>
@@ -198,10 +232,15 @@ export function QuizSetup() {
           count={roundSize.count}
           unit={roundSize.unit}
           busy={pending}
-          disabled={!!loadError}
+          disabled={!!loadError || (!country && !enough(category, difficulty))}
           label="Start game"
           summary={`${modeNames[mode]} · ${difficulty} · ${category === "all" ? "all topics" : category}${mode === "practice" ? " · no XP" : ""}`}
         />
+        {!country && !enough(category, difficulty) && (
+          <p className="muted" role="status">
+            Not enough questions for this combination yet – pick another difficulty or topic.
+          </p>
+        )}
         <ErrorBox message={error} />
       </SetupForm>
     </ModePage>
@@ -222,35 +261,6 @@ function Stat({ title, value }: { title: string; value: string | number }) {
     </div>
   );
 }
-export function GuestSessionRecovery({ retry }: { retry: () => void }) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  async function restore() {
-    setPending(true);
-    setError("");
-    try {
-      await api.guest();
-      retry();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setPending(false);
-    }
-  }
-  return (
-    <div className="mt-3">
-      <p className="muted">
-        Your existing guest session is restored when available. A new guest is created only if this browser has no
-        session.
-      </p>
-      <button className="secondary mt-3" disabled={pending} onClick={restore}>
-        {pending ? "Restoring…" : "Continue as guest"}
-      </button>
-      <ErrorBox message={error} />
-    </div>
-  );
-}
-
 export function Game() {
   const { id = "" } = useParams();
   const isAdmin = useIsAdmin();

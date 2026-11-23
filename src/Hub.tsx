@@ -9,6 +9,8 @@ import type { RecallSetup } from "./recall-domain";
 import type { CapitalSetup, FlagsSetup } from "./domain";
 import { BestsList, GameStat, GameStats, PersonalBest, describeSetup, regionLabel } from "./game-setup";
 import { Meter } from "./setup-ui";
+import type { Achievement, DailyStatus, ReviewSummary } from "./domain";
+import { AchievementsCard, DailyCard, ReviewCard } from "./Today";
 
 type HubData = {
   quiz: Dashboard;
@@ -17,19 +19,25 @@ type HubData = {
   recall: RecallSetup | null;
   bests: PersonalBest[] | null;
   stats: GameStats | null;
+  daily: DailyStatus | null;
+  review: ReviewSummary | null;
+  achievements: Achievement[] | null;
 };
 
 type Continue = { id: string; game: string; title: string; detail: string; to: string; done: number; total: number };
 
 async function loadHub(): Promise<HubData> {
   const optional = <T,>(promise: Promise<T>) => promise.catch(() => null);
-  const [quiz, flags, capitals, recall, bests, stats] = await Promise.all([
+  const [quiz, flags, capitals, recall, bests, stats, daily, review, achievements] = await Promise.all([
     api.dashboard(),
     optional(api.flagsSetup()),
     optional(api.capitalsSetup()),
     optional(api.recallSetup()),
     optional(api.personalBests()),
     optional(api.gameStats()),
+    optional(api.dailyStatus()),
+    optional(api.reviewSummary()),
+    optional(api.achievements()),
   ]);
   const withSessions = <T extends { activeSessions?: unknown }>(value: T | null) =>
     value && Array.isArray(value.activeSessions) ? value : null;
@@ -40,6 +48,9 @@ async function loadHub(): Promise<HubData> {
     recall: recall && Array.isArray(recall.catalog) && recall.recalled ? withSessions(recall) : null,
     bests: Array.isArray(bests) ? bests : null,
     stats: stats && typeof stats === "object" && "flags" in stats ? stats : null,
+    daily: daily && typeof daily === "object" && "streak" in daily && Array.isArray(daily.top) ? daily : null,
+    review: review && typeof review === "object" && "open" in review && review.byKind ? review : null,
+    achievements: Array.isArray(achievements) ? achievements : null,
   };
 }
 
@@ -167,6 +178,15 @@ export default function Hub() {
         </section>
       )}
 
+      <section aria-labelledby="hub-today">
+        <h2 id="hub-today" className="hub-section-title">Today</h2>
+        <div className="today-grid">
+          <DailyCard status={data.daily} />
+          <ReviewCard summary={data.review} />
+          <AchievementsCard achievements={data.achievements} />
+        </div>
+      </section>
+
       <section aria-labelledby="hub-games">
         <h2 id="hub-games" className="hub-section-title">Games</h2>
         <div className="hub-grid">
@@ -186,7 +206,7 @@ export default function Hub() {
           </GameCard>
           <GameCard to="/flags" icon="🏳️" title="Flags" text="Match flags and countries, region by region. Hints when you're stuck."
             stat={gameStat("flags", data.stats?.flags)} />
-          <GameCard to="/capitals" icon="🏛️" title="Capitals" text="Name the capital – or the country behind it – with spelling help as you type."
+          <GameCard to="/capitals" icon="🏛️" title="Capitals" text="Name the capital – or the country behind it – from memory, in English, German or French."
             stat={gameStat("capitals", data.stats?.capitals)} />
           <GameCard to="/recall" icon="🧠" title="Recall" text="Type every country or capital of a region from memory. English, German or French."
             stat={recallCatalog.length ? <>

@@ -207,6 +207,16 @@ export const demo = {
     data.sessions = data.sessions.filter(item => item.id !== id);
     write(data);
   },
+  async quizCatalog() {
+    const counts = new Map<string, { topic: string; difficulty: Difficulty; kind: "mc" | "tf"; count: number }>();
+    for (const q of bank as Question[]) {
+      const key = `${q.subcategory}|${q.difficulty}|${q.type}`;
+      const row = counts.get(key) ?? { topic: q.subcategory, difficulty: q.difficulty, kind: q.type, count: 0 };
+      row.count++;
+      counts.set(key, row);
+    }
+    return [...counts.values()];
+  },
   async dashboard(offset = 0): Promise<Dashboard> {
     const data = read();
     const done = data.sessions.filter(s => s.status === "completed");

@@ -4,7 +4,7 @@ import type { RecallAnswerResult, RecallChoice, RecallSession, RecallSetup } fro
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
 import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalBest, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
-import type { RoundOptions } from "./domain";
+import type { Achievement, DailyStatus, QuizCatalogRow, ReviewSession, ReviewSummary, RoundOptions } from "./domain";
 import type { GameStats, PersonalBest } from "./game-setup";
 import { demoGameStats, demoPersonalBests } from "./bests-demo";
 import type { AdminQuestionInfo } from "./QuestionEditor";
@@ -17,6 +17,9 @@ export const configurationError = Boolean(url) !== Boolean(key)
   ? "Set both Supabase environment variables, or leave both empty for local demo."
   : null;
 export const isDemo = !url && !key;
+export const DEMO_UNAVAILABLE = "ONLINE_ONLY";
+const onlineOnly = <T,>(feature: string): Promise<T> =>
+  Promise.reject(new Error(`${DEMO_UNAVAILABLE}: ${feature} needs an online account and isn't available in the local demo.`));
 const defaultRound: RoundOptions = { scope: "all", picks: [], size: null, limit: null };
 export const supabase = url && key ? createClient(url, key) : null;
 
@@ -139,6 +142,16 @@ export const api = {
     : rpc<RecallAnswerResult>("arena_recall_answer", { p_session_id: id, p_position: position, p_answer: answer }),
   recallFinish: (id: string) => isDemo ? recallDemo.finish(id) : rpc<RecallSession>("arena_recall_finish", { p_session_id: id }),
   recallAbandon: (id: string) => isDemo ? recallDemo.abandon(id) : rpc<void>("arena_recall_abandon", { p_session_id: id }),
+  quizCatalog: () => isDemo ? demo.quizCatalog() : rpc<QuizCatalogRow[]>("arena_quiz_catalog"),
+  dailyStatus: () => isDemo ? onlineOnly<DailyStatus>("The daily challenge") : rpc<DailyStatus>("arena_daily_status"),
+  dailyStart: () => isDemo ? onlineOnly<View>("The daily challenge") : rpc<View>("arena_daily_start"),
+  reviewSummary: () => isDemo ? onlineOnly<ReviewSummary>("Review my mistakes") : rpc<ReviewSummary>("arena_review_summary"),
+  reviewStart: (requestId: string) => isDemo ? onlineOnly<ReviewSession>("Review my mistakes")
+    : rpc<ReviewSession>("arena_review_start", { p_request_id: requestId }),
+  reviewView: (id: string) => isDemo ? onlineOnly<ReviewSession>("Review my mistakes") : rpc<ReviewSession>("arena_review_view", { p_session_id: id }),
+  reviewAnswer: (id: string, position: number, answer: string) => isDemo ? onlineOnly<ReviewSession>("Review my mistakes")
+    : rpc<ReviewSession>("arena_review_answer", { p_session_id: id, p_position: position, p_answer: answer }),
+  achievements: () => isDemo ? onlineOnly<Achievement[]>("Achievements") : rpc<Achievement[]>("arena_achievements"),
   personalBests: () => isDemo ? demoPersonalBests() : rpc<PersonalBest[]>("arena_personal_bests"),
   gameStats: () => isDemo ? demoGameStats() : rpc<GameStats>("arena_game_stats"),
   exportData: () =>
