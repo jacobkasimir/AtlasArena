@@ -81,6 +81,9 @@ If you could not run them, say so explicitly.
   topic/difficulty combinations that can't fill a round. Keep both filters identical.
 - Code splitting: Quiz, Hub, Review and all games are lazy routes; React and supabase-js are separate vendor chunks
   (`vite.config.ts` manualChunks). Don't import a lazy module from the eager shell (App/Auth/Profile/Settings).
+- Admin → Review queue (`src/AdminReview.tsx`): one draft at a time (`arena_admin_review_next`), with source link and
+  hints. "Approve and publish" (`arena_admin_review_approve`) only works after the admin ticks the source check – never
+  approve or publish questions from code, scripts or tests.
 - `src/QuestionEditor.tsx`: admins see "Edit question" in the quiz game and on each result review item. It loads the
   latest version with `arena_admin_question(question_id)` and saves through `arena_admin_import` (policy `version`), so
   every edit is validated like an import and creates a new version. "Save and publish" requires the admin to tick that

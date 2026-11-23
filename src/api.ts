@@ -245,6 +245,11 @@ export const api = {
   adminQuestion: (questionId: string) => isDemo
     ? Promise.reject(new Error("Editing questions is not available in the demo."))
     : rpc<AdminQuestionInfo>("arena_admin_question", { p_question_id: questionId }),
+  adminReviewNext: (offset: number) =>
+    rpc<{ remaining: number; offset: number; item: (AdminQuestionInfo["record"] & { questionId: string; countryName: string | null }) | null }>(
+      "arena_admin_review_next", { p_offset: offset }),
+  adminReviewApprove: (stableId: string, version: number, confirmChecked: boolean) =>
+    rpc<unknown>("arena_admin_review_approve", { p_stable_id: stableId, p_version: version, p_confirm_checked: confirmChecked }),
   unpublish: (stableId: string) =>
     rpc<void>("arena_admin_unpublish", { p_stable_id: stableId })
 };

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, isDemo } from "./api";
 import { difficulties } from "./domain";
 import { ErrorBox, Loading, useLoad } from "./components";
+import { ReviewQueue } from "./AdminReview";
 
 type AdminQuestion = {
   stableId: string; expectedVersion: number; type: "mc" | "tf"; prompt: string;
@@ -79,7 +80,7 @@ function QuestionPager({ offset, total, pending, onOffsetChange, placement }: {
   </nav>;
 }
 
-export default function Admin() {
+function QuestionStudio() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [offset, setOffset] = useState(0);
@@ -443,4 +444,21 @@ export default function Admin() {
       </section>
     </div>
   </div>;
+}
+
+export default function Admin() {
+  const [tab, setTab] = useState<"review" | "studio">(() => (new URLSearchParams(window.location.search).get("tab") === "studio" ? "studio" : "review"));
+  const access = useLoad(() => (isDemo ? Promise.resolve(null) : api.dashboard()));
+  if (isDemo) return <QuestionStudio />;
+  if (!access.data) return access.error ? <ErrorBox message={access.error} retry={access.reload} /> : <Loading />;
+  if (!access.data.profile.admin) return <QuestionStudio />;
+  return (
+    <div className="admin-shell">
+      <div className="segmented admin-tabs" role="tablist" aria-label="Admin sections">
+        <button type="button" role="tab" aria-selected={tab === "review"} aria-pressed={tab === "review"} onClick={() => setTab("review")}>Review queue</button>
+        <button type="button" role="tab" aria-selected={tab === "studio"} aria-pressed={tab === "studio"} onClick={() => setTab("studio")}>Question studio</button>
+      </div>
+      {tab === "review" ? <ReviewQueue /> : <QuestionStudio />}
+    </div>
+  );
 }
