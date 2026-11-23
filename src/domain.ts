@@ -137,15 +137,29 @@ export type Dashboard = {
   sessions: Summary[];
 };
 
+export type LeaderboardPeriod = "all" | "week";
 export type LeaderboardPlayer = {
-  rank: number;
+  rank: number | null;
   username: string;
   avatar: number;
   xp: number;
+  /** XP that decides the ranking: all-time XP, or XP earned in the last 7 days. */
+  points: number;
+  level: number;
+  games: number;
+  accuracy: number | null;
+  bestStreak: number;
+  dailyStreak: number;
+  lastPlayedAt: string | null;
+  isYou: boolean;
 };
 export type Leaderboard = {
+  period: LeaderboardPeriod;
+  totalPlayers: number;
   currentRank: number | null;
   players: LeaderboardPlayer[];
+  you: LeaderboardPlayer | null;
+  ahead: { rank: number; username: string; gap: number } | null;
 };
 
 export type Country = {

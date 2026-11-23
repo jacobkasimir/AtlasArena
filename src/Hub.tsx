@@ -11,6 +11,7 @@ import { BestsList, GameStat, GameStats, PersonalBest, describeSetup, regionLabe
 import { Meter } from "./setup-ui";
 import type { Achievement, DailyStatus, ReviewSummary } from "./domain";
 import { AchievementsCard, DailyCard, ReviewCard } from "./Today";
+import LeaderboardDialog from "./Leaderboard";
 
 type HubData = {
   quiz: Dashboard;
@@ -231,83 +232,6 @@ export default function Hub() {
       )}
 
       {leaderboardOpen && <LeaderboardDialog onClose={() => { setLeaderboardOpen(false); leaderboardButtonRef.current?.focus(); }} />}
-    </div>
-  );
-}
-
-function LeaderboardDialog({ onClose }: { onClose: () => void }) {
-  const leaderboard = useLoad(() => api.leaderboard());
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    closeRef.current?.focus();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") return onClose();
-      if (event.key !== "Tab") return;
-      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], [tabindex="0"]');
-      if (!focusable?.length) return;
-      const first = focusable[0], last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onClose]);
-
-  return (
-    <div className="leaderboard-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section ref={dialogRef} className="leaderboard-dialog" role="dialog" aria-modal="true" aria-labelledby="leaderboard-title">
-        <header className="leaderboard-header">
-          <div>
-            <p className="eyebrow">Atlas Arena · Global</p>
-            <h2 id="leaderboard-title" className="text-2xl font-black mt-1">Top 25 players</h2>
-            <p className="muted text-sm mt-1">Ranked by XP earned in quiz games.</p>
-          </div>
-          <button ref={closeRef} type="button" className="leaderboard-close secondary" aria-label="Close leaderboard" onClick={onClose}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-          </button>
-        </header>
-        {leaderboard.error && <ErrorBox message={leaderboard.error} retry={leaderboard.reload} />}
-        {!leaderboard.data && !leaderboard.error && <Loading />}
-        {leaderboard.data && (isDemo ? (
-          <p className="muted mt-5">The demo keeps progress in this browser only, so there is no shared leaderboard.</p>
-        ) : (
-          <>
-            {leaderboard.data.currentRank && leaderboard.data.currentRank > 25 && (
-              <p className="leaderboard-your-rank">Your rank: <strong>#{leaderboard.data.currentRank}</strong></p>
-            )}
-            {!leaderboard.data.currentRank && <p className="leaderboard-your-rank">Finish a scored quiz game to join the leaderboard.</p>}
-            {leaderboard.data.players.length ? (
-              <div className="leaderboard-table-scroll" role="region" aria-label="Top 25 players" tabIndex={0}>
-                <table className="leaderboard-table">
-                  <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">XP</th></tr></thead>
-                  <tbody>
-                    {leaderboard.data.players.map((player) => (
-                      <tr key={`${player.rank}-${player.username}`} className={player.rank === leaderboard.data?.currentRank ? "is-you" : ""}>
-                        <td><span className="leaderboard-position">{player.rank <= 3 ? ["①", "②", "③"][player.rank - 1] : `#${player.rank}`}</span></td>
-                        <td>
-                          <span className="leaderboard-player">
-                            <span aria-hidden="true">{avatars[player.avatar] ?? avatars[0]}</span>
-                            <strong>{player.username}</strong>
-                            {player.rank === leaderboard.data?.currentRank && <span className="leaderboard-you-tag">You</span>}
-                          </span>
-                        </td>
-                        <td className="leaderboard-xp">{player.xp.toLocaleString()} XP</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : <p className="muted mt-5">No ranked players yet – be the first.</p>}
-          </>
-        ))}
-      </section>
     </div>
   );
 }

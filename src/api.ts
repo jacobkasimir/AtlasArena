@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { recallDemo } from "./recall-demo";
 import type { RecallAnswerResult, RecallChoice, RecallSession, RecallSetup } from "./recall-domain";
 import { demo } from "./demo";
-import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, Mode, Profile, ResultView, View } from "./domain";
+import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, LeaderboardPeriod, Mode, Profile, ResultView, View } from "./domain";
 import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalBest, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
 import type { Achievement, DailyStatus, QuizCatalogRow, ReviewSession, ReviewSummary, RoundOptions } from "./domain";
 import type { GameStats, PersonalBest } from "./game-setup";
@@ -73,9 +73,9 @@ export const api = {
     isDemo ? demo.deleteRun(id) : rpc<void>("arena_delete_run", { p_id: id }),
   dashboard: (offset = 0) =>
     isDemo ? demo.dashboard(offset) : rpc<Dashboard>("arena_dashboard", { p_offset: offset }),
-  leaderboard: (): Promise<Leaderboard> => isDemo
-    ? Promise.resolve({ currentRank: null, players: [] })
-    : rpc<Leaderboard>("arena_leaderboard"),
+  leaderboard: (period: LeaderboardPeriod = "all"): Promise<Leaderboard> => isDemo
+    ? demo.leaderboard(period)
+    : rpc<Leaderboard>("arena_leaderboard", { p_period: period }),
   usernameConfirmed: () => rpc<boolean>("arena_username_confirmed"),
   saveProfile: async (profile: Omit<Profile, "xp" | "admin">) => {
     if (isDemo) return demo.saveProfile(profile);

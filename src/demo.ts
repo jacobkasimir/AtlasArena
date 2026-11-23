@@ -1,7 +1,7 @@
 import bank from "./demo-content.json";
 import countryData from "./demo-countries.json";
 import {
-  Dashboard, Difficulty, Mode, PlayableQuestion, Profile, Review, ResultView, State,
+  Dashboard, Difficulty, Leaderboard, LeaderboardPeriod, Mode, PlayableQuestion, Profile, Review, ResultView, State,
   Summary, View, Country, ExplorerCountry, eligibleDifficulty, eligibleXP, expired, rank,
   score, shuffle, validateOption
 } from "./domain";
@@ -216,6 +216,25 @@ export const demo = {
       counts.set(key, row);
     }
     return [...counts.values()];
+  },
+  /** The demo has no other players: the board shows the local player only. */
+  async leaderboard(period: LeaderboardPeriod): Promise<Leaderboard> {
+    const data = read();
+    const since = period === "week" ? Date.now() - 7 * 86_400_000 : 0;
+    const done = data.sessions.filter(s => s.status === "completed");
+    const scored = done.filter(s => s.mode !== "practice");
+    const xp = scored.reduce((n, s) => n + stats(s).xp, 0);
+    const points = scored.filter(s => Date.parse(s.createdAt) >= since).reduce((n, s) => n + stats(s).xp, 0);
+    const correct = scored.reduce((n, s) => n + stats(s).correct, 0);
+    const answered = scored.reduce((n, s) => n + s.reviews.length, 0);
+    const you = {
+      rank: points > 0 ? 1 : null, username: data.profile.username, avatar: data.profile.avatar, xp, points,
+      level: 1 + Math.floor(xp / 500), games: done.length,
+      accuracy: answered ? Math.round((100 * correct) / answered) : null,
+      bestStreak: Math.max(0, ...data.sessions.map(s => stats(s).bestStreak)), dailyStreak: 0,
+      lastPlayedAt: done.map(s => s.createdAt).sort().at(-1) ?? null, isYou: true
+    };
+    return { period, totalPlayers: you.rank ? 1 : 0, currentRank: you.rank, players: you.rank ? [you] : [], you, ahead: null };
   },
   async dashboard(offset = 0): Promise<Dashboard> {
     const data = read();
