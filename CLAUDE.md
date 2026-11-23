@@ -72,6 +72,8 @@ If you could not run them, say so explicitly.
 6. Admin rights come only from `auth.users.raw_app_meta_data.atlas_admin`, never from profile fields.
 
 ### Editing questions in the game (admins)
+- Never mark an RPC `stable` or `immutable` if it calls `private.require_admin()`, `private.require_user()` or
+  `private.rate()`: PostgREST runs stable functions read-only and those helpers write.
 - `src/QuestionEditor.tsx`: admins see "Edit question" in the quiz game and on each result review item. It loads the
   latest version with `arena_admin_question(question_id)` and saves through `arena_admin_import` (policy `version`), so
   every edit is validated like an import and creates a new version. "Save and publish" requires the admin to tick that
