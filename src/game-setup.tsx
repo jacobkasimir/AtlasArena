@@ -1,5 +1,6 @@
 // One setup screen for Flags, Capitals and Recall: the same five steps, the same
 // "your best for this setup" line and the same side cards in every game.
+import { Icon } from "./icons";
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { loadSetup, oneOf, saveSetup } from "./prefs";
@@ -364,7 +365,7 @@ export function useTimeLeft(deadlineAt: string | null | undefined, serverNow: st
 export function TimeLeft({ ms }: { ms: number }) {
   return (
     <span className={`time-left ${ms <= 30000 ? "is-low" : ""}`} role="timer" aria-label={`${formatClock(ms)} left`}>
-      <span aria-hidden="true">⏱</span> {formatClock(ms)}
+      <Icon name="timer" size={15} /> {formatClock(ms)}
     </span>
   );
 }

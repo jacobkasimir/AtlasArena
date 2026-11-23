@@ -105,7 +105,7 @@ function Welcome() {
         <p className="text-center font-mono text-sm muted">EXPLORE · LEARN · LEVEL UP</p>
       </div>
       <section className="welcome-games md:col-span-2" aria-labelledby="welcome-games-title">
-        <h2 id="welcome-games-title" className="hub-section-title">Five ways to learn the world</h2>
+        <h2 id="welcome-games-title" className="hub-section-title">Six ways to learn the world</h2>
         <ul className="welcome-game-grid">
           {welcomeGames.map((game) => (
             <li key={game.title}>
@@ -132,6 +132,7 @@ const welcomeGames: { game: keyof typeof games; title: string; text: string }[] 
   { game: "flags", title: "Flags", text: "Match flags and countries, region by region, with hints when you're stuck." },
   { game: "capitals", title: "Capitals", text: "Name the capital – or the country behind it – from memory." },
   { game: "recall", title: "Recall", text: "How many countries of Africa can you name? Type every one you know." },
+  { game: "elimination", title: "Elimination", text: "Four chains of clues – name places that fit them all until one is left." },
   { game: "explorer", title: "Explorer", text: "Browse every country: flags, capitals, languages and neighbours." },
 ];
 

@@ -80,11 +80,11 @@ function continueItems(data: HubData): Continue[] {
   return items;
 }
 
-function GameCard({ to, game, title, text, stat, children, wide }: {
-  to: string; game: keyof typeof games; title: string; text: string; stat?: React.ReactNode; children?: React.ReactNode; wide?: boolean;
+function GameCard({ to, game, title, text, stat, children, wide, full }: {
+  to: string; game: keyof typeof games; title: string; text: string; stat?: React.ReactNode; children?: React.ReactNode; wide?: boolean; full?: boolean;
 }) {
   return (
-    <article className={`hub-card ${wide ? "is-wide" : ""}`}>
+    <article className={`hub-card ${wide ? "is-wide" : ""} ${full ? "is-full" : ""}`}>
       <Link to={to} className="hub-card-link">
         <IconTile name={games[game].icon} tone={games[game].tone} size="lg" />
         <span className="hub-card-title">{title}</span>
@@ -215,7 +215,9 @@ export default function Hub() {
               <span><strong>{unCountries}/{recallCatalog.length}</strong> countries named</span>
               <span><strong>{unCapitals}/{recallCatalog.length}</strong> capitals named</span>
             </> : undefined} />
-          <GameCard to="/explorer" game="explorer" title="Explorer" text="Browse every country: flags, capitals, languages, neighbours and more."
+          <GameCard to="/elimination" game="elimination" title="Elimination" text="Four chains of clues. Name places that fit every clue until only one is left – easy, medium and hard puzzles."
+            stat={<span>24 puzzles · 3 difficulties</span>} />
+          <GameCard full to="/explorer" game="explorer" title="Explorer" text="Browse every country: flags, capitals, languages, neighbours and more."
             stat={<span>Practice any country with one click</span>} />
         </div>
       </section>

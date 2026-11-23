@@ -15,6 +15,7 @@ const Explorer = lazy(() => import("./Explorer"));
 const Flags = lazy(() => import("./Flags"));
 const Capitals = lazy(() => import("./Capitals"));
 const Recall = lazy(() => import("./Recall"));
+const Elimination = lazy(() => import("./Elimination"));
 const Hub = lazy(() => import("./Hub"));
 const Review = lazy(() => import("./Review"));
 const QuizSetup = lazy(() => import("./Quiz").then((module) => ({ default: module.QuizSetup })));
@@ -27,6 +28,7 @@ const tabs = [
   { to: "/flags", label: "Flags", icon: "flag" },
   { to: "/capitals", label: "Capitals", icon: "capital" },
   { to: "/recall", label: "Recall", icon: "recall" },
+  { to: "/elimination", label: "Elimination", icon: "funnel" },
   { to: "/explorer", label: "Explorer", icon: "explorer" },
 ] satisfies { to: string; label: string; icon: IconName }[];
 
@@ -726,6 +728,14 @@ export default function App() {
           element={
             <Protected>
               <Recall />
+            </Protected>
+          }
+        />
+        <Route
+          path="elimination/*"
+          element={
+            <Protected>
+              <Elimination />
             </Protected>
           }
         />

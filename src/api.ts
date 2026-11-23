@@ -4,7 +4,7 @@ import type { RecallAnswerResult, RecallChoice, RecallSession, RecallSetup } fro
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, LeaderboardPeriod, Mode, Profile, ResultView, View } from "./domain";
 import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalBest, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
-import type { Achievement, DailyStatus, QuizCatalogRow, ReviewSession, ReviewSummary, RoundOptions } from "./domain";
+import type { Achievement, DailyStatus, EliminationGuess, EliminationPuzzle, EliminationView, QuizCatalogRow, ReviewSession, ReviewSummary, RoundOptions } from "./domain";
 import type { GameStats, PersonalBest } from "./game-setup";
 import { demoGameStats, demoPersonalBests } from "./bests-demo";
 import type { AdminQuestionInfo } from "./QuestionEditor";
@@ -151,6 +151,13 @@ export const api = {
   reviewView: (id: string) => isDemo ? onlineOnly<ReviewSession>("Review my mistakes") : rpc<ReviewSession>("arena_review_view", { p_session_id: id }),
   reviewAnswer: (id: string, position: number, answer: string) => isDemo ? onlineOnly<ReviewSession>("Review my mistakes")
     : rpc<ReviewSession>("arena_review_answer", { p_session_id: id, p_position: position, p_answer: answer }),
+  elimCatalog: () => isDemo ? onlineOnly<EliminationPuzzle[]>("Category Elimination") : rpc<EliminationPuzzle[]>("arena_elim_catalog"),
+  elimStart: (puzzle: string, requestId: string) => isDemo ? onlineOnly<EliminationView>("Category Elimination")
+    : rpc<EliminationView>("arena_elim_start", { p_puzzle: puzzle, p_request_id: requestId }),
+  elimView: (id: string) => isDemo ? onlineOnly<EliminationView>("Category Elimination") : rpc<EliminationView>("arena_elim_view", { p_id: id }),
+  elimGuess: (id: string, text: string) => isDemo ? onlineOnly<EliminationGuess>("Category Elimination")
+    : rpc<EliminationGuess>("arena_elim_guess", { p_id: id, p_text: text }),
+  elimGiveUp: (id: string) => isDemo ? onlineOnly<EliminationView>("Category Elimination") : rpc<EliminationView>("arena_elim_give_up", { p_id: id }),
   achievements: () => isDemo ? onlineOnly<Achievement[]>("Achievements") : rpc<Achievement[]>("arena_achievements"),
   personalBests: () => isDemo ? demoPersonalBests() : rpc<PersonalBest[]>("arena_personal_bests"),
   gameStats: () => isDemo ? demoGameStats() : rpc<GameStats>("arena_game_stats"),

@@ -7,15 +7,16 @@ searchable atlas, learn them in focused games, and come back to beat your own re
 
 ## What you can play
 
-| | Game | What you do |
-|---|---|---|
-| ◎ | **Quiz** | Multiple-choice questions in four modes – Classic (10 questions), Practice, Timed (60 s) and Endless (three lives, harder every five correct answers) – across four difficulty tiers and many topics |
-| 🏳️ | **Flags** | See a country and pick its flag, or see a flag and type the country. Region hints when you're stuck |
-| 🏛️ | **Capitals** | Name the capital – or the country behind it – from memory. No suggestions while you type |
-| 🧠 | **Recall** | How many countries of Africa can you name? Type every place in a set; each correct answer drops into place |
-| 🧭 | **Explorer** | Browse every country and territory: flag, capital, population, area, languages, currency and clickable neighbours |
+| Game | What you do |
+|---|---|
+| **Quiz** | Multiple-choice questions in four modes – Classic (10 questions), Practice, Timed (60 s) and Endless (three lives, harder every five correct answers) – across four difficulty tiers and many topics |
+| **Flags** | See a country and pick its flag, or see a flag and type the country. Region hints when you're stuck |
+| **Capitals** | Name the capital – or the country behind it – from memory. No suggestions while you type |
+| **Recall** | How many countries of Africa can you name? Type every place in a set; each correct answer drops into place |
+| **Elimination** | Four colour chains of clues (after JetPunk's *Category Elimination*): every place you name must fit all clues shown so far, until one place is left. 24 puzzles – 8 easy, 8 medium, 8 hard |
+| **Explorer** | Browse every country and territory: flag, capital, population, area, languages, currency and clickable neighbours |
 
-Answers in Capitals, Recall and the mistake review are accepted in **English, German or French** – accents, capital
+Answers in Capitals, Recall, Elimination and the mistake review are accepted in **English, German or French** – accents, capital
 letters, hyphens and spaces don't matter.
 
 ### One setup for Flags, Capitals and Recall
@@ -73,7 +74,7 @@ browser before they are needed (Recall uses salted hashes of the accepted spelli
 |---|---|
 | `src/api.ts` | The only module that talks to Supabase; every call also has a local demo branch |
 | `src/game-setup.tsx` | The shared setup screen, personal bests, timer and round tags |
-| `src/Quiz.tsx`, `src/Flags.tsx`, `src/Capitals.tsx`, `src/Recall.tsx`, `src/Explorer.tsx` | The games |
+| `src/Quiz.tsx`, `src/Flags.tsx`, `src/Capitals.tsx`, `src/Recall.tsx`, `src/Elimination.tsx`, `src/Explorer.tsx` | The games |
 | `src/Hub.tsx`, `src/Today.tsx`, `src/Review.tsx`, `src/Statistics.tsx`, `src/Achievements.tsx`, `src/Leaderboard.tsx` | Home, daily challenge, mistake review, statistics, achievements and leaderboard |
 | `src/icons.tsx` | The app's SVG icon set and per-game accent colours |
 | `src/Admin.tsx`, `src/AdminReview.tsx`, `src/QuestionEditor.tsx` | Admin tools |

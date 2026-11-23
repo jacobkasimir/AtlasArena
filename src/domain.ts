@@ -409,3 +409,24 @@ export type Achievement = {
   title: string; description: string; current: number; target: number; earned: boolean;
 };
 export type QuizCatalogRow = { topic: string; difficulty: Difficulty; kind: "mc" | "tf"; count: number };
+
+// Category Elimination: four colour groups of clue chains; every revealed clue must fit the named place.
+export type EliminationDifficulty = "easy" | "medium" | "hard";
+export type EliminationColour = "green" | "orange" | "blue" | "purple";
+export type EliminationPlace = { code: string; name: string };
+export type EliminationPuzzle = {
+  id: string; difficulty: EliminationDifficulty; number: number; pool: "un" | "all"; timeLimitSeconds: number;
+  groups: number; total: number; plays: number; best: { solved: number; elapsedMs: number } | null; activeId: string | null;
+};
+export type EliminationStep = { label: string; remaining: number; answer: EliminationPlace | null };
+export type EliminationGroup = { colour: EliminationColour; size: number; solved: number; answer: EliminationPlace | null; steps: EliminationStep[] };
+export type EliminationView = {
+  id: string; puzzleId: string; difficulty: EliminationDifficulty; number: number; pool: "un" | "all";
+  state: "active" | "completed" | "abandoned"; endReason: "all_solved" | "time_up" | "gave_up" | null;
+  timeLimitSeconds: number; deadlineAt: string; serverNow: string; elapsedMs: number;
+  solved: number; total: number; guesses: number; wrong: number; groups: EliminationGroup[];
+};
+export type EliminationGuess = {
+  result: "advanced" | "no_match" | "unknown" | "ambiguous" | "empty" | "finished";
+  place?: EliminationPlace; advanced?: EliminationColour[]; view: EliminationView;
+};

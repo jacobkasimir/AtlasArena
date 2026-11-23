@@ -46,6 +46,7 @@ const paths = {
   hourglass: <path d="M6 3h12M6 21h12M7 3v2.5c0 2.5 5 4 5 6.5s-5 4-5 6.5V21M17 3v2.5c0 2.5-5 4-5 6.5s5 4 5 6.5V21" />,
   book: <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H20v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H20M9 7.5h7" />,
   podium: <path d="M3 21V14h6v7M9 21V9h6v12M15 21v-5h6v5M3 21h18M12 3.5l.9 1.8 2 .3-1.4 1.4.3 2-1.8-.9-1.8.9.3-2-1.4-1.4 2-.3z" />,
+  funnel: <path d="M3 4.5h18l-7 8.2v6.3l-4 2v-8.3z" />,
   checkCircle: <><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.5 9.5" /></>,
   warning: <path d="M12 3.5 2.5 20h19zM12 10v4.5M12 17.5h.01" />,
 } satisfies Record<string, ReactNode>;
@@ -64,7 +65,7 @@ export function Icon({ name, size = 20, className, label }: { name: IconName; si
 }
 
 /** Accent colour per game / feature. */
-export type Tone = "quiz" | "flags" | "capitals" | "recall" | "explorer" | "daily" | "review" | "awards" | "neutral";
+export type Tone = "elimination" | "quiz" | "flags" | "capitals" | "recall" | "explorer" | "daily" | "review" | "awards" | "neutral";
 
 /** Rounded square with a tinted background and a coloured icon – used for games, modes and feature cards. */
 export function IconTile({ name, tone, size = "md" }: { name: IconName; tone: Tone; size?: "sm" | "md" | "lg" }) {
@@ -79,6 +80,7 @@ export const games = {
   capitals: { icon: "capital", tone: "capitals" },
   recall: { icon: "recall", tone: "recall" },
   explorer: { icon: "explorer", tone: "explorer" },
+  elimination: { icon: "funnel", tone: "elimination" },
   daily: { icon: "calendar", tone: "daily" },
   review: { icon: "review", tone: "review" },
   achievements: { icon: "medal", tone: "awards" },
