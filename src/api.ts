@@ -4,7 +4,7 @@ import type { RecallAnswerResult, RecallChoice, RecallSession, RecallSetup } fro
 import { demo } from "./demo";
 import { Country, ExplorerCountry, Dashboard, Difficulty, Leaderboard, LeaderboardPeriod, Mode, Profile, ResultView, View } from "./domain";
 import { CapitalDirection, CapitalPoolMode, CapitalSession, CapitalBest, CapitalSetup, FlagsBestBoard, FlagsDirection, FlagsPoolTier, FlagsSession, FlagsSetup } from "./domain";
-import type { Achievement, DailyStatus, EliminationGuess, EliminationPuzzle, EliminationView, QuizCatalogRow, ReviewSession, ReviewSummary, RoundOptions } from "./domain";
+import type { Achievement, DailyStatus, EliminationCandidates, EliminationGuess, EliminationHint, EliminationPuzzle, EliminationView, QuizCatalogRow, ReviewSession, ReviewSummary, RoundOptions } from "./domain";
 import type { GameStats, PersonalBest } from "./game-setup";
 import { demoGameStats, demoPersonalBests } from "./bests-demo";
 import type { AdminQuestionInfo } from "./QuestionEditor";
@@ -157,6 +157,16 @@ export const api = {
   elimView: (id: string) => isDemo ? onlineOnly<EliminationView>("Category Elimination") : rpc<EliminationView>("arena_elim_view", { p_id: id }),
   elimGuess: (id: string, text: string) => isDemo ? onlineOnly<EliminationGuess>("Category Elimination")
     : rpc<EliminationGuess>("arena_elim_guess", { p_id: id, p_text: text }),
+  /** Full candidate lists for one group (1-based); the server refuses while the round is active. */
+  elimCandidates: (id: string, group: number) =>
+    isDemo
+      ? onlineOnly<EliminationCandidates>("Category Elimination")
+      : rpc<EliminationCandidates>("arena_elim_candidates", { p_id: id, p_group: group }),
+  /** Spends (or re-opens for free) a hint for the open clue of one group (1-based); online only. */
+  elimHint: (id: string, group: number) =>
+    isDemo
+      ? onlineOnly<EliminationHint>("Category Elimination")
+      : rpc<EliminationHint>("arena_elim_hint", { p_id: id, p_group: group }),
   elimGiveUp: (id: string) => isDemo ? onlineOnly<EliminationView>("Category Elimination") : rpc<EliminationView>("arena_elim_give_up", { p_id: id }),
   achievements: () => isDemo ? onlineOnly<Achievement[]>("Achievements") : rpc<Achievement[]>("arena_achievements"),
   personalBests: () => isDemo ? demoPersonalBests() : rpc<PersonalBest[]>("arena_personal_bests"),

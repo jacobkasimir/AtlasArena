@@ -425,6 +425,35 @@ export type EliminationView = {
   state: "active" | "completed" | "abandoned"; endReason: "all_solved" | "time_up" | "gave_up" | null;
   timeLimitSeconds: number; deadlineAt: string; serverNow: string; elapsedMs: number;
   solved: number; total: number; guesses: number; wrong: number; groups: EliminationGroup[];
+  /** True once the player has used a hint: the round still finishes but never counts as a personal best. */
+  hinted: boolean;
+  hintsUsed: number;
+  hintsLeft: number;
+  hintLimit: number;
+  /** Hints already paid for (1-based group and clue step); re-opening one of these is free. */
+  hints: EliminationHintKey[];
+};
+export type EliminationHintKey = { group: number; step: number };
+/** A place that fits clue 1 of a group; `depth` is the last clue step (1-based) it still fits. */
+export type EliminationCandidate = EliminationPlace & { depth: number };
+/** Every place behind the counts of one group – only sent by the server once the round is over. */
+export type EliminationCandidates = {
+  group: number;
+  colour: EliminationColour;
+  answer: EliminationPlace | null;
+  steps: { label: string; remaining: number; pick: EliminationPlace | null }[];
+  places: EliminationCandidate[];
+};
+/**
+ * A mid-round hint: the candidate list for the current open clue step of one group, cut to that step.
+ * `steps` holds clues 1..step only, every place fits all of them (depth = step) and `answer` is always null.
+ */
+export type EliminationHint = EliminationCandidates & {
+  step: number;
+  size: number;
+  /** True when this hint had already been paid for, so nothing was spent. */
+  free: boolean;
+  view: EliminationView;
 };
 export type EliminationGuess = {
   result: "advanced" | "no_match" | "unknown" | "ambiguous" | "empty" | "finished";

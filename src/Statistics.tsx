@@ -5,6 +5,7 @@ import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
 import { BestsList, GameId, GameStats, PersonalBest, formatClock, gameNames } from "./game-setup";
 import { Chips } from "./setup-ui";
+import { prefersReducedMotion } from "./prefs";
 import type { Achievement } from "./domain";
 import { AchievementsGrid } from "./Achievements";
 import { IconTile, games as gameIcons } from "./icons";
@@ -34,8 +35,9 @@ export function Statistics() {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!data) return;
-    if (location.hash === "#statistics") ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (location.hash === "#achievements") document.getElementById("achievements")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const behavior: ScrollBehavior = prefersReducedMotion() ? "auto" : "smooth";
+    if (location.hash === "#statistics") ref.current?.scrollIntoView({ behavior, block: "start" });
+    if (location.hash === "#achievements") document.getElementById("achievements")?.scrollIntoView({ behavior, block: "start" });
   }, [data, location.hash]);
 
   const bests = (data?.bests ?? []).filter((best) => !game || best.game === game);

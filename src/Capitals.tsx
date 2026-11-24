@@ -3,8 +3,11 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import { AUTO_CONTINUE_MS, haptic, isIOS, usePrefs } from "./prefs";
-import { StreakBadge } from "./setup-ui";
+import { autoContinueMs, haptic, isIOS, showCountdown, useLeaveGuard, usePrefs } from "./prefs";
+import { cue } from "./sound";
+import { ContinueHint, StreakBadge } from "./setup-ui";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { isContinueKey, useGameKeys } from "./keys";
 import { CapitalDirection, CapitalEntry, CapitalSession, CapitalSetup, CapitalVocabularyOption } from "./domain";
 import { capitalPercentage } from "./capitals-domain";
 import {
@@ -115,9 +118,12 @@ function Game() {
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const [now, setNow] = useState(Date.now());
   const prefs = usePrefs();
+  useLeaveGuard(session?.state === "active");
   const inputRef = useRef<HTMLInputElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const submitLock = useRef(false);
+  const gameKeys = useGameKeys();
+  gameKeys.current = null;
   async function load() {
     try {
       setError("");
@@ -154,7 +160,7 @@ function Game() {
   const autoContinue = Boolean(prefs.autoContinue && current?.outcome === "correct" && session?.state === "active");
   useEffect(() => {
     if (!autoContinue) return;
-    const timer = window.setTimeout(() => void next(), AUTO_CONTINUE_MS);
+    const timer = window.setTimeout(() => void next(), autoContinueMs(prefs.autoContinueSpeed));
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoContinue, current?.id]);
@@ -185,21 +191,22 @@ function Game() {
     try {
       const result = await action();
       if (result.state === "completed") {
-        haptic("complete");
+        cue("complete");
         navigate("/capitals/results/" + result.id);
         return;
       }
       setSession(result);
       if (result.actionResult?.outcome === "ambiguous") {
         setMessage("That name fits more than one place – please be more specific. No attempt was used.");
-        inputRef.current?.focus();
+        // The input is disabled until this request settles; focus it after the re-render.
+        window.setTimeout(() => inputRef.current?.select(), 0);
       } else if (result.actionResult?.outcome === "correct") {
-        haptic("correct");
+        cue("correct");
         const lang = result.actionResult.lang;
         setMessage(`Correct · 100 points${lang === "de" ? " · accepted in German" : lang === "fr" ? " · accepted in French" : ""}.`);
       }
       else if (result.actionResult?.outcome === "incorrect") {
-        haptic("wrong");
+        cue("wrong");
         setMessage("Not quite · 0 points.");
       }
       else if (result.actionResult?.outcome === "skipped") setMessage("Skipped · 0 points.");
@@ -227,19 +234,24 @@ function Game() {
     void act(() => api.capitalsSkip(session.id, current.id, requestId()));
   }
   async function next() {
-    if (!session) return;
+    if (!session || submitLock.current) return;
+    submitLock.current = true;
     setBusy(true);
+    setError("");
     try {
       const result = await api.capitalsNext(session.id, requestId());
-      setSession(result);
       if (result.state === "completed") {
-        haptic("complete");
+        cue("complete");
         navigate("/capitals/results/" + session.id);
+        return;
       }
+      setSession(result);
     } catch (cause) {
       setError((cause as Error).message);
+      void load();
     } finally {
       setBusy(false);
+      submitLock.current = false;
     }
   }
   function abandonNow() {
@@ -285,6 +297,14 @@ function Game() {
         </section>
       </div>
     );
+  gameKeys.current = (event) => {
+    if (!finalized || !isContinueKey(event, prefs.continueKeys)) return;
+    // Enter/Space on another control keeps its own meaning (the Next button handles itself).
+    if ((event.target as HTMLElement).closest("a,button,summary")) return;
+    event.preventDefault();
+    if (!busy && !event.repeat) void next();
+  };
+  const clock = (ms: number) => (timeLeft !== null && !showCountdown(prefs, timeLeft) ? "Timed" : formatTime(ms));
   const timer =
     session.state === "completed"
       ? (session.elapsedMs ?? 0)
@@ -335,7 +355,7 @@ function Game() {
           <small>Points</small>
         </span>
         <span>
-          <strong>{formatTime(timeLeft ?? timer)}</strong>
+          <strong>{clock(timeLeft ?? timer)}</strong>
           <small>{timeLeft !== null ? "Left" : "Elapsed"}</small>
         </span>
       </div>
@@ -363,6 +383,12 @@ function Game() {
                 autoCapitalize="words"
                 spellCheck={false}
                 enterKeyHint="go"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape" && answer) {
+                    event.preventDefault();
+                    setAnswer("");
+                  }
+                }}
               />
             </div>
             <p className="capitals-answer-hint">
@@ -434,6 +460,12 @@ function Game() {
               <span aria-hidden="true">→</span>
             </button>
           )}
+          {finalized && (
+            <ContinueHint
+              className="mt-3"
+              action={session.answered === session.total ? "to see your results" : "for the next question"}
+            />
+          )}
         </section>
         <aside className="card capitals-stats">
           <h2>Round status</h2>
@@ -462,7 +494,7 @@ function Game() {
             </div>
             <div>
               <dt>{timeLeft !== null ? "Time left" : "Elapsed"}</dt>
-              <dd>{formatTime(timeLeft ?? timer)}</dd>
+              <dd>{clock(timeLeft ?? timer)}</dd>
             </div>
           </dl>
           <p className="capitals-timer-note">
@@ -490,33 +522,17 @@ function Game() {
         </aside>
       </div>
       {confirmAbandon && (
-        <div
-          className="flags-dialog-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setConfirmAbandon(false);
-          }}
+        <ConfirmDialog
+          id="capitals-abandon"
+          title="Abandon this round?"
+          cancelLabel="Keep playing"
+          confirmLabel="Abandon round"
+          busy={busy}
+          onCancel={() => setConfirmAbandon(false)}
+          onConfirm={() => void abandonNow()}
         >
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="capitals-abandon-title"
-            className="card flags-confirm"
-          >
-            <h2 id="capitals-abandon-title">Abandon this round?</h2>
-            <p>This ends the round permanently. It will not count toward personal bests.</p>
-            <div>
-              <button className="secondary" onClick={() => setConfirmAbandon(false)}>
-                Keep playing
-              </button>
-              <button
-                className="danger"
-                onClick={() => void abandonNow()}
-              >
-                Abandon round
-              </button>
-            </div>
-          </section>
-        </div>
+          This ends the round permanently. It will not count toward personal bests.
+        </ConfirmDialog>
       )}
     </div>
   );

@@ -3,7 +3,7 @@
 import { Icon } from "./icons";
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { loadSetup, oneOf, saveSetup } from "./prefs";
+import { CALM_ROUND_MS, loadSetup, oneOf, saveSetup, showCountdown, usePrefs } from "./prefs";
 import { Chips, ModePage, OptionCard, OptionCards, ResumeItem, ResumeList, SetupForm, SideCard, StartBar, Step } from "./setup-ui";
 
 export type GameId = "flags" | "capitals" | "recall";
@@ -363,6 +363,19 @@ export function useTimeLeft(deadlineAt: string | null | undefined, serverNow: st
 }
 
 export function TimeLeft({ ms }: { ms: number }) {
+  const prefs = usePrefs();
+  if (!showCountdown(prefs, ms)) {
+    // Calm timer (Settings): the countdown appears only for the last 30 seconds.
+    return (
+      <span
+        className="time-left is-calm"
+        role="timer"
+        aria-label={`Timed round, countdown appears for the last ${CALM_ROUND_MS / 1000} seconds`}
+      >
+        <Icon name="timer" size={15} /> Timed
+      </span>
+    );
+  }
   return (
     <span className={`time-left ${ms <= 30000 ? "is-low" : ""}`} role="timer" aria-label={`${formatClock(ms)} left`}>
       <Icon name="timer" size={15} /> {formatClock(ms)}

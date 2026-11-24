@@ -3,6 +3,7 @@
 import { Icon } from "./icons";
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { usePrefs } from "./prefs";
 
 export function ModePage({ eyebrow, title, intro, side, children }: {
   eyebrow: string; title: string; intro: ReactNode; side?: ReactNode; children: ReactNode;
@@ -152,5 +153,23 @@ export function AutoContinueBar({ ms, onSkip }: { ms: number; onSkip?: () => voi
     <button type="button" className="auto-continue" onClick={onSkip} aria-label="Continue now">
       <span style={{ animationDuration: `${ms}ms` }} />
     </button>
+  );
+}
+
+/** "Press Enter (or Space) to …" under in-game feedback; hidden when keyboard hints are off in Settings. */
+export function ContinueHint({ action, className = "" }: { action: string; className?: string }) {
+  const prefs = usePrefs();
+  if (!prefs.keyboardHints) return null;
+  return (
+    <p className={`game-keyboard-hint muted text-sm ${className}`}>
+      Press <kbd>Enter</kbd>
+      {prefs.continueKeys === "enter-space" && (
+        <>
+          {" "}
+          or <kbd>Space</kbd>
+        </>
+      )}{" "}
+      {action}
+    </p>
   );
 }

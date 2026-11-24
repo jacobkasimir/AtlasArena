@@ -19,7 +19,21 @@ import {
   modes,
   setsNewPersonalBest,
 } from "./domain";
-import { AUTO_CONTINUE_MS, haptic, isIOS, loadSetup, oneOf, saveSetup, usePrefs } from "./prefs";
+import {
+  CALM_QUESTION_MS,
+  autoContinueMs,
+  haptic,
+  isIOS,
+  loadSetup,
+  oneOf,
+  saveSetup,
+  showCountdown,
+  useLeaveGuard,
+  usePrefs,
+} from "./prefs";
+import { cue } from "./sound";
+import { hasModifier, isContinueKey, isTypingTarget, modalOpen, numberKeyIndex } from "./keys";
+import { useModalDialog } from "./useDialog";
 import { accuracy, modeDescriptions, modeIcons, modeNames } from "./quiz-meta";
 import {
   AutoContinueBar,
@@ -272,11 +286,13 @@ export function Game() {
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const leaveDialogRef = useRef<HTMLElement>(null);
+  const promptRef = useRef<HTMLHeadingElement>(null);
   const pendingRef = useRef(false);
   const offset = useRef(0);
   const [now, setNow] = useState(Date.now());
   const finalizedEvent = useRef(false);
   const prefs = usePrefs();
+  useLeaveGuard(Boolean(view && view.status !== "completed" && view.status !== "abandoned"));
   const lastFeedbackKey = useRef("");
   // The last answer finishes the run on the server; keep its feedback on screen until the player finishes the round.
   const [finalHold, setFinalHold] = useState<{ current: PlayableQuestion; feedback: Review } | null>(null);
@@ -310,35 +326,10 @@ export function Game() {
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    if (!leaveDialogOpen) return;
-    leaveDialogRef.current?.querySelector<HTMLElement>(".leave-run-cancel")?.focus();
-    const oldOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setLeaveDialogOpen(false);
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const nodes = leaveDialogRef.current?.querySelectorAll<HTMLElement>("button:not(:disabled)");
-      if (!nodes?.length) return;
-      const first = nodes[0],
-        last = nodes[nodes.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = oldOverflow;
-    };
-  }, [leaveDialogOpen]);
+  useModalDialog(leaveDialogOpen, leaveDialogRef, () => setLeaveDialogOpen(false), {
+    initialFocus: ".leave-run-cancel",
+    canClose: () => !deletePending,
+  });
 
   // While the final answer is held on screen, show the finished run as if it were still giving feedback.
   const shown: View | undefined =
@@ -424,32 +415,33 @@ export function Game() {
   useEffect(() => {
     if (!feedbackKey || feedbackKey === lastFeedbackKey.current || !shown?.feedback) return;
     lastFeedbackKey.current = feedbackKey;
-    haptic(shown.feedback.correct ? "correct" : "wrong");
+    cue(shown.feedback.correct ? "correct" : "wrong");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feedbackKey]);
   const autoContinue = Boolean(feedbackKey && prefs.autoContinue && shown?.feedback?.correct);
   useEffect(() => {
     if (!autoContinue) return;
-    const timer = window.setTimeout(() => continueOn(), AUTO_CONTINUE_MS);
+    const timer = window.setTimeout(() => continueOn(), autoContinueMs(prefs.autoContinueSpeed));
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoContinue, feedbackKey]);
   useEffect(() => {
-    if (shown?.status === "completed") haptic("complete");
+    if (shown?.status === "completed") cue("complete");
   }, [shown?.status]);
 
   useEffect(() => {
     function keydown(e: KeyboardEvent) {
+      if (e.defaultPrevented || modalOpen() || isTypingTarget(e.target) || hasModifier(e)) return;
       const target = e.target as HTMLElement;
-      if (target.closest("input,textarea,select,[contenteditable=true]") || e.altKey || e.ctrlKey || e.metaKey) return;
-      if (shown?.status === "showing_feedback" && (e.key === "Enter" || e.code === "Space") && !target.closest("a")) {
+      if (shown?.status === "showing_feedback" && isContinueKey(e, prefs.continueKeys)) {
+        // Enter/Space on another control (link, admin edit, leave run) keeps its own meaning.
+        if (target.closest("a,button:not(.game-next-button),summary")) return;
         e.preventDefault();
-        if (!pending) continueOn();
+        if (!pending && !e.repeat) continueOn();
         return;
       }
-      if (e.repeat || shown?.status !== "awaiting_answer" || remaining === 0) return;
-      const index = Number(e.key) - 1;
-      const option = shown.current?.options[index];
+      if (!prefs.numberKeys || e.repeat || shown?.status !== "awaiting_answer" || remaining === 0) return;
+      const option = shown.current?.options[numberKeyIndex(e, shown.current.options.length)];
       if (option) {
         e.preventDefault();
         void action("answer", option.id);
@@ -458,6 +450,15 @@ export function Game() {
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
   });
+
+  // A new question: put keyboard focus on its prompt, so Tab reaches the answers next.
+  const currentQuestionId = shown?.status === "awaiting_answer" ? shown.current?.id : undefined;
+  useEffect(() => {
+    if (!currentQuestionId) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || !active.closest("button:not(:disabled),a,input,select,textarea"))
+      promptRef.current?.focus({ preventScroll: true });
+  }, [currentQuestionId]);
 
   if (!shown) return error ? <ErrorBox message={error} retry={refresh} /> : <Loading />;
   if (shown.status === "abandoned")
@@ -505,7 +506,7 @@ export function Game() {
               className={`card game-question map-grid ${shown.status === "showing_feedback" && shown.feedback?.correct ? "has-correct-answer" : ""} ${shown.status === "showing_feedback" && shown.feedback && !shown.feedback.correct ? "has-incorrect-answer" : ""}`}
             >
               <StreakBadge streak={shown.stats.streak} />
-              <h1 tabIndex={-1} className="game-prompt mt-6">
+              <h1 ref={promptRef} tabIndex={-1} className="game-prompt mt-6">
                 {shown.current.prompt}
               </h1>
               <div className="answer-grid grid gap-3 sm:grid-cols-2 mt-7">
@@ -531,9 +532,9 @@ export function Game() {
                   </button>
                 ))}
               </div>
-              {prefs.keyboardHints && (
+              {prefs.keyboardHints && prefs.numberKeys && (
                 <p className="keyboard-hint muted text-sm mt-5">
-                  <span className="keycap">1</span>–<span className="keycap">4</span> to answer
+                  <span className="keycap">1</span>–<span className="keycap">{Math.min(9, shown.current.options.length)}</span> to answer
                 </p>
               )}
             </section>
@@ -541,7 +542,14 @@ export function Game() {
           <ErrorBox message={error} retry={refresh} />
           {shown.feedback && prefs.keyboardHints && (
             <p className="game-keyboard-hint muted text-sm mt-3">
-              Press <kbd>Enter</kbd> or <kbd>Space</kbd> {finalAnswer ? "to finish the round" : "for the next question"}
+              Press <kbd>Enter</kbd>
+              {prefs.continueKeys === "enter-space" && (
+                <>
+                  {" "}
+                  or <kbd>Space</kbd>
+                </>
+              )}{" "}
+              {finalAnswer ? "to finish the round" : "for the next question"}
             </p>
           )}
           {remaining === 0 && shown.status !== "completed" && (
@@ -599,7 +607,12 @@ export function Game() {
             </div>
           )}
           {shown.deadline &&
-            (remaining !== null ? (
+            (remaining !== null && !showCountdown(prefs, remaining, CALM_QUESTION_MS) ? (
+              <div className="game-stat timer-stat is-paused">
+                <span>Challenge timer</span>
+                <strong>Countdown shows for the last {CALM_QUESTION_MS / 1000}s</strong>
+              </div>
+            ) : remaining !== null ? (
               <div className="game-stat timer-stat">
                 <div className="timer-label-row">
                   <span>Time left</span>
@@ -661,7 +674,7 @@ export function Game() {
               >
                 {pending ? "Loading…" : finalAnswer ? "Finish round · See results →" : "Next question →"}
               </button>
-              {autoContinue && !pending && <AutoContinueBar ms={AUTO_CONTINUE_MS} onSkip={() => continueOn()} />}
+              {autoContinue && !pending && <AutoContinueBar ms={autoContinueMs(prefs.autoContinueSpeed)} onSkip={() => continueOn()} />}
             </section>
           )}
           {!shown.feedback && (

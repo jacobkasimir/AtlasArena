@@ -5,7 +5,7 @@ import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
 import type { ReviewItem, ReviewSession, ReviewSummary } from "./domain";
-import { haptic } from "./prefs";
+import { cue } from "./sound";
 
 const requestId = () => crypto.randomUUID();
 const kindLabel: Record<ReviewItem["kind"], string> = { quiz: "Quiz question", flag: "Flag", capital: "Capital" };
@@ -84,7 +84,7 @@ function ItemCard({ session, item, onAnswered }: { session: ReviewSession; item:
     try {
       const next = await api.reviewAnswer(session.id, item.position, value);
       const result = next.items.find((entry) => entry.position === item.position);
-      haptic(result?.correct ? "correct" : "wrong");
+      cue(result?.correct ? "correct" : "wrong");
       onAnswered(next);
     } catch (cause) {
       setMessage(friendlyReviewError((cause as Error).message));

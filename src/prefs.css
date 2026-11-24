@@ -1,0 +1,111 @@
+/*
+ * Display preferences from Settings (src/prefs.ts sets the data attributes on <html>).
+ * Loaded after style.css so these rules win over the defaults.
+ */
+
+/* ---------- Reduce motion (in addition to prefers-reduced-motion) ---------- */
+html[data-motion="reduce"] { scroll-behavior: auto; }
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: .01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .01ms !important;
+}
+
+/* ---------- Text size: everything is rem based, so scaling the root scales the UI ---------- */
+html[data-text-size="large"] { font-size: 112.5%; }
+html[data-text-size="larger"] { font-size: 125%; }
+html[data-text-size="large"] input:not([type=checkbox]):not([type=radio]),
+html[data-text-size="large"] select,
+html[data-text-size="large"] textarea,
+html[data-text-size="larger"] input:not([type=checkbox]):not([type=radio]),
+html[data-text-size="larger"] select,
+html[data-text-size="larger"] textarea { font-size: max(16px, 1rem); }
+
+/* ---------- High contrast: stronger muted text, borders and focus, in both themes ---------- */
+html[data-contrast="more"][data-theme="dark"] {
+  --c-muted: 214 223 238;
+  --c-line: 196 210 232;
+  --c-focus: 94 234 222;
+}
+html[data-contrast="more"][data-theme="light"] {
+  --c-muted: 38 50 70;
+  --c-line: 30 45 70;
+  --c-focus: 0 84 80;
+}
+@media (prefers-color-scheme: dark) {
+  html[data-contrast="more"]:not([data-theme="light"]) {
+    --c-muted: 214 223 238;
+    --c-line: 196 210 232;
+    --c-focus: 94 234 222;
+  }
+}
+@media (prefers-color-scheme: light) {
+  html[data-contrast="more"]:not([data-theme="dark"]) {
+    --c-muted: 38 50 70;
+    --c-line: 30 45 70;
+    --c-focus: 0 84 80;
+  }
+}
+html[data-contrast="more"] .card,
+html[data-contrast="more"] .answer,
+html[data-contrast="more"] .secondary { border-color: rgb(var(--c-line) / .6); }
+html[data-contrast="more"] :focus-visible { outline-width: 4px; }
+
+/* ---------- Compact density: tighter spacing so more fits on a desktop screen ---------- */
+html[data-density="compact"] .card { padding: 1rem 1.15rem; }
+html[data-density="compact"] .answer { min-height: 56px; padding-block: .65rem; }
+html[data-density="compact"] .game-question { min-height: 340px; padding: clamp(1rem, 2vw, 1.6rem); }
+html[data-density="compact"] .game-layout,
+html[data-density="compact"] .hub-grid,
+html[data-density="compact"] .mode-setup-grid { gap: .75rem; }
+html[data-density="compact"] .setting-list > * { padding-block: .65rem; }
+html[data-density="compact"] .primary,
+html[data-density="compact"] .secondary,
+html[data-density="compact"] .danger-button { min-height: 40px; padding-block: .5rem; }
+
+/* ---------- Focus outline after mouse clicks too ---------- */
+html[data-focus="always"] :focus:not(h1):not(h2):not(main):not([role="dialog"]) {
+  outline: 3px solid rgb(var(--c-focus));
+  outline-offset: 3px;
+}
+
+/* ---------- Calm timer chip (countdown hidden until time is nearly up) ---------- */
+.time-left.is-calm { font-weight: 700; color: rgb(var(--c-muted)); }
+
+/* ---------- Keyboard shortcut list and "?" overlay ---------- */
+.shortcut-groups { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.shortcut-group-title { margin-bottom: .45rem; color: rgb(var(--c-focus)); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.shortcut-row { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr); gap: .75rem; align-items: baseline; padding: .4rem 0; border-top: 1px solid rgb(var(--c-line) / .12); }
+.shortcut-row:first-child { border-top: 0; }
+.shortcut-row dt { white-space: nowrap; }
+.shortcut-row dd { margin: 0; color: rgb(var(--c-muted)); font-size: .85rem; }
+.shortcut-row kbd,
+.setting-row kbd,
+.keycap-inline { display: inline-block; min-width: 1.6rem; padding: .08rem .4rem; border: 1px solid rgb(var(--c-line) / .35); border-bottom-width: 2px; border-radius: .4rem; background: rgb(var(--c-raised)); font: inherit; font-size: .75rem; font-weight: 700; text-align: center; }
+.shortcut-or { color: rgb(var(--c-muted)); font-size: .72rem; }
+.shortcut-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 1rem; background: rgb(var(--c-bg) / .72); backdrop-filter: blur(4px); }
+.shortcut-dialog { width: min(100%, 760px); max-height: calc(100dvh - 2rem); overflow: auto; padding: clamp(1.2rem, 3vw, 1.8rem); border: 1px solid rgb(var(--c-line) / .25); border-radius: 1.4rem; background: rgb(var(--c-surface)); box-shadow: var(--shadow-card); }
+.shortcut-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.shortcut-dialog-head h2 { margin-top: .25rem; font-size: 1.4rem; font-weight: 850; letter-spacing: -.025em; }
+
+/* ---------- Settings page layout ---------- */
+.settings-grid { display: grid; gap: 1.25rem; margin-top: 1.5rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) {
+  .settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-grid > .is-wide { grid-column: 1 / -1; }
+}
+.settings-section-head { display: flex; align-items: center; gap: .65rem; }
+.settings-section-head p { margin-top: .1rem; }
+.setting-row.is-stacked { flex-direction: column; align-items: stretch; gap: .65rem; }
+.setting-row.is-disabled { opacity: .55; }
+.segmented { display: inline-flex; flex-wrap: wrap; gap: .3rem; padding: .25rem; border: 1px solid rgb(var(--c-line) / .22); border-radius: .85rem; background: rgb(var(--c-bg) / .5); }
+.segmented button { min-height: 36px; padding: .35rem .8rem; border-radius: .6rem; color: rgb(var(--c-muted)); font-size: .82rem; font-weight: 700; }
+.segmented button:hover { color: rgb(var(--c-text)); }
+.segmented button[aria-checked="true"] { background: rgb(var(--c-mint) / .16); color: rgb(var(--c-text)); box-shadow: inset 0 0 0 1px rgb(var(--c-mint) / .55); }
+.volume-row { display: flex; align-items: center; gap: .75rem; }
+.volume-row input[type="range"] { flex: 1; accent-color: rgb(var(--c-mint)); }
+.volume-row output { min-width: 3ch; font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.settings-reset { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }

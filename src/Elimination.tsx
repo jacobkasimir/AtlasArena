@@ -3,10 +3,23 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { DEMO_UNAVAILABLE, api, isDemo } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import type { EliminationDifficulty, EliminationGroup, EliminationGuess, EliminationPuzzle, EliminationView } from "./domain";
+import { ConfirmDialog } from "./ConfirmDialog";
+import type {
+  EliminationCandidates,
+  EliminationDifficulty,
+  EliminationGroup,
+  EliminationGuess,
+  EliminationHint,
+  EliminationPuzzle,
+  EliminationView,
+} from "./domain";
+import { CandidatesSheet } from "./EliminationCandidates";
+import { DEFAULT_HINT_LIMIT, HintAvailability, hintAvailability, hintErrorText } from "./elimination-domain";
 import { TimeLeft, formatClock, useTimeLeft } from "./game-setup";
 import { Icon, IconTile } from "./icons";
+import { usePrefs, useLeaveGuard } from "./prefs";
 import { Meter } from "./setup-ui";
+import { cue } from "./sound";
 
 const requestId = () => crypto.randomUUID();
 export const difficulties: { id: EliminationDifficulty; label: string; text: string }[] = [
@@ -31,8 +44,9 @@ function HowItWorks() {
     <ol className="elim-how">
       <li><span><strong>Name any place that fits the first clue</strong> of a group – that reveals the next clue.</span></li>
       <li><span><strong>Every new answer must fit all clues shown so far</strong> in that group. One answer can move several groups.</span></li>
-      <li><span><strong>The number beside a clue</strong> is how many places still fit. The last clue leaves exactly one.</span></li>
+      <li><span><strong>The number beside a clue</strong> is how many places still fit. The last clue leaves exactly one. After the round, select it to see every place that fit.</span></li>
       <li><span><strong>Type in English, German or French</strong> and press Enter. Wrong guesses cost nothing but time.</span></li>
+      <li><span><strong>Stuck? Use a hint</strong> ({DEFAULT_HINT_LIMIT} per round): it lists every place that fits a group's open clue. There is no hint for a clue that leaves a single place, and a round with a hint never counts as your personal best.</span></li>
     </ol>
   );
 }
@@ -135,7 +149,45 @@ function Setup() {
   );
 }
 
-function GroupCard({ group, done }: { group: EliminationGroup; done: boolean }) {
+type GroupHint = { availability: HintAvailability; left: number; busy: boolean; onHint: () => void };
+
+function HintButton({ colour, hint }: { colour: string; hint: GroupHint }) {
+  const { availability, left, busy, onHint } = hint;
+  if (availability === "closed") return null;
+  if (availability === "lastClue") {
+    return <p className="elim-hint-row muted">No hint for a clue that leaves one place.</p>;
+  }
+  const owned = availability === "owned";
+  const label = owned ? "Show hint" : availability === "noneLeft" ? "No hints left" : `Hint (${left} left)`;
+  return (
+    <div className="elim-hint-row">
+      <button
+        type="button"
+        className={`elim-hint-button${owned ? " is-owned" : ""}`}
+        disabled={busy || availability === "noneLeft"}
+        aria-haspopup="dialog"
+        aria-label={owned ? `Show the ${colour} hint again (free)` : availability === "noneLeft" ? `No hints left for ${colour}` : `Use a hint for ${colour}, ${left} left`}
+        onClick={onHint}
+      >
+        <Icon name="search" size={14} /> {label}
+      </button>
+    </div>
+  );
+}
+
+function GroupCard({
+  group,
+  done,
+  hint,
+  onShowCandidates,
+}: {
+  group: EliminationGroup;
+  done: boolean;
+  /** Only passed while the round is active: the group's hint button. */
+  hint?: GroupHint;
+  /** Only passed once the round is over: opens the full list for a 1-based clue step. */
+  onShowCandidates?: (step: number) => void;
+}) {
   const complete = group.solved >= group.size;
   const hidden = Math.max(0, group.size - group.steps.length);
   return (
@@ -150,7 +202,22 @@ function GroupCard({ group, done }: { group: EliminationGroup; done: boolean }) 
           const missed = done && !step.answer;
           return (
             <li key={index} className={`${current ? "is-current" : ""}${missed ? " is-missed" : ""}${step.answer ? " is-answered" : ""}`}>
-              <span className="elim-count" title={`${step.remaining} ${step.remaining === 1 ? "place fits" : "places fit"} up to here`}>{step.remaining}</span>
+              {onShowCandidates ? (
+                <button
+                  type="button"
+                  className="elim-count is-button"
+                  aria-haspopup="dialog"
+                  aria-label={`Show every place that fit up to clue ${index + 1} (${step.remaining})`}
+                  title="Show every place that fit"
+                  onClick={() => onShowCandidates(index + 1)}
+                >
+                  {step.remaining}
+                </button>
+              ) : (
+                <span className="elim-count" title={`${step.remaining} ${step.remaining === 1 ? "place fits" : "places fit"} up to here`}>
+                  {step.remaining}
+                </span>
+              )}
               <span className="elim-clue">{step.label}</span>
               <span className="elim-answer">
                 {step.answer ? <Place {...step.answer} /> : current ? <span className="elim-waiting">Your answer…</span> : missed ? <span className="muted">—</span> : null}
@@ -165,6 +232,7 @@ function GroupCard({ group, done }: { group: EliminationGroup; done: boolean }) 
           </li>
         ))}
       </ol>
+      {hint && <HintButton colour={colourNames[group.colour]} hint={hint} />}
       {done && group.answer && (
         <p className="elim-solution">{complete ? <Icon name="checkCircle" size={16} /> : <Icon name="target" size={16} />} {complete ? "Solved:" : "Answer:"} <Place {...group.answer} /></p>
       )}
@@ -194,17 +262,38 @@ function Play() {
   const [feedback, setFeedback] = useState<{ tone: string; text: string } | null>(null);
   const [error, setError] = useState("");
   const [confirmGiveUp, setConfirmGiveUp] = useState(false);
+  // Open candidate sheet: 1-based group and clue step. Lists are fetched once per group and kept.
+  const [sheet, setSheet] = useState<{ group: number; step: number } | null>(null);
+  const candidateCache = useRef(new Map<number, Promise<EliminationCandidates>>());
+  // Hints: the group (1-based) whose hint waits for confirmation, the open hint sheet, and bought hints by "group:step".
+  const [hintAsk, setHintAsk] = useState<number | null>(null);
+  const [hintSheet, setHintSheet] = useState<{ group: number; step: number } | null>(null);
+  const hintCache = useRef(new Map<string, Promise<EliminationHint>>());
   const inputRef = useRef<HTMLInputElement>(null);
+  const keepPlayingRef = useRef<HTMLButtonElement>(null);
+  const prefs = usePrefs();
   useEffect(() => { if (initial.data) setView(initial.data); }, [initial.data]);
   const current = view ?? initial.data ?? null;
   const left = useTimeLeft(current?.state === "active" ? current.deadlineAt : null, current?.serverNow);
   const done = current ? current.state !== "active" : false;
+  useLeaveGuard(Boolean(current && !done));
 
-  // When the clock runs out, ask the server to close the round.
+  // When the clock runs out, ask the server to close the round – once, then every 2 s until it has
+  // (re-running on every new view would send a request storm if this device's clock is ahead).
+  const roundId = current?.id;
+  const timeUp = !done && left === 0;
   useEffect(() => {
-    if (!current || done || left === null || left > 0) return;
-    api.elimView(current.id).then(setView).catch(() => undefined);
-  }, [left, done, current]);
+    if (!roundId || !timeUp) return;
+    const check = () => void api.elimView(roundId).then(setView).catch(() => undefined);
+    check();
+    const retry = window.setInterval(check, 2000);
+    return () => window.clearInterval(retry);
+  }, [roundId, timeUp]);
+
+  // The give-up question replaces the button that asked it: move focus to the safe answer.
+  useEffect(() => {
+    if (confirmGiveUp) keepPlayingRef.current?.focus();
+  }, [confirmGiveUp]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -215,17 +304,71 @@ function Play() {
       const guess = await api.elimGuess(current.id, typed);
       setView(guess.view);
       setFeedback(feedbackText(guess, typed));
+      if (guess.view.state !== "active") cue("complete");
+      else if (guess.result === "advanced") cue("correct");
+      else if (guess.result === "no_match" || guess.result === "unknown") cue("wrong");
       if (guess.result === "advanced" || guess.result === "no_match") setText("");
     } catch (cause) { setError((cause as Error).message); }
     finally { setBusy(false); inputRef.current?.focus(); }
   }
 
   async function giveUp() {
-    if (!current) return;
+    if (!current || busy) return;
     setBusy(true);
     try { setView(await api.elimGiveUp(current.id)); setConfirmGiveUp(false); }
     catch (cause) { setError((cause as Error).message); }
     finally { setBusy(false); }
+  }
+
+  function loadCandidates(group: number) {
+    const cached = candidateCache.current.get(group);
+    if (cached) return cached;
+    const request = api.elimCandidates(id, group);
+    candidateCache.current.set(group, request);
+    request.catch(() => candidateCache.current.delete(group));
+    return request;
+  }
+
+  /** A bought hint: from this page's cache, or again from the server (free, nothing is spent twice). */
+  function loadHint(group: number, step: number) {
+    const key = `${group}:${step}`;
+    const cached = hintCache.current.get(key);
+    if (cached) return cached;
+    const request = api.elimHint(id, group);
+    hintCache.current.set(key, request);
+    request.then((hint) => setView(hint.view)).catch(() => hintCache.current.delete(key));
+    return request;
+  }
+
+  function askHint(groupIndex: number) {
+    if (!current || busy) return;
+    const availability = hintAvailability(current, groupIndex);
+    const group = groupIndex + 1;
+    if (availability === "owned") setHintSheet({ group, step: current.groups[groupIndex].solved + 1 });
+    else if (availability === "available") setHintAsk(group);
+  }
+
+  async function spendHint() {
+    if (!current || hintAsk === null || busy) return;
+    const group = hintAsk;
+    setBusy(true); setError("");
+    try {
+      const hint = await api.elimHint(current.id, group);
+      hintCache.current.set(`${group}:${hint.step}`, Promise.resolve(hint));
+      setView(hint.view);
+      setHintAsk(null);
+      setHintSheet({ group, step: hint.step });
+    } catch (cause) {
+      const message = (cause as Error).message;
+      setHintAsk(null);
+      setError(hintErrorText(message));
+      if (message.includes("ELIMINATION_ROUND_OVER")) void api.elimView(current.id).then(setView).catch(() => undefined);
+    } finally { setBusy(false); }
+  }
+
+  function keepPlaying() {
+    setConfirmGiveUp(false);
+    inputRef.current?.focus();
   }
 
   if (initial.error) return <div className="mode-shell"><ErrorBox message={initial.error} retry={initial.reload} /><Link className="text-link mt-4" to="/elimination">← All puzzles</Link></div>;
@@ -238,7 +381,10 @@ function Play() {
         <div>
           <p className="eyebrow">Elimination · {label}</p>
           <h1 className="text-2xl font-black mt-1" tabIndex={-1}>{done ? resultTitle(current) : "Name places that fit every clue"}</h1>
-          <p className="muted text-sm mt-1">{current.pool === "un" ? "UN member states only" : "Countries and territories"} · English, German or French</p>
+          <p className="muted text-sm mt-1">
+            {current.pool === "un" ? "UN member states only" : "Countries and territories"} · English, German or French
+            {current.hinted && <span className="elim-hinted-badge" title="This round doesn't count for personal bests">Hinted</span>}
+          </p>
         </div>
         <div className="elim-status">
           <div className="elim-progress">
@@ -253,7 +399,8 @@ function Play() {
         <form className="elim-input" onSubmit={(event) => void submit(event)}>
           <label htmlFor="elim-guess" className="sr-only">Name a country or territory</label>
           <input id="elim-guess" ref={inputRef} autoFocus autoComplete="off" autoCapitalize="words" spellCheck={false}
-            placeholder="Type a country and press Enter" value={text} maxLength={80} onChange={(event) => setText(event.target.value)} />
+            placeholder="Type a country and press Enter" value={text} maxLength={80} onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Escape" && text) { event.preventDefault(); setText(""); } }} />
           <button className="primary" disabled={busy || !text.trim()}>{busy ? "…" : "Enter"}</button>
         </form>
       ) : (
@@ -264,20 +411,83 @@ function Play() {
       </p>
       {error && <p className="error" role="alert">{error}</p>}
 
+      {done && (
+        <p className="elim-cands-hint">
+          <Icon name="search" size={16} /> Select a number beside a clue to see every place that fit.
+        </p>
+      )}
       <div className="elim-groups">
-        {current.groups.map((group) => <GroupCard key={group.colour} group={group} done={done} />)}
+        {current.groups.map((group, index) => (
+          <GroupCard
+            key={group.colour}
+            group={group}
+            done={done}
+            onShowCandidates={done ? (step) => setSheet({ group: index + 1, step }) : undefined}
+            hint={done ? undefined : {
+              availability: hintAvailability(current, index),
+              left: current.hintsLeft,
+              busy,
+              onHint: () => askHint(index),
+            }}
+          />
+        ))}
       </div>
+      {hintAsk !== null && current.groups[hintAsk - 1] && (
+        <ConfirmDialog
+          id="elim-hint-confirm"
+          title="Use a hint?"
+          confirmLabel="Use a hint"
+          cancelLabel="Keep playing"
+          busy={busy}
+          onConfirm={() => void spendHint()}
+          onCancel={() => setHintAsk(null)}
+        >
+          {current.hintsLeft} {current.hintsLeft === 1 ? "hint" : "hints"} left – this uses one. You'll see every place that fits
+          the open {colourNames[current.groups[hintAsk - 1].colour]} clue.{" "}
+          {current.hinted ? "This round already doesn't count for personal bests." : "This round will no longer count for personal bests."}
+        </ConfirmDialog>
+      )}
+      {hintSheet && !done && current.groups[hintSheet.group - 1] && (
+        <CandidatesSheet
+          key={`hint-${hintSheet.group}-${hintSheet.step}`}
+          variant="hint"
+          group={hintSheet.group}
+          colour={current.groups[hintSheet.group - 1].colour}
+          load={(group) => loadHint(group, hintSheet.step)}
+          onClose={() => setHintSheet(null)}
+        />
+      )}
+      {sheet && current.groups[sheet.group - 1] && (
+        <CandidatesSheet
+          key={sheet.group}
+          group={sheet.group}
+          colour={current.groups[sheet.group - 1].colour}
+          initialStep={sheet.step}
+          load={loadCandidates}
+          onClose={() => setSheet(null)}
+        />
+      )}
 
       {!done && (
         <div className="elim-footer">
           <span className="muted text-sm">{current.guesses} guesses · {current.wrong} didn't fit</span>
           {confirmGiveUp ? (
-            <span className="elim-confirm">
+            <span
+              className="elim-confirm"
+              role="group"
+              aria-label="Give up?"
+              onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); keepPlaying(); } }}
+            >
               Reveal all answers and end the round?
-              <button type="button" className="secondary" onClick={() => setConfirmGiveUp(false)}>Keep playing</button>
+              <button ref={keepPlayingRef} type="button" className="secondary" onClick={keepPlaying}>Keep playing</button>
               <button type="button" className="danger-button" disabled={busy} onClick={() => void giveUp()}>Give up</button>
             </span>
-          ) : <button type="button" className="secondary" onClick={() => setConfirmGiveUp(true)}>Give up</button>}
+          ) : (
+            <button type="button" className="secondary" disabled={busy}
+              onClick={() => (prefs.confirmGiveUp ? setConfirmGiveUp(true) : void giveUp())}>
+              Give up
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -317,9 +527,15 @@ function ResultBanner({ view, onAgain }: { view: EliminationView; onAgain: () =>
         <div><dt>Guesses</dt><dd>{view.guesses}</dd></div>
         <div><dt>Didn't fit</dt><dd>{view.wrong}</dd></div>
         {best && <div><dt>Your best</dt><dd>{best.solved}/{view.total}</dd></div>}
+        {view.hinted && <div><dt>Hints</dt><dd>{view.hintsUsed}</dd></div>}
       </dl>
+      {view.hinted && (
+        <p className="elim-hinted-note">
+          <span className="elim-hinted-badge">Hinted</span> This round used {view.hintsUsed === 1 ? "a hint" : `${view.hintsUsed} hints`}, so it doesn't count as a personal best.
+        </p>
+      )}
       <div className="elim-result-actions">
-        <button type="button" className="primary" disabled={busy} onClick={() => void play(view.puzzleId)}>Play again</button>
+        <button type="button" className="primary" autoFocus disabled={busy} onClick={() => void play(view.puzzleId)}>Play again</button>
         {next && <button type="button" className="secondary" disabled={busy} onClick={() => void play(next.id)}>Next puzzle →</button>}
         <button type="button" className="secondary" onClick={onAgain}>All puzzles</button>
       </div>
@@ -327,11 +543,17 @@ function ResultBanner({ view, onAgain }: { view: EliminationView; onAgain: () =>
   );
 }
 
+/** "Play again" and "Next puzzle" stay on this route: a fresh Play per round id drops the old round's state. */
+function PlayRound() {
+  const { id = "" } = useParams();
+  return <Play key={id} />;
+}
+
 export default function Elimination() {
   return (
     <Routes>
       <Route index element={<Setup />} />
-      <Route path="play/:id" element={<Play />} />
+      <Route path="play/:id" element={<PlayRound />} />
     </Routes>
   );
 }

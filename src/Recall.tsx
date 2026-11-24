@@ -3,7 +3,8 @@ import { ChangeEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useS
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import { getPrefs, haptic, usePrefs } from "./prefs";
+import { getPrefs, showCountdown, useLeaveGuard, usePrefs } from "./prefs";
+import { cue } from "./sound";
 import { Meter } from "./setup-ui";
 import { GameChoice, GameSetup, PersonalBest, RoundTags, SetupPlace, initialChoice, setupUrl } from "./game-setup";
 import {
@@ -161,11 +162,13 @@ function Play() {
   const [confirmGiveUp, setConfirmGiveUp] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const prefs = usePrefs();
+  useLeaveGuard(session?.state === "active");
   const inputRef = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
   const waitTimer = useRef<number>();
   const pendingMatch = useRef<{ position: number; lang: RecallLang; text: string } | null>(null);
   const finishedRef = useRef(false);
+  const keepGoingRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!initial) return;
@@ -188,6 +191,10 @@ function Play() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining !== null && remaining <= 0, session?.id]);
   useEffect(() => () => window.clearTimeout(waitTimer.current), []);
+  // The give-up question replaces the button that asked it: move focus to the safe answer.
+  useEffect(() => {
+    if (confirmGiveUp) keepGoingRef.current?.focus();
+  }, [confirmGiveUp]);
 
   if (!session) return error ? <ErrorBox message={friendlyError(error)} retry={reload} /> : <Loading />;
   const active = session;
@@ -205,7 +212,7 @@ function Play() {
     setFound(current => new Map(current).set(position, { name: null, alpha2: entry.alpha2, matched: typed, lang }));
     setFeed(current => [{ position, text: typed, name: null, lang, at: Date.now() }, ...current].slice(0, 8));
     setText("");
-    haptic("correct");
+    cue("correct");
     setHint({ tone: "ok", text: `✓ ${typed}${lang !== "en" ? ` (${langLabel[lang]})` : ""}` });
     api.recallAnswer(active.id, position, typed).then((result: RecallAnswerResult) => {
       if (result.status === "found" || result.status === "already_found") {
@@ -229,7 +236,7 @@ function Play() {
   async function finishWithResults() {
     if (finishedRef.current) return;
     finishedRef.current = true;
-    haptic("complete");
+    cue("complete");
     window.setTimeout(() => navigate(`/recall/results/${active.id}`, { replace: true }), 900);
   }
 
@@ -257,11 +264,16 @@ function Play() {
     } else if (commit) {
       setHint({ tone: "bad", text: `“${value.trim()}” isn't in this set.` });
       setShaking(true);
-      haptic("wrong");
+      cue("wrong");
       inputRef.current?.select();
     } else {
       setHint(null);
     }
+  }
+
+  function keepGoing() {
+    setConfirmGiveUp(false);
+    inputRef.current?.focus();
   }
 
   function onChange(event: ChangeEvent<HTMLInputElement>) { setText(event.target.value); void evaluate(event.target.value, false); }
@@ -288,9 +300,13 @@ function Play() {
           </div>
           <div className="recall-stats">
             <div className="recall-stat"><span>Found</span><strong>{foundCount}<small>/{active.total}</small></strong></div>
-            <div className={`recall-stat ${lowTime ? "is-low" : ""}`} aria-live={lowTime ? "polite" : "off"}>
+            <div className={`recall-stat ${lowTime ? "is-low" : ""}`} role="timer">
               <span>{remaining !== null ? "Left" : "Time"}</span>
-              <strong>{formatClock(remaining !== null ? remaining : elapsed)}</strong>
+              <strong>
+                {remaining !== null && !showCountdown(prefs, remaining)
+                  ? "Timed"
+                  : formatClock(remaining !== null ? remaining : elapsed)}
+              </strong>
             </div>
           </div>
         </div>
@@ -321,11 +337,18 @@ function Play() {
 
         <div className="recall-console-actions">
           {confirmGiveUp ? (
-            <>
+            <div
+              className="recall-confirm"
+              role="group"
+              aria-label="Give up?"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") { event.preventDefault(); keepGoing(); }
+              }}
+            >
               <span className="muted text-sm">Reveal the missing {noun(active.kind)} and end the round?</span>
-              <button type="button" className="secondary" onClick={() => { setConfirmGiveUp(false); inputRef.current?.focus(); }}>Keep going</button>
+              <button ref={keepGoingRef} type="button" className="secondary" onClick={keepGoing}>Keep going</button>
               <button type="button" className="danger-button" onClick={() => void finish()} disabled={finishing}>Give up</button>
-            </>
+            </div>
           ) : (
             <>
               <Link to="/recall" className="text-button">Pause & leave</Link>

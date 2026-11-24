@@ -3,8 +3,11 @@ import { FormEvent, KeyboardEvent, RefObject, useEffect, useMemo, useRef, useSta
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "./api";
 import { ErrorBox, Loading, useLoad } from "./components";
-import { AUTO_CONTINUE_MS, getPrefs, haptic, isIOS, usePrefs } from "./prefs";
-import { StreakBadge } from "./setup-ui";
+import { autoContinueMs, getPrefs, haptic, isIOS, showCountdown, useLeaveGuard, usePrefs } from "./prefs";
+import { cue } from "./sound";
+import { ContinueHint, StreakBadge } from "./setup-ui";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { gridStep, isContinueKey, numberKeyIndex, useGameKeys } from "./keys";
 import {
   GameChoice, GameSetup, PersonalBest, RoundTags, SetupPlace, TimeLeft, badgeText, describeSetup, endedOnTime, initialChoice,
   regionLabel, roundOptions, setupUrl, useTimeLeft,
@@ -304,20 +307,16 @@ function Setup() {
       }}
     >
       {deleteId && (
-        <div className="flags-dialog-backdrop">
-          <section role="dialog" aria-modal="true" aria-labelledby="flags-delete-title" className="card flags-confirm">
-            <h2 id="flags-delete-title">Discard this round?</h2>
-            <p>Your answers in this round will be removed.</p>
-            <div>
-              <button className="secondary" onClick={() => setDeleteId(null)}>
-                Keep round
-              </button>
-              <button className="danger" onClick={() => void discard(deleteId)}>
-                Discard
-              </button>
-            </div>
-          </section>
-        </div>
+        <ConfirmDialog
+          id="flags-delete"
+          title="Discard this round?"
+          cancelLabel="Keep round"
+          confirmLabel="Discard"
+          onCancel={() => setDeleteId(null)}
+          onConfirm={() => void discard(deleteId)}
+        >
+          Your answers in this round will be removed.
+        </ConfirmDialog>
       )}
     </GameSetup>
   );
@@ -340,6 +339,7 @@ function StatsPanel({
   onNext: () => void;
   nextRef: RefObject<HTMLButtonElement>;
 }) {
+  const prefs = usePrefs();
   const [tick, setTick] = useState(Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setTick(Date.now()), 1000);
@@ -388,7 +388,9 @@ function StatsPanel({
         </div>
         <div>
           <dt>{timeLeft !== null ? "Time left" : "Elapsed"}</dt>
-          <dd>{timeLeft !== null ? fmt(timeLeft) : fmt(elapsed)}</dd>
+          <dd>
+            {timeLeft === null ? fmt(elapsed) : showCountdown(prefs, timeLeft) ? fmt(timeLeft) : "Hidden until the last 30s"}
+          </dd>
         </div>
       </dl>
       {session.current && session.current.outcome !== "pending" && (
@@ -410,6 +412,7 @@ function Game() {
   const [feedback, setFeedback] = useState("");
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   const prefs = usePrefs();
+  useLeaveGuard(session?.state === "active");
   const [focusedChoice, setFocusedChoice] = useState(0);
   const [unavailableAssets, setUnavailableAssets] = useState<string[]>([]);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -417,6 +420,8 @@ function Game() {
   const gridRef = useRef<HTMLDivElement>(null);
   const nextRef = useRef<HTMLButtonElement>(null);
   const submitting = useRef(false);
+  const gameKeys = useGameKeys();
+  gameKeys.current = null;
   const latestSession = useRef<FlagsSession | null>(null);
   const mobileNextRef = useRef<HTMLButtonElement>(null);
   const focusNext = () =>
@@ -482,7 +487,8 @@ function Game() {
       if (shouldFocus)
         setTimeout(() => {
           if (session.direction === "flag_to_country") answerRef.current?.focus();
-          else headingRef.current?.focus();
+          else
+            (gridRef.current?.querySelector<HTMLButtonElement>('button[tabindex="0"]:not(:disabled)') ?? headingRef.current)?.focus();
         }, 0);
     }
   }, [session?.current?.id]);
@@ -507,7 +513,7 @@ function Game() {
   const autoContinue = Boolean(prefs.autoContinue && current && current.outcome === "correct" && session?.state === "active");
   useEffect(() => {
     if (!autoContinue) return;
-    const timer = window.setTimeout(() => void next(), AUTO_CONTINUE_MS);
+    const timer = window.setTimeout(() => void next(), autoContinueMs(prefs.autoContinueSpeed));
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoContinue, current?.id]);
@@ -550,7 +556,7 @@ function Game() {
       const s = await fn();
       latestSession.current = s;
       if (s.state === "completed") {
-        haptic("complete");
+        cue("complete");
         navigate(`/flags/results/${s.id}`);
         return;
       }
@@ -570,8 +576,8 @@ function Game() {
       if (Object.keys(resolved).length) setRoundOutcomes((previous) => ({ ...previous, ...resolved }));
       if (s.actionResult) {
         const a = s.actionResult;
-        if (a.outcome === "correct") haptic("correct");
-        else if (a.outcome !== "ambiguous" && a.outcome !== "duplicate_choice") haptic("wrong");
+        if (a.outcome === "correct") cue("correct");
+        else if (a.outcome !== "ambiguous" && a.outcome !== "duplicate_choice") cue("wrong");
         setFeedback(
           a.outcome === "wrong_choice"
             ? `Incorrect. ${a.remainingAttempts} ${a.remainingAttempts === 1 ? "attempt" : "attempts"} remaining.`
@@ -607,14 +613,15 @@ function Game() {
     void act(() => api.flagsAnswer(session.id, current.id, choiceId, null, requestId()));
   }
   function onGridKey(e: KeyboardEvent<HTMLDivElement>) {
-    const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
-    if (!keys.includes(e.key)) return;
-    const buttons = [...(gridRef.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
+    if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(e.key)) return;
+    const buttons = [...(gridRef.current?.querySelectorAll<HTMLButtonElement>("button.flags-option") ?? [])];
     const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    if (i < 0 || !buttons.length) return;
+    if (i < 0) return;
     e.preventDefault();
-    const next = (i + (e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
-    const button = buttons[next];
+    // Cells in the first row share its top edge: that is the column count of the wrapped grid.
+    const columns = buttons.filter((button) => button.offsetTop === buttons[0].offsetTop).length || 1;
+    const target = gridStep(i, e.key, buttons.length, columns, (index) => !buttons[index].disabled);
+    const button = buttons[target];
     const choiceIndex = choices.findIndex((choice) => choice.id === button?.dataset.choiceId);
     if (choiceIndex >= 0) setFocusedChoice(choiceIndex);
     button?.focus();
@@ -666,15 +673,42 @@ function Game() {
       ? focusedChoice
       : choices.findIndex(canFocusChoice);
   async function next() {
-    if (!session) return;
-    const s = await api.flagsNext(session.id, requestId());
-    latestSession.current = s;
-    if (s.state === "completed") {
-      haptic("complete");
-      navigate(`/flags/results/${session.id}`);
+    if (!session || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const s = await api.flagsNext(session.id, requestId());
+      latestSession.current = s;
+      if (s.state === "completed") {
+        cue("complete");
+        navigate(`/flags/results/${session.id}`);
+      } else setSession(s);
+    } catch (e) {
+      setError((e as Error).message);
+      void load();
+    } finally {
+      submitting.current = false;
+      setBusy(false);
     }
-    else setSession(s);
   }
+  const smallGrid = session.direction === "country_to_flag" && choices.length <= 9;
+  const numberKeysActive = prefs.numberKeys && smallGrid;
+  gameKeys.current = (event) => {
+    if (finalized && isContinueKey(event, prefs.continueKeys)) {
+      // Enter/Space on another control keeps its own meaning (the Next button handles itself).
+      if ((event.target as HTMLElement).closest("a,button,summary")) return;
+      event.preventDefault();
+      if (!busy && !event.repeat) void next();
+      return;
+    }
+    if (!numberKeysActive || finalized || busy || event.repeat || !current) return;
+    const choice = choices[numberKeyIndex(event, choices.length)];
+    if (choice && canFocusChoice(choice)) {
+      event.preventDefault();
+      choose(choice.id);
+    }
+  };
   function abandonNow() {
     if (!session) return;
     return act(async () => {
@@ -806,6 +840,11 @@ function Game() {
                           </svg>
                         </span>
                       )}
+                      {numberKeysActive && (
+                        <span className="flags-option-key" aria-hidden="true">
+                          {i + 1}
+                        </span>
+                      )}
                       <span className="sr-only">Flag option {i + 1}</span>
                       {c.flagDescription && (
                         <span className="sr-only" id={`flags-desc-${c.id}`}>
@@ -820,6 +859,16 @@ function Game() {
                 Flag options are numbered so they don't give away the answer. A description of each flag is read out when
                 one is available.
               </p>
+              {prefs.keyboardHints && !finalized && (
+                <p className="keyboard-hint muted text-sm mt-3">
+                  {numberKeysActive ? (
+                    <>
+                      <span className="keycap">1</span>–<span className="keycap">{choices.length}</span> pick a flag ·
+                    </>
+                  ) : null}{" "}
+                  Arrow keys move between flags, Enter picks one
+                </p>
+              )}
             </>
           ) : current ? (
             <div className="flags-identify-layout">
@@ -897,6 +946,12 @@ function Game() {
               A required flag image did not load. Retry the image before selecting an answer.
             </p>
           )}
+          {finalized && (
+            <ContinueHint
+              className="flags-continue-hint mt-4"
+              action={session.answered === session.total ? "to see your results" : "for the next flag"}
+            />
+          )}
           {displayFeedback && (
             <p className={`flags-feedback flags-mobile-feedback ${feedbackClass}`} role="status" aria-live="polite">
               {displayFeedback}
@@ -914,23 +969,17 @@ function Game() {
         />
       </div>
       {confirmAbandon && (
-        <div className="flags-dialog-backdrop" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="flags-abandon-title" className="card flags-confirm">
-            <h2 id="flags-abandon-title">Abandon this round?</h2>
-            <p>This ends the round permanently. It will not count toward personal bests.</p>
-            <div>
-              <button className="secondary" onClick={() => setConfirmAbandon(false)}>
-                Keep playing
-              </button>
-              <button
-                className="danger"
-                onClick={() => void abandonNow()}
-              >
-                Abandon round
-              </button>
-            </div>
-          </section>
-        </div>
+        <ConfirmDialog
+          id="flags-abandon"
+          title="Abandon this round?"
+          cancelLabel="Keep playing"
+          confirmLabel="Abandon round"
+          busy={busy}
+          onCancel={() => setConfirmAbandon(false)}
+          onConfirm={() => void abandonNow()}
+        >
+          This ends the round permanently. It will not count toward personal bests.
+        </ConfirmDialog>
       )}
     </div>
   );

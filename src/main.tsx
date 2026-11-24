@@ -3,9 +3,12 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./style.css";
+import "./prefs.css";
 import { track } from "./analytics";
+import { applyDocumentPrefs } from "./prefs";
+import { ShortcutOverlay } from "./shortcuts";
 
-document.documentElement.dataset.motion = localStorage.getItem("atlas-motion") ?? "system";
+applyDocumentPrefs();
 const savedTheme=localStorage.getItem("atlas-theme");
 if(savedTheme) document.documentElement.dataset.theme=savedTheme;
 const themeColor=document.querySelector('meta[name="theme-color"]');
@@ -13,7 +16,12 @@ if(themeColor)themeColor.setAttribute("content",savedTheme==="light"||(!savedThe
 track("return_visit");
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode><BrowserRouter><App/></BrowserRouter></React.StrictMode>
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+    <ShortcutOverlay />
+  </React.StrictMode>
 );
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
