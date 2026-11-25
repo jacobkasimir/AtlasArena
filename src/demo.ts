@@ -19,7 +19,13 @@ type Session = {
   status: State;
   version: number;
   createdAt: string;
+  /**
+   * Timed runs only. Like the server (migration 20261108050000_endless_streaks_and_review_pause.sql), the clock
+   * pauses while answer feedback is open: `answer` sets `feedbackStartedAt`, `next` moves `deadline` forward by the
+   * time spent on feedback before it checks the deadline. Optional so runs saved by older versions still load.
+   */
   deadline: number | null;
+  feedbackStartedAt?: number | null;
   started: number;
   categories?: string[];
   country?: string | null;
@@ -33,6 +39,9 @@ type Store = {
   sessions: Session[];
 };
 const KEY = "atlas-demo-v1";
+
+const isClosed = (s: Session) => s.status === "completed" || s.status === "abandoned";
+const CLOSED = "This run is already over. Open its results or start a new one.";
 
 function read(): Store {
   const raw = localStorage.getItem(KEY);
@@ -74,6 +83,8 @@ function finish(s: Session) {
   s.version++;
 }
 function selectNext(s: Session) {
+  if (isClosed(s)) return;
+  if (expired(s.deadline, Date.now())) { finish(s); return; }
   const used = new Set(s.reviews.map(r => r.questionId));
   const eligible = s.pool.filter(q =>
     !used.has(q.id)
@@ -85,6 +96,7 @@ function selectNext(s: Session) {
   if (!next) { finish(s); return; }
   s.currentId = next.id;
   s.started = Date.now();
+  s.feedbackStartedAt = null;
   s.status = "awaiting_answer";
   s.version++;
 }
@@ -113,6 +125,10 @@ export const demo = {
     country?: string, count = 10
   ) {
     const data = read();
+    // Like arena_start: timed runs whose deadline has passed are completed first, so they don't count as active.
+    for (const other of data.sessions)
+      if ((other.status === "awaiting_answer" || other.status === "showing_feedback") && expired(other.deadline, Date.now()))
+        finish(other);
     if (data.sessions.filter(s =>
       s.status === "awaiting_answer" || s.status === "showing_feedback"
     ).length >= 3) throw new Error("Resume or abandon an active game before starting another.");
@@ -158,11 +174,13 @@ export const demo = {
   },
   async answer(id: string, questionId: string, optionId: string) {
     const data = read(), s = find(data, id);
+    if (isClosed(s)) throw new Error(CLOSED);
     if (expired(s.deadline, Date.now())) { finish(s); write(data); return render(s); }
     if (s.status !== "awaiting_answer" || s.currentId !== questionId)
       throw new Error("This question is no longer accepting answers. Reload session state.");
     const q = s.pool.find(q => q.id === questionId)!;
     if (!validateOption(q, optionId)) throw new Error("Invalid answer identifier.");
+    const now = Date.now();
     const correct = q.correct === optionId;
     const points = score(correct, q.difficulty, correct ? stats(s).streak + 1 : 0);
     s.reviews.push({
@@ -170,10 +188,12 @@ export const demo = {
       chosen: q.options.find(o => o.id === optionId)!.label,
       correctAnswer: q.options.find(o => o.id === q.correct)!.label,
       correct, explanation: q.explanation, source: q.source,
-      points, responseMs: Math.max(0, Date.now() - s.started),
+      // Ends at the accepted answer: feedback reading time is not part of the response time.
+      points, responseMs: Math.max(0, now - s.started),
       subcategory: q.subcategory
     });
     s.version++;
+    s.feedbackStartedAt = now;
     if (
       (s.mode === "endless" && stats(s).incorrect >= 3)
       || s.reviews.length === s.pool.length
@@ -184,12 +204,17 @@ export const demo = {
   },
   async next(id: string) {
     const data = read(), s = find(data, id);
-    if (expired(s.deadline, Date.now())) finish(s);
-    else {
-      if (s.status !== "showing_feedback")
-        throw new Error("Answer the current question before continuing.");
-      selectNext(s);
+    if (isClosed(s)) throw new Error(CLOSED);
+    if (s.status !== "showing_feedback")
+      throw new Error("Answer the current question before continuing.");
+    const now = Date.now();
+    // Same order as arena_next: first give back the time spent on feedback, then check the (moved) deadline.
+    if (s.deadline !== null && s.feedbackStartedAt != null) {
+      s.deadline += Math.max(0, now - s.feedbackStartedAt);
+      s.feedbackStartedAt = null;
     }
+    if (expired(s.deadline, now)) finish(s);
+    else selectNext(s);
     write(data); return render(s);
   },
   async abandon(id: string) {

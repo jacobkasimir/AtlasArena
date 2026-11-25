@@ -75,7 +75,11 @@ function ItemCard({ session, item, onAnswered }: { session: ReviewSession; item:
   const [message, setMessage] = useState("");
   const [flagBroken, setFlagBroken] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { setText(""); setMessage(""); setFlagBroken(false); if (!item.answered) inputRef.current?.focus(); }, [item.position, item.answered]);
+  // Each item gets its own ItemCard (keyed by position in Play), so the text, message and flag state start fresh
+  // without a reset effect. A reset effect would run after the first paint and could wipe what was already typed.
+  useEffect(() => {
+    if (!item.answered) inputRef.current?.focus();
+  }, [item.answered]);
 
   async function answer(value: string) {
     if (!value.trim() || busy) return;
@@ -212,7 +216,7 @@ function Play() {
       <div className="game-progress" role="progressbar" aria-label="Review progress" aria-valuemin={0} aria-valuemax={session.total} aria-valuenow={session.answered}>
         <span style={{ width: `${(session.answered / session.total) * 100}%` }} />
       </div>
-      <ItemCard session={session} item={item} onAnswered={setSession} />
+      <ItemCard key={`${session.id}:${item.position}`} session={session} item={item} onAnswered={setSession} />
       {item.answered && (
         <button type="button" className="primary review-next" autoFocus onClick={() => setPosition(nextOpen?.position ?? -1)}>
           {nextOpen ? "Next →" : "See summary →"}

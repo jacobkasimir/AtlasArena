@@ -3,6 +3,7 @@ import {
   AUTO_CONTINUE_MS,
   applyDocumentPrefs,
   autoContinueMs,
+  clearSavedSetups,
   defaultPrefs,
   getPrefs,
   loadSetup,
@@ -152,5 +153,31 @@ describe("derived helpers", () => {
     expect(loadSetup("flags")).toEqual({ region: "europe" });
     setPref("rememberSetup", false);
     expect(loadSetup("flags")).toEqual({});
+  });
+});
+
+describe("clearSavedSetups", () => {
+  it("forgets every remembered game setup and keeps other device data", () => {
+    saveSetup("flags", { region: "Europe" });
+    saveSetup("capitals", { region: "Asia" });
+    setPref("sound", false);
+    localStorage.setItem("unrelated", "keep");
+
+    expect(loadSetup("flags")).toEqual({ region: "Europe" });
+
+    clearSavedSetups();
+
+    expect(loadSetup("flags")).toEqual({});
+    expect(loadSetup("capitals")).toEqual({});
+    expect(Object.keys(localStorage).some((key) => key.startsWith("atlas-setup-"))).toBe(false);
+    expect(localStorage.getItem("unrelated")).toBe("keep");
+    expect(getPrefs().sound).toBe(false);
+    expect(JSON.parse(localStorage.getItem("atlas-prefs") ?? "{}")).toMatchObject({ sound: false });
+  });
+
+  it("does nothing when no setup was saved", () => {
+    localStorage.setItem("unrelated", "keep");
+    clearSavedSetups();
+    expect(Object.keys(localStorage)).toEqual(["unrelated"]);
   });
 });

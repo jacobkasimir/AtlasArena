@@ -36,14 +36,27 @@ Do not add a new mode or multiplayer while a mode is half-finished.
   Home). Keep existing best signatures stable: untimed whole-set rounds must hash exactly as before.
 - `src/setup-ui.tsx` — shared setup building blocks (ModePage, Step, OptionCards, Chips, StartBar, ResumeList,
   StreakBadge). Every mode's setup screen uses them; don't build a one-off setup layout.
-- `src/prefs.ts` — device-local game preferences (auto-continue, remembered setups, confirmations, keyboard
-  hints, vibration) edited in Settings. New gameplay must respect them (`usePrefs`, `haptic`, `loadSetup`/`saveSetup`).
+- `src/prefs.ts` — device-local game preferences edited in Settings: auto-continue + `autoContinueSpeed`, remembered
+  setups, confirmations (`confirmGiveUp`, `confirmLeave` → `useLeaveGuard`), keyboard hints, `numberKeys`/
+  `continueKeys`, vibration, `sound`/`volume` (play cues only via `cue()` in `src/sound.ts`), `timerDisplay`, and
+  display prefs `reduceMotion`/`textSize`/`highContrast`/`density`/`focusAlways` (set as `html` data attributes,
+  styled in `src/prefs.css`). New gameplay must respect them (`usePrefs`, `haptic`, `cue`, `loadSetup`/`saveSetup`).
+- `src/keys.ts` — shared game key handling (number keys, continue keys); `src/shortcuts.tsx` — shortcut reference
+  (Settings and the "?" overlay). `src/useDialog.ts` + `src/ConfirmDialog.tsx` — modal focus trap / Esc and the
+  games' confirmation dialog; use them instead of a new dialog.
+- `src/view-mode.ts` — Auto/Phone/Desktop view switch shared by both apps (`redirectAtStartup` before render, loop
+  guard, `switchApp`). The phone app lives in `phone/` (see `phone/README.md`).
 - `src/api.ts` — the only place that talks to Supabase. Every call has a demo branch.
 - `src/domain.ts` — shared types, scoring, eligibility and state rules. `*-domain.ts` per mode.
 - `src/demo.ts`, `flags-demo.ts`, `capitals-demo.ts` — device-local demo engines (localStorage).
 - `src/App.tsx` — layout, player menu and routes. `Quiz.tsx` (quiz setup/game/results), `Auth.tsx` (welcome, sign-in, onboarding, route guard), `Profile.tsx`, `Settings.tsx`, `Hub.tsx` (Home). Explorer, Flags, Capitals, Recall and Admin are lazy-loaded.
 - `supabase/migrations/` — the **only** source of truth for schema and RPCs.
 - `scripts/` — build/import tooling (`build-sw.mjs` runs after `vite build`).
+- `phone/` — the phone app at `/phone/`: a second Vite entry (`phone/index.html`, router basename `/phone`) with its own
+  touch-first UI (`phone/src/shell`, design system `phone/src/ui`, one folder per area in `phone/src/areas`) on the same
+  backend, accounts and progress. It imports shared logic via `@shared/*` (= `src/`) — never desktop screens — and
+  session/sign-in logic from `src/auth-flow.ts`, shared with `src/Auth.tsx`. Colours: `src/theme-tokens.css`. Own PWA
+  manifest (`public/phone/manifest.webmanifest`, scope `/phone/`), same service worker. Details: `phone/README.md`.
 
 ## Commands
 ```
@@ -142,8 +155,6 @@ If you could not run them, say so explicitly.
 - Recall accepts German/French capital names only from the curated `private.recall_aliases` table
   (the catalog stores English capitals). Add missing exonyms there via a migration. The demo has English names only.
 - Catalog display names `Naoero` (Nauru) and `DRC` (DR Congo) come from the import; fix in the importer, not by hand.
-- `src/api.auth.test.tsx` only passes when `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` are set
-  (e.g. from `.env.local`); it should stub them with `vi.stubEnv` instead.
 - `npm test` from a Linux shell needs its own `npm ci`; the checked-out `node_modules` is macOS-only.
 - The hosted database had SQL applied outside migrations once (`arena_explore`, reconciled in
   `20261122100000_reconcile_arena_explore.sql`). If `supabase db push` reports drift, capture it in a

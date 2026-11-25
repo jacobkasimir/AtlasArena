@@ -27,7 +27,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: [["←"], ["→"], ["↑"], ["↓"]], action: "Move between flag options" },
       { keys: [["Home"], ["End"]], action: "First or last flag option" },
       { keys: [["Enter"], ["Space"]], action: "Choose the focused flag" },
-      { keys: [["1–9"]], action: "Pick a numbered flag when a round shows nine or fewer (if number keys are on)" },
+      {
+        keys: [["0–9"]],
+        action:
+          "Type a flag's number to pick it (if number keys are on). With more than nine flags, press Enter or pause briefly",
+      },
+      { keys: [["Backspace"], ["Esc"]], action: "Edit or clear a typed flag number" },
       { keys: [["↑"], ["↓"], ["Enter"]], action: "Pick a country from the suggestions while typing" },
       { keys: [["Enter"], ["Space"]], action: "Next flag after feedback (Space can be turned off)" },
     ],
@@ -38,6 +43,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: [["Enter"]], action: "Submit what you typed (Recall: accept a name right away)" },
       { keys: [["Esc"]], action: "Clear what you typed" },
       { keys: [["Enter"], ["Space"]], action: "Capitals: next question after feedback (Space can be turned off)" },
+      { keys: [["←"], ["→"], ["Home"], ["End"]], action: "Recall results: switch between the Missed and Found tabs" },
     ],
   },
   {

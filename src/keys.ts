@@ -96,3 +96,57 @@ export function useGameKeys() {
   }, []);
   return handler;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Typed numbers: pick option 12 of 40 by typing "1", "2" (then Enter).     */
+/* ------------------------------------------------------------------------ */
+
+/** Pause after the last digit before a typed number is picked. */
+export const NUMBER_BUFFER_DELAY_MS = 600;
+
+/**
+ * Result of one key press on the typed-number buffer.
+ * - `buffer`: the digits typed so far ("" when nothing is pending).
+ * - `pick`: zero-based option index to choose now, or null.
+ * - `handled`: the key belonged to the buffer (call preventDefault).
+ * - `wait`: start (or restart) the pause timer that picks `buffer` after NUMBER_BUFFER_DELAY_MS.
+ */
+export type NumberBufferStep = { buffer: string; pick: number | null; handled: boolean; wait: boolean };
+
+/** Zero-based option index for typed digits ("12" → 11), or -1 when the number is empty or out of range. */
+export function numberBufferIndex(buffer: string, count: number): number {
+  if (!/^[1-9][0-9]*$/.test(buffer)) return -1;
+  const value = Number(buffer);
+  return value >= 1 && value <= count ? value - 1 : -1;
+}
+
+/**
+ * Applies one key to the typed-number buffer for `count` numbered options.
+ * Digits extend the number. A number is picked at once when no further digit could still fit
+ * (so with nine or fewer options a single digit picks immediately, as before); otherwise Enter or the pause picks it.
+ * A digit that would overflow the range starts a new number. Backspace removes the last digit, Esc clears.
+ * Enter, Backspace and Esc are only handled while digits are pending, so they keep their normal meaning otherwise.
+ */
+export function stepNumberBuffer(buffer: string, key: string, count: number): NumberBufferStep {
+  const idle: NumberBufferStep = { buffer, pick: null, handled: false, wait: false };
+  if (count <= 0) return { ...idle, buffer: "" };
+  if (/^[0-9]$/.test(key)) {
+    let next = buffer + key;
+    if (numberBufferIndex(next, count) < 0) {
+      // "0" cannot start a number; a digit that overflows the range starts a new number.
+      if (numberBufferIndex(key, count) < 0) return { buffer, pick: null, handled: true, wait: buffer !== "" };
+      next = key;
+    }
+    const canGrow = Number(next) * 10 <= count;
+    if (!canGrow) return { buffer: "", pick: numberBufferIndex(next, count), handled: true, wait: false };
+    return { buffer: next, pick: null, handled: true, wait: true };
+  }
+  if (!buffer) return idle;
+  if (key === "Enter") return { buffer: "", pick: numberBufferIndex(buffer, count), handled: true, wait: false };
+  if (key === "Escape") return { buffer: "", pick: null, handled: true, wait: false };
+  if (key === "Backspace") {
+    const next = buffer.slice(0, -1);
+    return { buffer: next, pick: null, handled: true, wait: next !== "" };
+  }
+  return idle;
+}

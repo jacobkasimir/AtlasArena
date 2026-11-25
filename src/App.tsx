@@ -3,6 +3,7 @@ import { Icon, type IconName } from "./icons";
 import { Link, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api, configurationError, isDemo, supabase } from "./api";
 import { ErrorBox, Loading, OfflineBanner } from "./components";
+import { PhoneSuggestion } from "./PhoneSuggestion";
 import { avatars } from "./domain";
 
 import { Auth, AuthRedirect, Onboarding, Protected } from "./Auth";
@@ -250,6 +251,7 @@ function Layout() {
         </nav>
       )}
       <OfflineBanner />
+      <PhoneSuggestion />
       <main id="main" className="shell py-8 md:py-12">
         <Suspense fallback={<Loading />}>
           <Outlet context={{ onProfileUpdated: updateProfileIdentity, isAdmin: Boolean(identity?.isAdmin) }} />

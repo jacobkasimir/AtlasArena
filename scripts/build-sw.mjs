@@ -7,6 +7,7 @@ async function walk(dir) {
     e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]
   ))).flat();
 }
+// Includes both apps: dist/index.html (desktop) and dist/phone/index.html (phone), plus their assets.
 const files = (await walk("dist")).filter(f => !f.endsWith("/sw.js") && !f.startsWith("dist/flags/"));
 const urls = files.map(f => "/" + f.slice(5));
 const hash = createHash("sha256");
@@ -59,7 +60,9 @@ self.addEventListener("fetch", e => {
   if (r.method !== "GET" || u.origin !== self.location.origin) return;
   if (u.pathname.startsWith("/api/") || r.headers.has("authorization")) return;
   if (r.mode === "navigate") {
-    e.respondWith(fetch(r).catch(() => caches.match("/index.html")));
+    // Two apps: pages under /phone/ fall back to the phone app's shell, everything else to the desktop app.
+    const shell = u.pathname === "/phone" || u.pathname.startsWith("/phone/") ? "/phone/index.html" : "/index.html";
+    e.respondWith(fetch(r).catch(() => caches.match(shell)));
     return;
   }
   if (ASSETS.includes(u.pathname) && !u.search) {

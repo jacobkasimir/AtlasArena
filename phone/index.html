@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Zoom stays enabled for accessibility; inputs use 16px text so iOS does not zoom on focus. -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B1020" />
+  <!-- Same inline theme script as /index.html: its hash is allowed by the CSP in vercel.json. Keep it byte-identical. -->
+  <script>try{const t=localStorage.getItem('atlas-theme');if(t)document.documentElement.dataset.theme=t}catch{}</script>
+  <meta name="description" content="Atlas Arena for phones — a geography game for curious minds." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Atlas Arena" />
+  <link rel="manifest" href="/phone/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <title>Atlas Arena</title>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/phone/src/main.tsx"></script>
+</body>
+</html>

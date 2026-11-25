@@ -395,13 +395,71 @@ function Play() {
 /* Results                                                                   */
 /* ------------------------------------------------------------------------ */
 
+type ResultTab = "missed" | "found";
+const RESULT_TABS: ResultTab[] = ["missed", "found"];
+const tabId = (tab: ResultTab) => `recall-tab-${tab}`;
+const tabPanelId = "recall-tabpanel";
+
+/** Missed / Found tabs (WAI-ARIA tabs pattern): ←/→ and Home/End move and select, only the selected tab is in the Tab order. */
+function ResultTabs({
+  tab,
+  onChange,
+  labels,
+}: {
+  tab: ResultTab;
+  onChange: (tab: ResultTab) => void;
+  labels: Record<ResultTab, string>;
+}) {
+  const refs = useRef<Partial<Record<ResultTab, HTMLButtonElement | null>>>({});
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const index = RESULT_TABS.indexOf(tab);
+    const last = RESULT_TABS.length - 1;
+    const target =
+      event.key === "ArrowRight"
+        ? (index + 1) % RESULT_TABS.length
+        : event.key === "ArrowLeft"
+          ? (index - 1 + RESULT_TABS.length) % RESULT_TABS.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? last
+              : -1;
+    if (target < 0 || event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    const next = RESULT_TABS[target];
+    onChange(next);
+    refs.current[next]?.focus();
+  }
+  return (
+    <div className="segmented" role="tablist" aria-label="Answers" onKeyDown={onKeyDown}>
+      {RESULT_TABS.map((value) => (
+        <button
+          key={value}
+          ref={(element) => {
+            refs.current[value] = element;
+          }}
+          type="button"
+          role="tab"
+          id={tabId(value)}
+          aria-selected={tab === value}
+          aria-controls={tabPanelId}
+          tabIndex={tab === value ? 0 : -1}
+          onClick={() => onChange(value)}
+        >
+          {labels[value]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Results() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const { data: session, error, reload } = useLoad<RecallSession>(() => api.recallView(id), id);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState<"missed" | "found">("missed");
+  const [tab, setTab] = useState<ResultTab>("missed");
 
   useEffect(() => { if (session?.state === "active") navigate(`/recall/play/${session.id}`, { replace: true }); }, [session, navigate]);
   useEffect(() => { if (session && session.found === session.total) setTab("found"); }, [session]);
@@ -451,27 +509,36 @@ function Results() {
       </section>
 
       <section className="card mt-5">
-        <div className="segmented" role="tablist" aria-label="Answers">
-          <button type="button" role="tab" aria-selected={tab === "missed"} aria-pressed={tab === "missed"} onClick={() => setTab("missed")}>Missed · {missed.length}</button>
-          <button type="button" role="tab" aria-selected={tab === "found"} aria-pressed={tab === "found"} onClick={() => setTab("found")}>Found · {hits.length}</button>
+        <ResultTabs
+          tab={tab}
+          onChange={setTab}
+          labels={{ missed: `Missed · ${missed.length}`, found: `Found · ${hits.length}` }}
+        />
+        <div
+          id={tabPanelId}
+          role="tabpanel"
+          aria-labelledby={tabId(tab)}
+          tabIndex={0}
+          className="recall-tabpanel"
+        >
+          {list.length ? (
+            <ul className="recall-result-list">
+              {list.map(entry => (
+                <li key={entry.position} className={entry.found ? "is-found" : "is-missed"}>
+                  <Flag alpha2={entry.alpha2} />
+                  <div>
+                    <p className="font-semibold">{entry.name}</p>
+                    <p className="muted text-sm">
+                      {done.kind === "capitals" ? entry.prompt : entry.region}
+                      {entry.found && entry.matched && normalizeRecall(entry.matched) !== normalizeRecall(entry.name ?? "") ? ` · you typed “${entry.matched}”` : ""}
+                    </p>
+                  </div>
+                  <LangTag lang={entry.lang} />
+                </li>
+              ))}
+            </ul>
+          ) : <p className="muted mt-4">{tab === "missed" ? "Nothing missed – every single one!" : "No answers this time."}</p>}
         </div>
-        {list.length ? (
-          <ul className="recall-result-list">
-            {list.map(entry => (
-              <li key={entry.position} className={entry.found ? "is-found" : "is-missed"}>
-                <Flag alpha2={entry.alpha2} />
-                <div>
-                  <p className="font-semibold">{entry.name}</p>
-                  <p className="muted text-sm">
-                    {done.kind === "capitals" ? entry.prompt : entry.region}
-                    {entry.found && entry.matched && normalizeRecall(entry.matched) !== normalizeRecall(entry.name ?? "") ? ` · you typed “${entry.matched}”` : ""}
-                  </p>
-                </div>
-                <LangTag lang={entry.lang} />
-              </li>
-            ))}
-          </ul>
-        ) : <p className="muted mt-4">{tab === "missed" ? "Nothing missed – every single one!" : "No answers this time."}</p>}
       </section>
     </div>
   );

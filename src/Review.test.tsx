@@ -27,7 +27,9 @@ it("answers mistakes one at a time and ends with a summary", async () => {
   reviewAnswer.mockResolvedValueOnce(afterFlag).mockResolvedValueOnce(afterQuiz);
   render(<MemoryRouter initialEntries={["/review/r1"]}><Routes><Route path="/review/*" element={<Review />} /></Routes></MemoryRouter>);
 
-  fireEvent.change(await screen.findByPlaceholderText("Type the country"), { target: { value: "Oman" } });
+  const input = await screen.findByPlaceholderText("Type the country");
+  fireEvent.change(input, { target: { value: "Oman" } });
+  expect(input).toHaveValue("Oman");
   fireEvent.click(screen.getByRole("button", { name: "Check" }));
   expect(await screen.findByText("Cleared – it won't come back.")).toBeInTheDocument();
   expect(reviewAnswer).toHaveBeenCalledWith("r1", 1, "Oman");

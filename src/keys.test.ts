@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { gridStep, isContinueKey, isTypingTarget, numberKeyIndex } from "./keys";
+import {
+  gridStep,
+  isContinueKey,
+  isTypingTarget,
+  numberBufferIndex,
+  numberKeyIndex,
+  stepNumberBuffer,
+} from "./keys";
 
 const key = (k: string, extra: Partial<KeyboardEvent> = {}) =>
   ({ key: k, code: k === " " ? "Space" : k, altKey: false, ctrlKey: false, metaKey: false, ...extra }) as KeyboardEvent;
@@ -67,5 +74,56 @@ describe("isTypingTarget", () => {
     expect(isTypingTarget(input)).toBe(true);
     expect(isTypingTarget(button)).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
+  });
+});
+
+describe("typed number buffer", () => {
+  const typeKeys = (keys: string[], count: number) => {
+    let buffer = "";
+    let pick: number | null = null;
+    for (const k of keys) {
+      const step = stepNumberBuffer(buffer, k, count);
+      buffer = step.buffer;
+      if (step.pick !== null) pick = step.pick;
+    }
+    return { buffer, pick };
+  };
+
+  it("picks a single digit at once when nine or fewer options exist", () => {
+    expect(stepNumberBuffer("", "3", 9)).toEqual({ buffer: "", pick: 2, handled: true, wait: false });
+    expect(stepNumberBuffer("", "9", 9).pick).toBe(8);
+  });
+  it("waits for more digits while a longer number could still fit", () => {
+    expect(stepNumberBuffer("", "1", 25)).toEqual({ buffer: "1", pick: null, handled: true, wait: true });
+    expect(stepNumberBuffer("", "2", 25)).toEqual({ buffer: "2", pick: null, handled: true, wait: true });
+    expect(stepNumberBuffer("", "3", 25).pick).toBe(2);
+  });
+  it("picks a number as soon as no other digit fits", () => {
+    expect(typeKeys(["1", "2"], 25)).toEqual({ buffer: "", pick: 11 });
+    expect(typeKeys(["1", "2"], 150)).toEqual({ buffer: "12", pick: null });
+    expect(typeKeys(["1", "2", "5"], 150)).toEqual({ buffer: "", pick: 124 });
+  });
+  it("picks the pending number with Enter", () => {
+    expect(stepNumberBuffer("2", "Enter", 25)).toEqual({ buffer: "", pick: 1, handled: true, wait: false });
+  });
+  it("edits with Backspace and clears with Escape", () => {
+    expect(stepNumberBuffer("12", "Backspace", 150)).toEqual({ buffer: "1", pick: null, handled: true, wait: true });
+    expect(stepNumberBuffer("1", "Backspace", 150)).toEqual({ buffer: "", pick: null, handled: true, wait: false });
+    expect(stepNumberBuffer("12", "Escape", 150)).toEqual({ buffer: "", pick: null, handled: true, wait: false });
+  });
+  it("leaves Enter, Backspace and Escape alone when nothing is pending", () => {
+    for (const k of ["Enter", "Backspace", "Escape", "a"]) expect(stepNumberBuffer("", k, 25).handled).toBe(false);
+  });
+  it("ignores a leading zero and starts over on overflow", () => {
+    expect(stepNumberBuffer("", "0", 25)).toEqual({ buffer: "", pick: null, handled: true, wait: false });
+    expect(stepNumberBuffer("2", "7", 25)).toEqual({ buffer: "", pick: 6, handled: true, wait: false });
+    expect(stepNumberBuffer("2", "0", 25).pick).toBe(19);
+    expect(stepNumberBuffer("1", "0", 150)).toEqual({ buffer: "10", pick: null, handled: true, wait: true });
+  });
+  it("maps typed numbers to indexes within range only", () => {
+    expect(numberBufferIndex("12", 40)).toBe(11);
+    expect(numberBufferIndex("41", 40)).toBe(-1);
+    expect(numberBufferIndex("", 40)).toBe(-1);
+    expect(numberBufferIndex("07", 40)).toBe(-1);
   });
 });

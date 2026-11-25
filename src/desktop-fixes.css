@@ -1,0 +1,180 @@
+/*
+ * Desktop fixes for the Flags, Capitals and Recall game screens.
+ * Loaded after style.css and prefs.css (see src/main.tsx), so equal-specificity rules here win.
+ */
+
+/* ---------- Feedback colours: the same theme switch as theme-tokens.css ----------
+ * Dark is the default (explicit dark, system dark, no preference); light applies for data-theme="light" or a
+ * light system preference without an explicit choice. So "system" always looks exactly like the chosen theme.
+ * Contrast on the tinted feedback boxes (WCAG AA ≥ 4.5:1; high contrast ≥ 7:1):
+ *   light  success 5.1, second try 5.6, third try / wrong 5.5, wrong name 5.6
+ *   dark   success 9.0, second try 9.6, third try / wrong 7.0, wrong name 7.9
+ *   high contrast light 7.1 / 8.0 / 7.5 / 7.2, high contrast dark 10.8 / 10.9 / 9.1 / 8.7
+ */
+:root {
+  --fb-success: #70e0b7;
+  --fb-second-try: #ffd081;
+  --fb-danger: #ff938b;
+  --fb-wrong-name: #ffaaa4;
+  --fb-wrong-name-bg: rgb(183 71 66 / .2);
+}
+html[data-theme="light"] {
+  --fb-success: #0f7454;
+  --fb-second-try: #8f5300;
+  --fb-danger: #a83a36;
+  --fb-wrong-name: #a83232;
+  --fb-wrong-name-bg: rgb(183 71 66 / .12);
+}
+@media (prefers-color-scheme: light) {
+  html:not([data-theme="dark"]):not([data-theme="light"]) {
+    --fb-success: #0f7454;
+    --fb-second-try: #8f5300;
+    --fb-danger: #a83a36;
+    --fb-wrong-name: #a83232;
+    --fb-wrong-name-bg: rgb(183 71 66 / .12);
+  }
+}
+html[data-contrast="more"]:not([data-theme="light"]) {
+  --fb-success: #9af0d0;
+  --fb-second-try: #ffe0a8;
+  --fb-danger: #ffb8b2;
+  --fb-wrong-name: #ffb8b2;
+}
+html[data-contrast="more"][data-theme="light"] {
+  --fb-success: #0a5c42;
+  --fb-second-try: #6e4000;
+  --fb-danger: #8a2b28;
+  --fb-wrong-name: #8a2b28;
+}
+@media (prefers-color-scheme: light) {
+  html[data-contrast="more"]:not([data-theme="dark"]):not([data-theme="light"]) {
+    --fb-success: #0a5c42;
+    --fb-second-try: #6e4000;
+    --fb-danger: #8a2b28;
+    --fb-wrong-name: #8a2b28;
+  }
+}
+
+.flags-wrong-name {
+  color: var(--fb-wrong-name);
+  background: var(--fb-wrong-name-bg);
+}
+.flags-feedback.success {
+  color: var(--fb-success);
+}
+.flags-feedback.success.attempt-2 {
+  color: var(--fb-second-try);
+}
+.flags-feedback.success.attempt-3,
+.flags-feedback.failure {
+  color: var(--fb-danger);
+}
+/* "Not solved" keeps white text on its dark red box in every theme (10:1). */
+.flags-feedback.failure.unsolved {
+  color: #fff;
+}
+
+/* Capitals "Recent answers": the theme tokens instead of fixed colours (light 2.96:1 before, now 6.1:1). */
+.capitals-recent .outcome-correct {
+  color: rgb(var(--c-success));
+}
+.capitals-recent .outcome-incorrect {
+  color: rgb(var(--c-danger));
+}
+
+/* ---------- Stable feedback slots: feedback fills reserved space instead of moving content ---------- */
+.flags-feedback-slot {
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: .65rem;
+  padding: .75rem .9rem;
+  line-height: 1.4;
+  font-weight: 720;
+}
+/* Sidebar: three lines of text are reserved below the round numbers. */
+.flags-stats .flags-feedback-slot {
+  min-height: calc(4.2em + 1.5rem + 2px);
+  margin: 0;
+}
+.flags-mobile-feedback.flags-feedback-slot {
+  min-height: calc(4.2em + 1.5rem + 2px);
+  margin: 1rem 0 .25rem;
+}
+
+.capitals-feedback-slot {
+  min-height: 17rem;
+}
+.capitals-feedback-slot > .capitals-feedback:first-child {
+  margin-top: 1.1rem;
+}
+.capitals-message.is-empty {
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flags-feedback-slot,
+  .capitals-feedback-slot,
+  .capitals-feedback-slot *,
+  .flags-number-entry {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- Flags: typed flag number ("Flag #12") ---------- */
+.flags-option-area {
+  position: relative;
+}
+.flags-number-entry {
+  position: absolute;
+  z-index: 4;
+  top: .35rem;
+  right: .6rem;
+  margin: 0;
+  padding: .3rem .75rem;
+  border: 1px solid rgb(var(--c-focus));
+  border-radius: 999px;
+  background: rgb(var(--c-surface));
+  box-shadow: 0 6px 18px rgb(0 0 0 / .2);
+  color: rgb(var(--c-text));
+  font-size: .85rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.flags-number-entry strong {
+  color: rgb(var(--c-focus));
+}
+/* Not typing: hidden visually, still in the accessibility tree so its messages are announced. */
+.flags-number-entry:not(.is-active) {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+.flags-option.is-typed {
+  border-color: rgb(var(--c-focus));
+  box-shadow: inset 0 0 0 2px rgb(var(--c-focus));
+}
+.flags-option.is-typed .flags-option-key {
+  border-color: rgb(var(--c-focus));
+  background: rgb(var(--c-focus));
+  color: rgb(var(--c-surface));
+}
+
+/* ---------- Recall results: Found / Missed tabs ---------- */
+.segmented button[role="tab"][aria-selected="true"] {
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-text));
+  box-shadow: 0 2px 10px rgb(0 0 0 / .12);
+}
+.segmented button[role="tab"]:focus-visible {
+  outline: 3px solid rgb(var(--c-focus));
+  outline-offset: 2px;
+}

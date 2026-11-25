@@ -1,5 +1,11 @@
 // Pure logic for Category Elimination's candidate lists ("which places fit up to this clue?").
-import type { EliminationCandidate, EliminationCandidates, EliminationHint, EliminationView } from "./domain";
+import type {
+  EliminationCandidate,
+  EliminationCandidates,
+  EliminationDifficulty,
+  EliminationHint,
+  EliminationView,
+} from "./domain";
 
 /**
  * - `kept`: still fits the next clue.
@@ -139,4 +145,58 @@ export function hintErrorText(message: string): string {
   if (message.includes("ELIMINATION_GROUP_SOLVED")) return "This group is already solved.";
   if (message.includes("ELIMINATION_ROUND_OVER")) return "The round is over – every list is open now.";
   return message;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Setup texts shared by the desktop (src/Elimination.tsx) and phone app     */
+/* ------------------------------------------------------------------------ */
+
+export type EliminationDifficultyInfo = { id: EliminationDifficulty; label: string; text: string };
+
+/** The three difficulties in display order, with the label and the one-line description shown in both setups. */
+export const ELIMINATION_DIFFICULTIES: readonly EliminationDifficultyInfo[] = [
+  { id: "easy", label: "Easy", text: "UN member states · 4 clues per group · well-known countries · 5 minutes" },
+  { id: "medium", label: "Medium", text: "UN member states · 5 clues · memberships, languages and borders · 5 minutes" },
+  { id: "hard", label: "Hard", text: "Countries and territories · 5 clues · subregions and density · 4 minutes" },
+];
+
+/** Display label of a difficulty ("Easy"); falls back to the id. */
+export function eliminationDifficultyLabel(id: EliminationDifficulty): string {
+  return ELIMINATION_DIFFICULTIES.find((item) => item.id === id)?.label ?? id;
+}
+
+/** One "How it works" step: `lead` is shown in bold, `text` follows it. */
+export type HowItWorksStep = { lead: string; text: string };
+/** The words that differ between a mouse/keyboard and a touch screen. */
+export type EliminationDevice = "desktop" | "phone";
+
+const deviceWords: Record<EliminationDevice, { select: string; submit: string }> = {
+  desktop: { select: "select", submit: "press Enter" },
+  phone: { select: "tap", submit: "tap Go" },
+};
+
+/** "How it works" for the Elimination setup, in the device's words ("press Enter" / "tap Go"). */
+export function eliminationHowItWorks(device: EliminationDevice): HowItWorksStep[] {
+  const words = deviceWords[device];
+  return [
+    { lead: "Name any place that fits the first clue", text: " of a group – that reveals the next clue." },
+    {
+      lead: "Every new answer must fit all clues shown so far",
+      text: " in that group. One answer can move several groups.",
+    },
+    {
+      lead: "The number beside a clue",
+      text: ` is how many places still fit. The last clue leaves exactly one. After the round, ${words.select} it to see every place that fit.`,
+    },
+    {
+      lead: "Type in English, German or French",
+      text: ` and ${words.submit}. Wrong guesses cost nothing but time.`,
+    },
+    {
+      lead: "Stuck? Use a hint",
+      text:
+        ` (${DEFAULT_HINT_LIMIT} per round): it lists every place that fits a group's open clue. There is no hint for a` +
+        " clue that leaves a single place, and a round with a hint never counts as your personal best.",
+    },
+  ];
 }

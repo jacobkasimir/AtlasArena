@@ -21,7 +21,32 @@ export const DEMO_UNAVAILABLE = "ONLINE_ONLY";
 const onlineOnly = <T,>(feature: string): Promise<T> =>
   Promise.reject(new Error(`${DEMO_UNAVAILABLE}: ${feature} needs an online account and isn't available in the local demo.`));
 const defaultRound: RoundOptions = { scope: "all", picks: [], size: null, limit: null };
+/**
+ * The URL this page was opened with, captured before supabase-js reads (and clears) auth tokens in the hash,
+ * so the sign-in screens can still tell that they were opened from an email link.
+ */
+export const initialAuthUrl: { pathname: string; search: string; hash: string } | null =
+  typeof window === "undefined"
+    ? null
+    : { pathname: window.location.pathname, search: window.location.search, hash: window.location.hash };
 export const supabase = url && key ? createClient(url, key) : null;
+
+/** Which app sent an auth email: its links open the same app again. */
+export type AuthApp = "phone" | "desktop";
+/** "confirm": sign-up or email-change confirmation; "recovery": password reset. */
+export type AuthLinkKind = "confirm" | "recovery";
+export type AuthAppOption = { app?: AuthApp };
+
+/**
+ * Where a Supabase email link returns to. Built only from this page's origin (never from user input).
+ * Desktop: /auth (confirm) and /auth?recovery=1. Phone: /phone/sign-in?auth=callback and /phone/sign-in?recovery=1.
+ * Every URL must be in Supabase Auth → URL Configuration → Redirect URLs, otherwise the link opens the Site URL.
+ */
+export function authRedirectUrl(kind: AuthLinkKind, app: AuthApp = "desktop") {
+  const path = app === "phone" ? "/phone/sign-in" : "/auth";
+  const query = kind === "recovery" ? "?recovery=1" : app === "phone" ? "?auth=callback" : "";
+  return window.location.origin + path + query;
+}
 
 async function rpc<T>(name: string, params = {}): Promise<T> {
   if (!supabase) throw new Error(configurationError ?? "Supabase is not configured.");
@@ -189,10 +214,17 @@ export const api = {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   },
-  signUp: async (email: string, password: string, username: string) => {
+  signUp: async (email: string, password: string, username: string, options: AuthAppOption = {}) => {
     if (!supabase) throw new Error("Accounts require Supabase configuration.");
     const requestedUsername = username.trim();
-    const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + "/auth", data: { requested_username: requestedUsername, display_name: requestedUsername, full_name: requestedUsername } } });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: authRedirectUrl("confirm", options.app),
+        data: { requested_username: requestedUsername, display_name: requestedUsername, full_name: requestedUsername },
+      },
+    });
     if (error) throw error;
     return { needsConfirmation: !data.session };
   },
@@ -207,17 +239,21 @@ export const api = {
     const existing = await api.dashboard();
     return api.saveProfile({ username: username.trim(), avatar: existing.profile.avatar, favorites: existing.profile.favorites });
   },
-  link: async (email: string, password: string) => {
+  link: async (email: string, password: string, options: AuthAppOption = {}) => {
     if (!supabase) throw new Error("Accounts require Supabase configuration.");
     await requireSession();
     if (!(await api.currentUser()).isAnonymous) throw new Error("This session already belongs to a permanent account.");
-    const { error } = await supabase.auth.updateUser({ email, password });
+    // Desktop keeps the original call (the confirmation opens the Site URL); the phone app asks for its own page.
+    const { error } =
+      options.app === "phone"
+        ? await supabase.auth.updateUser({ email, password }, { emailRedirectTo: authRedirectUrl("confirm", "phone") })
+        : await supabase.auth.updateUser({ email, password });
     if (error) throw error;
   },
-  resetPassword: async (email: string) => {
+  resetPassword: async (email: string, options: AuthAppOption = {}) => {
     if (!supabase) throw new Error("Accounts require Supabase configuration.");
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: location.origin + "/auth?recovery=1"
+      redirectTo: authRedirectUrl("recovery", options.app),
     });
     if (error) throw error;
   },

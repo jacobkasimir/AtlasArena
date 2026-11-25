@@ -14,7 +14,14 @@ import type {
   EliminationView,
 } from "./domain";
 import { CandidatesSheet } from "./EliminationCandidates";
-import { DEFAULT_HINT_LIMIT, HintAvailability, hintAvailability, hintErrorText } from "./elimination-domain";
+import {
+  ELIMINATION_DIFFICULTIES,
+  HintAvailability,
+  eliminationDifficultyLabel,
+  eliminationHowItWorks,
+  hintAvailability,
+  hintErrorText,
+} from "./elimination-domain";
 import { TimeLeft, formatClock, useTimeLeft } from "./game-setup";
 import { Icon, IconTile } from "./icons";
 import { usePrefs, useLeaveGuard } from "./prefs";
@@ -22,11 +29,6 @@ import { Meter } from "./setup-ui";
 import { cue } from "./sound";
 
 const requestId = () => crypto.randomUUID();
-export const difficulties: { id: EliminationDifficulty; label: string; text: string }[] = [
-  { id: "easy", label: "Easy", text: "UN member states · 4 clues per group · well-known countries · 5 minutes" },
-  { id: "medium", label: "Medium", text: "UN member states · 5 clues · memberships, languages and borders · 5 minutes" },
-  { id: "hard", label: "Hard", text: "Countries and territories · 5 clues · subregions and density · 4 minutes" },
-];
 const colourNames = { green: "Green", orange: "Orange", blue: "Blue", purple: "Purple" } as const;
 const flag = (code: string) => `/flags/${code.toLowerCase()}.svg`;
 
@@ -42,11 +44,14 @@ function Place({ code, name }: { code: string; name: string }) {
 function HowItWorks() {
   return (
     <ol className="elim-how">
-      <li><span><strong>Name any place that fits the first clue</strong> of a group – that reveals the next clue.</span></li>
-      <li><span><strong>Every new answer must fit all clues shown so far</strong> in that group. One answer can move several groups.</span></li>
-      <li><span><strong>The number beside a clue</strong> is how many places still fit. The last clue leaves exactly one. After the round, select it to see every place that fit.</span></li>
-      <li><span><strong>Type in English, German or French</strong> and press Enter. Wrong guesses cost nothing but time.</span></li>
-      <li><span><strong>Stuck? Use a hint</strong> ({DEFAULT_HINT_LIMIT} per round): it lists every place that fits a group's open clue. There is no hint for a clue that leaves a single place, and a round with a hint never counts as your personal best.</span></li>
+      {eliminationHowItWorks("desktop").map((step) => (
+        <li key={step.lead}>
+          <span>
+            <strong>{step.lead}</strong>
+            {step.text}
+          </span>
+        </li>
+      ))}
     </ol>
   );
 }
@@ -86,7 +91,7 @@ function Setup() {
           <fieldset className="mode-step">
             <legend><span className="mode-step-number">1</span> Choose a difficulty</legend>
             <div className="elim-difficulties" role="group" aria-label="Difficulty">
-              {difficulties.map((item) => {
+              {ELIMINATION_DIFFICULTIES.map((item) => {
                 const all = (catalog.data ?? []).filter((puzzle) => puzzle.difficulty === item.id);
                 const done = all.filter((puzzle) => puzzle.best && puzzle.best.solved === puzzle.total).length;
                 return (
@@ -373,7 +378,7 @@ function Play() {
 
   if (initial.error) return <div className="mode-shell"><ErrorBox message={initial.error} retry={initial.reload} /><Link className="text-link mt-4" to="/elimination">← All puzzles</Link></div>;
   if (!current) return <Loading />;
-  const label = `${difficulties.find((item) => item.id === current.difficulty)?.label} #${current.number}`;
+  const label = `${eliminationDifficultyLabel(current.difficulty)} #${current.number}`;
 
   return (
     <div className="elim-shell">

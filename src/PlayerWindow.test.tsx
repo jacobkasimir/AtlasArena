@@ -80,6 +80,16 @@ function open(props: Partial<Parameters<typeof PlayerWindow>[0]> = {}) {
 
 const tab = (name: string) => screen.getByRole("tab", { name: new RegExp(name) });
 
+/**
+ * Lets the mocked API promises resolve inside act(), so React commits the loaded window synchronously when act
+ * ends. Waiting with findBy* instead depends on a 1 s timeout that a cold first render can miss under CPU load.
+ */
+async function loaded() {
+  await act(async () => {
+    for (let tick = 0; tick < 5; tick += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 it("computes level progress and play time", () => {
   expect(levelProgress(1730)).toEqual({ level: 4, into: 230, needed: 270, percent: 46 });
   expect(levelProgress(-5)).toMatchObject({ level: 1, into: 0 });
@@ -89,20 +99,22 @@ it("computes level progress and play time", () => {
 
 it("shows the player header with level, XP, streak and rank", async () => {
   open();
+  await loaded();
   const dialog = screen.getByRole("dialog", { name: "Jacob" });
-  expect(await within(dialog).findByText("Level 4")).toBeInTheDocument();
+  expect(within(dialog).getByText("Level 4")).toBeInTheDocument();
   expect(within(dialog).getByRole("progressbar", { name: "Progress to level 5" })).toHaveAttribute("aria-valuenow", "230");
-  expect(await within(dialog).findByText("#5")).toBeInTheDocument();
+  expect(within(dialog).getByText("#5")).toBeInTheDocument();
   const chips = within(dialog).getByRole("list", { name: "Streak and rank" });
   expect(chips).toHaveTextContent("3 day streak");
   expect(chips).toHaveTextContent("14 best answer streak");
   expect(tab("Overview")).toHaveAttribute("aria-selected", "true");
-  expect(await screen.findByText(/Achievements are tracked with an online account/)).toBeInTheDocument();
+  expect(screen.getByText(/Achievements are tracked with an online account/)).toBeInTheDocument();
 });
 
 it("switches sections with number keys, arrow keys and clicks", async () => {
   open();
-  await screen.findByText("Level 4");
+  await loaded();
+  expect(screen.getByText("Level 4")).toBeInTheDocument();
   fireEvent.keyDown(window, { key: "2" });
   expect(tab("Statistics")).toHaveAttribute("aria-selected", "true");
   expect(screen.getByRole("tabpanel")).toHaveTextContent("Flags");
@@ -127,7 +139,8 @@ it("closes with Escape and gives focus back to the trigger", async () => {
   document.body.appendChild(trigger);
   trigger.focus();
   const { onClose, unmount } = open();
-  await screen.findByText("Level 4");
+  await loaded();
+  expect(screen.getByText("Level 4")).toBeInTheDocument();
   expect(tab("Overview")).toHaveFocus();
   fireEvent.keyDown(window, { key: "Escape" });
   expect(onClose).toHaveBeenCalledTimes(1);
@@ -154,7 +167,8 @@ it("asks before signing out and returns to the window on cancel", async () => {
     );
   }
   render(<Harness />);
-  await screen.findByText("Level 4");
+  await loaded();
+  expect(screen.getByText("Level 4")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
   const confirm = screen.getByRole("alertdialog", { name: "Sign out of Atlas Arena?" });
   expect(within(confirm).getByRole("button", { name: "Cancel" })).toHaveFocus();

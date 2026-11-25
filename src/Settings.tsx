@@ -18,18 +18,19 @@ import {
 } from "./prefs";
 import { ShortcutList } from "./shortcuts";
 import { playSound } from "./sound";
+import { applyTheme } from "./theme";
+import {
+  ViewMode,
+  detectPhone,
+  resolveTarget,
+  setViewMode,
+  switchApp,
+  useViewMode,
+  viewModeDescription,
+  viewModeLabels,
+} from "./view-mode";
 
-export function applyTheme(theme: string) {
-  if (theme === "system") delete document.documentElement.dataset.theme;
-  else document.documentElement.dataset.theme = theme;
-  const meta = document.querySelector('meta[name="theme-color"]');
-  const prefersLight =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: light)").matches;
-  if (meta)
-    meta.setAttribute("content", theme === "light" || (theme === "system" && prefersLight) ? "#f5f8ff" : "#0B1020");
-}
+export { applyTheme } from "./theme";
 
 export function ThemeControl() {
   const [theme, setTheme] = useState(localStorage.getItem("atlas-theme") ?? "system");
@@ -171,6 +172,39 @@ function SettingChoice<T extends string>({
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * View mode: Auto (the version that fits this device), Phone or Desktop. Choosing a mode that belongs to the
+ * phone app opens the same screen there right away; the choice is remembered on this device.
+ */
+export function ViewModeControl() {
+  const mode = useViewMode();
+  const [detectedPhone] = useState(() => detectPhone());
+  const [status, setStatus] = useState("");
+  function choose(next: ViewMode) {
+    if (resolveTarget("desktop", next, detectedPhone) === "phone") {
+      setStatus("Opening the phone version…");
+      switchApp("desktop", next);
+      return;
+    }
+    setViewMode(next);
+    setStatus(next === "desktop" ? "This device will always open the desktop version." : "Auto: this device keeps the desktop version.");
+  }
+  return (
+    <>
+      <SettingChoice<ViewMode>
+        title="View mode"
+        text={viewModeDescription(detectedPhone)}
+        value={mode}
+        options={(["auto", "phone", "desktop"] as const).map((value) => [value, viewModeLabels[value]] as const)}
+        onChange={choose}
+      />
+      <p role="status" className="muted text-sm">
+        {status}
+      </p>
+    </>
   );
 }
 
@@ -381,6 +415,7 @@ export function Settings() {
 
         <SettingsSection title="Display & accessibility" text="Applies to every page on this device.">
           <ThemeControl />
+          <ViewModeControl />
           <SettingChoice
             title="Text size"
             text="Scales text and controls across the app."
@@ -571,6 +606,10 @@ export function Settings() {
             <p className="muted">
               Install Atlas Arena from your browser's menu, or on iPhone/iPad via Safari's Share → Add to Home Screen.
               After the first visit the app opens offline; games, sign-in and saving need a connection.
+            </p>
+            <p className="muted">
+              Atlas Arena also has a phone version with the same account and progress, made for touch screens. Switch
+              with “View mode” under Display & accessibility.
             </p>
             <SettingToggle
               id="diagnostics"

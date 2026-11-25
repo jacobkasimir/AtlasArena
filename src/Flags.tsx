@@ -7,7 +7,15 @@ import { autoContinueMs, getPrefs, haptic, isIOS, showCountdown, useLeaveGuard, 
 import { cue } from "./sound";
 import { ContinueHint, StreakBadge } from "./setup-ui";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { gridStep, isContinueKey, numberKeyIndex, useGameKeys } from "./keys";
+import {
+  NUMBER_BUFFER_DELAY_MS,
+  gridStep,
+  isContinueKey,
+  modalOpen,
+  numberBufferIndex,
+  stepNumberBuffer,
+  useGameKeys,
+} from "./keys";
 import {
   GameChoice, GameSetup, PersonalBest, RoundTags, SetupPlace, TimeLeft, badgeText, describeSetup, endedOnTime, initialChoice,
   regionLabel, roundOptions, setupUrl, useTimeLeft,
@@ -356,11 +364,6 @@ function StatsPanel({
   return (
     <aside className="card flags-stats">
       <h2>Round status</h2>
-      {feedback && (
-        <p className={`flags-feedback flags-sidebar-feedback ${feedbackClass}`} role="status" aria-live="polite">
-          {feedback}
-        </p>
-      )}
       <dl>
         <div>
           <dt>Progress</dt>
@@ -393,6 +396,14 @@ function StatsPanel({
           </dd>
         </div>
       </dl>
+      {/* Always rendered with reserved height: feedback appearing never pushes the round numbers around. */}
+      <p
+        className={`flags-feedback-slot flags-sidebar-feedback ${feedback ? `flags-feedback ${feedbackClass}` : ""}`}
+        role="status"
+        aria-live="polite"
+      >
+        {feedback}
+      </p>
       {session.current && session.current.outcome !== "pending" && (
         <button ref={nextRef} className="primary flags-next" disabled={busy} onClick={onNext}>
           {session.answered === session.total ? "View results" : "Next flag"}
@@ -424,6 +435,18 @@ function Game() {
   gameKeys.current = null;
   const latestSession = useRef<FlagsSession | null>(null);
   const mobileNextRef = useRef<HTMLButtonElement>(null);
+  // Typed flag number ("Flag #12"): digits build a number, Enter or a short pause picks that flag.
+  const [typedNumber, setTypedNumber] = useState("");
+  const [numberNotice, setNumberNotice] = useState("");
+  const typedRef = useRef("");
+  const typedTimer = useRef<number | undefined>(undefined);
+  const pickTypedRef = useRef<(buffer: string) => void>(() => {});
+  const setTyped = (value: string) => {
+    window.clearTimeout(typedTimer.current);
+    typedRef.current = value;
+    setTypedNumber(value);
+  };
+  useEffect(() => () => window.clearTimeout(typedTimer.current), []);
   const focusNext = () =>
     window.setTimeout(() => {
       const button = window.matchMedia("(max-width: 800px)").matches ? mobileNextRef.current : nextRef.current;
@@ -464,6 +487,10 @@ function Game() {
     },
     [id],
   );
+  useEffect(() => {
+    setTyped("");
+    setNumberNotice("");
+  }, [session?.current?.id]);
   useEffect(() => {
     if (session?.current) {
       setAnswer("");
@@ -692,8 +719,28 @@ function Game() {
       setBusy(false);
     }
   }
-  const smallGrid = session.direction === "country_to_flag" && choices.length <= 9;
-  const numberKeysActive = prefs.numberKeys && smallGrid;
+  const numberKeysActive = prefs.numberKeys && session.direction === "country_to_flag";
+  // Picks the flag numbered `index + 1` (the badge and the "Flag option N" label). choose() and act() keep the
+  // double-submit guard, so a typed number can never answer twice.
+  function pickNumbered(index: number) {
+    const choice = choices[index];
+    if (!choice) {
+      setNumberNotice("There is no flag with that number.");
+      return;
+    }
+    if (!canFocusChoice(choice) || busy || submitting.current) {
+      setNumberNotice(`Flag ${index + 1} can't be picked.`);
+      return;
+    }
+    setNumberNotice("");
+    choose(choice.id);
+  }
+  pickTypedRef.current = (buffer) => {
+    setTyped("");
+    // A dialog opened (or the question ended) during the pause: drop the number instead of answering.
+    if (modalOpen() || finalized || !numberKeysActive) return;
+    pickNumbered(numberBufferIndex(buffer, choices.length));
+  };
   gameKeys.current = (event) => {
     if (finalized && isContinueKey(event, prefs.continueKeys)) {
       // Enter/Space on another control keeps its own meaning (the Next button handles itself).
@@ -702,11 +749,20 @@ function Game() {
       if (!busy && !event.repeat) void next();
       return;
     }
-    if (!numberKeysActive || finalized || busy || event.repeat || !current) return;
-    const choice = choices[numberKeyIndex(event, choices.length)];
-    if (choice && canFocusChoice(choice)) {
-      event.preventDefault();
-      choose(choice.id);
+    if (!numberKeysActive || finalized || busy || !current) {
+      if (typedRef.current) setTyped("");
+      return;
+    }
+    if (event.repeat && /^[0-9]$/.test(event.key)) return;
+    const step = stepNumberBuffer(typedRef.current, event.key, choices.length);
+    if (!step.handled) return;
+    event.preventDefault();
+    setTyped(step.buffer);
+    setNumberNotice("");
+    if (step.pick !== null) pickNumbered(step.pick);
+    else if (step.wait) {
+      const buffer = step.buffer;
+      typedTimer.current = window.setTimeout(() => pickTypedRef.current(buffer), NUMBER_BUFFER_DELAY_MS);
     }
   };
   function abandonNow() {
@@ -796,64 +852,81 @@ function Game() {
                   </span>
                 )}
               </div>
-              <div
-                className="flags-option-grid"
-                ref={gridRef}
-                onKeyDown={onGridKey}
-                role="group"
-                aria-label="Flag options"
-              >
-                {choices.map((c, i) => {
-                  const wasWrong = current.wrongChoiceIds.includes(c.id);
-                  const outcome = getChoiceOutcome(c);
-                  const isCorrect = outcome?.outcome === "correct";
-                  const notGuessed = outcome?.outcome === "incorrect";
-                  const resultClass = isCorrect ? `right attempt-${outcome.attempts}` : notGuessed ? "unresolved" : "";
-                  const resultLabel = isCorrect
-                    ? `, correct on attempt ${outcome.attempts}`
-                    : notGuessed
-                      ? ", not guessed"
-                      : "";
-                  return (
-                    <button
-                      key={c.id}
-                      data-choice-id={c.id}
-                      type="button"
-                      tabIndex={i === tabChoiceIndex ? 0 : -1}
-                      className={`flags-option ${wasWrong ? "wrong" : ""} ${resultClass}`}
-                      aria-label={`Flag option ${i + 1}${wasWrong ? ", incorrect selection" : ""}${wasWrong && c.name ? `, ${c.name}` : ""}${resultLabel}`}
-                      aria-describedby={c.flagDescription ? `flags-desc-${c.id}` : undefined}
-                      aria-pressed={isCorrect}
-                      disabled={busy || finalized || wasWrong || isCorrect || assetUnavailable}
-                      onClick={() => choose(c.id)}
-                    >
-                      <FlagImage
-                        value={c}
-                        label={`Flag option ${i + 1}`}
-                        className="small"
-                        onUnavailable={(missing) => markAsset(c.id, missing)}
-                      />
-                      {isCorrect && (
-                        <span className="flags-option-correct-mark" aria-hidden="true">
-                          <svg viewBox="0 0 20 20" focusable="false">
-                            <path d="m4 10.5 4 4L16 6.5" />
-                          </svg>
-                        </span>
-                      )}
-                      {numberKeysActive && (
-                        <span className="flags-option-key" aria-hidden="true">
-                          {i + 1}
-                        </span>
-                      )}
-                      <span className="sr-only">Flag option {i + 1}</span>
-                      {c.flagDescription && (
-                        <span className="sr-only" id={`flags-desc-${c.id}`}>
-                          {c.flagDescription}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+              <div className="flags-option-area">
+                <p
+                  className={`flags-number-entry${typedNumber ? " is-active" : ""}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {typedNumber ? (
+                    <>
+                      Flag #<strong>{typedNumber}</strong>
+                    </>
+                  ) : (
+                    numberNotice
+                  )}
+                </p>
+                <div
+                  className="flags-option-grid"
+                  ref={gridRef}
+                  onKeyDown={onGridKey}
+                  role="group"
+                  aria-label="Flag options"
+                >
+                  {choices.map((c, i) => {
+                    const wasWrong = current.wrongChoiceIds.includes(c.id);
+                    const outcome = getChoiceOutcome(c);
+                    const isCorrect = outcome?.outcome === "correct";
+                    const notGuessed = outcome?.outcome === "incorrect";
+                    const resultClass = isCorrect ? `right attempt-${outcome.attempts}` : notGuessed ? "unresolved" : "";
+                    const resultLabel = isCorrect
+                      ? `, correct on attempt ${outcome.attempts}`
+                      : notGuessed
+                        ? ", not guessed"
+                        : "";
+                    return (
+                      <button
+                        key={c.id}
+                        data-choice-id={c.id}
+                        type="button"
+                        tabIndex={i === tabChoiceIndex ? 0 : -1}
+                        className={`flags-option ${wasWrong ? "wrong" : ""} ${resultClass}${
+                          typedNumber === String(i + 1) ? " is-typed" : ""
+                        }`}
+                        aria-label={`Flag option ${i + 1}${wasWrong ? ", incorrect selection" : ""}${wasWrong && c.name ? `, ${c.name}` : ""}${resultLabel}`}
+                        aria-describedby={c.flagDescription ? `flags-desc-${c.id}` : undefined}
+                        aria-pressed={isCorrect}
+                        disabled={busy || finalized || wasWrong || isCorrect || assetUnavailable}
+                        onClick={() => choose(c.id)}
+                      >
+                        <FlagImage
+                          value={c}
+                          label={`Flag option ${i + 1}`}
+                          className="small"
+                          onUnavailable={(missing) => markAsset(c.id, missing)}
+                        />
+                        {isCorrect && (
+                          <span className="flags-option-correct-mark" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" focusable="false">
+                              <path d="m4 10.5 4 4L16 6.5" />
+                            </svg>
+                          </span>
+                        )}
+                        {numberKeysActive && (
+                          <span className="flags-option-key" aria-hidden="true">
+                            {i + 1}
+                          </span>
+                        )}
+                        <span className="sr-only">Flag option {i + 1}</span>
+                        {c.flagDescription && (
+                          <span className="sr-only" id={`flags-desc-${c.id}`}>
+                            {c.flagDescription}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <p className="sr-only">
                 Flag options are numbered so they don't give away the answer. A description of each flag is read out when
@@ -861,9 +934,15 @@ function Game() {
               </p>
               {prefs.keyboardHints && !finalized && (
                 <p className="keyboard-hint muted text-sm mt-3">
-                  {numberKeysActive ? (
+                  {numberKeysActive && choices.length <= 9 ? (
                     <>
                       <span className="keycap">1</span>–<span className="keycap">{choices.length}</span> pick a flag ·
+                    </>
+                  ) : numberKeysActive ? (
+                    <>
+                      Type a flag number (<span className="keycap">1</span>–
+                      <span className="keycap">{choices.length}</span>) and press <span className="keycap">Enter</span>{" "}
+                      ·
                     </>
                   ) : null}{" "}
                   Arrow keys move between flags, Enter picks one
@@ -952,11 +1031,15 @@ function Game() {
               action={session.answered === session.total ? "to see your results" : "for the next flag"}
             />
           )}
-          {displayFeedback && (
-            <p className={`flags-feedback flags-mobile-feedback ${feedbackClass}`} role="status" aria-live="polite">
-              {displayFeedback}
-            </p>
-          )}
+          <p
+            className={`flags-feedback-slot flags-mobile-feedback ${
+              displayFeedback ? `flags-feedback ${feedbackClass}` : ""
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {displayFeedback}
+          </p>
         </section>
         <StatsPanel
           session={session}

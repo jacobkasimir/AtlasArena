@@ -404,68 +404,69 @@ function Game() {
               </button>
             </div>
           </form>
-          {finalized && current && (
-            <div className={"capitals-feedback capitals-feedback-" + current.outcome} role="status" aria-live="polite">
-              <strong>
-                {current.outcome === "correct" ? "Correct" : current.outcome === "incorrect" ? "Not quite" : "Skipped"}
-              </strong>
-              <span>{current.points} points</span>
-              {current.acceptedAnswers?.length ? (
-                <div className="capitals-accepted">
-                  <b>{session.direction === "country_to_capital" ? "Accepted capital names" : "Country"}</b>
-                  <ul>
-                    {current.acceptedAnswers.map((item, index) => (
-                      <li key={item.name + "-" + index}>
-                        <strong>{item.name}</strong>
-                        {item.primary && <small>Primary</small>}
-                        {item.roles.length > 0 && <small>{item.roles.join(" · ")}</small>}
-                      </li>
+          {/* Reserved feedback slot: answering fills it instead of growing the card, so nothing jumps. */}
+          <div className="capitals-feedback-slot">
+            {finalized && current && (
+              <div className={"capitals-feedback capitals-feedback-" + current.outcome} role="status" aria-live="polite">
+                <strong>
+                  {current.outcome === "correct" ? "Correct" : current.outcome === "incorrect" ? "Not quite" : "Skipped"}
+                </strong>
+                <span>{current.points} points</span>
+                {current.acceptedAnswers?.length ? (
+                  <div className="capitals-accepted">
+                    <b>{session.direction === "country_to_capital" ? "Accepted capital names" : "Country"}</b>
+                    <ul>
+                      {current.acceptedAnswers.map((item, index) => (
+                        <li key={item.name + "-" + index}>
+                          <strong>{item.name}</strong>
+                          {item.primary && <small>Primary</small>}
+                          {item.roles.length > 0 && <small>{item.roles.join(" · ")}</small>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {current.catalogKind === "non_iso" && (
+                  <p className="capitals-neutral-note">This place has no official ISO country code.</p>
+                )}
+                {current.sourceLinks.length > 0 && (
+                  <div className="capitals-source-links">
+                    <b>Catalog reference links</b>
+                    {current.sourceLinks.map((link) => (
+                      <a key={link.url + "-" + link.label} href={link.url} target="_blank" rel="noopener noreferrer">
+                        {link.label}
+                        <span aria-hidden="true"> ↗</span>
+                      </a>
                     ))}
-                  </ul>
-                </div>
-              ) : null}
-              {current.catalogKind === "non_iso" && (
-                <p className="capitals-neutral-note">This place has no official ISO country code.</p>
-              )}
-              {current.sourceLinks.length > 0 && (
-                <div className="capitals-source-links">
-                  <b>Catalog reference links</b>
-                  {current.sourceLinks.map((link) => (
-                    <a key={link.url + "-" + link.label} href={link.url} target="_blank" rel="noopener noreferrer">
-                      {link.label}
-                      <span aria-hidden="true"> ↗</span>
-                    </a>
-                  ))}
-                  <small>
-                    Imported API data can require editorial review. These links do not independently verify every
-                    capital claim.
-                  </small>
-                </div>
-              )}
-            </div>
-          )}
-          {message && (
-            <p className="capitals-message" role="status" aria-live="polite">
+                    <small>
+                      Imported API data can require editorial review. These links do not independently verify every
+                      capital claim.
+                    </small>
+                  </div>
+                )}
+              </div>
+            )}
+            <p className={message ? "capitals-message" : "capitals-message is-empty"} role="status" aria-live="polite">
               {message}
             </p>
-          )}
-          {finalized && (
-            <button
-              type="button"
-              className="primary capitals-next-question"
-              disabled={busy}
-              onClick={() => void next()}
-            >
-              {session.answered === session.total ? "View results" : "Next question"}
-              <span aria-hidden="true">→</span>
-            </button>
-          )}
-          {finalized && (
-            <ContinueHint
-              className="mt-3"
-              action={session.answered === session.total ? "to see your results" : "for the next question"}
-            />
-          )}
+            {finalized && (
+              <button
+                type="button"
+                className="primary capitals-next-question"
+                disabled={busy}
+                onClick={() => void next()}
+              >
+                {session.answered === session.total ? "View results" : "Next question"}
+                <span aria-hidden="true">→</span>
+              </button>
+            )}
+            {finalized && (
+              <ContinueHint
+                className="mt-3"
+                action={session.answered === session.total ? "to see your results" : "for the next question"}
+              />
+            )}
+          </div>
         </section>
         <aside className="card capitals-stats">
           <h2>Round status</h2>

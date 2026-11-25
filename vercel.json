@@ -1,8 +1,12 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/phone", "destination": "/phone/", "permanent": false }
+  ],
   "rewrites": [
-    { "source": "/((?!assets/|flags/|icons/|icon-|favicon-|manifest.webmanifest|sw.js).*)", "destination": "/index.html" }
+    { "source": "/phone/((?!assets/).*)", "destination": "/phone/index.html" },
+    { "source": "/((?!assets/|flags/|icons/|icon-|favicon-|manifest.webmanifest|sw.js|phone(?:/|$)).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

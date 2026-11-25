@@ -3,7 +3,22 @@ import { Icon, IconTile, games } from "./icons";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { api, isDemo, supabase } from "./api";
 import { ErrorBox, Loading } from "./components";
-import { validUsername } from "./domain";
+import {
+  authActions,
+  AuthAction,
+  completeAuthCallback,
+  completeOnboarding,
+  consumeAuthCallback,
+  continueInPreferredApp,
+  EMAIL_CONFIRMED,
+  keepsAuthFlow,
+  performAuthAction,
+  readAuthCallback,
+  RECOVERY_EXPIRED,
+  useLandingState,
+  useSessionGate,
+} from "./auth-flow";
+export { authMessage } from "./auth-flow";
 
 import { ThemeControl } from "./Settings";
 
@@ -136,21 +151,6 @@ const welcomeGames: { game: keyof typeof games; title: string; text: string }[] 
   { game: "explorer", title: "Explorer", text: "Browse every country: flags, capitals, languages and neighbours." },
 ];
 
-export function authMessage(message: string) {
-  const m = message.toLowerCase();
-  if (m.includes("invalid login credentials")) return "Email or password is incorrect.";
-  if (m.includes("email not confirmed")) return "Please confirm your email address first.";
-  if (m.includes("user already registered") || m.includes("already been registered"))
-    return "An account with this email already exists. Sign in or reset your password.";
-  if (m.includes("password") && m.includes("least")) return "The password is too short.";
-  if (m.includes("email address") && m.includes("already")) return "This email address is already in use.";
-  if (/duplicate|unique|username_taken/i.test(message))
-    return "This username is already taken. Please choose another one.";
-  if (m.includes("invalid_profile"))
-    return "The database does not support this avatar yet. Apply the latest migration first.";
-  return message;
-}
-
 export function Onboarding() {
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
@@ -159,17 +159,12 @@ export function Onboarding() {
     e.preventDefault();
     setPending(true);
     setMessage("");
-    const name = String(new FormData(e.currentTarget).get("username") ?? "").trim();
+    const name = String(new FormData(e.currentTarget).get("username") ?? "");
     try {
-      if (!validUsername(name)) throw new Error("Use 2–24 characters: letters, numbers, spaces, _ or -.");
-      await api.claimUsername(name);
-      if (isDemo) localStorage.setItem("atlas-demo-onboarded", "yes");
+      await completeOnboarding(name);
       nav("/home", { replace: true });
     } catch (err) {
-      const m = (err as Error).message;
-      setMessage(
-        /duplicate|unique|username_taken/i.test(m) ? "This username is already taken. Please choose another one." : m,
-      );
+      setMessage((err as Error).message);
     } finally {
       setPending(false);
     }
@@ -227,8 +222,15 @@ export function AccountActions() {
 
 export function Auth() {
   const [params] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [action, setAction] = useState(params.has("recovery") ? "change" : (params.get("mode") ?? "choice"));
+  // Email link (sign-up confirmation, password reset, email change) from either app: read once on arrival.
+  const [callback] = useState(() => readAuthCallback(location.search, location.hash));
+  const fromEmailLink = useRef(Boolean(callback));
+  const requested = params.get("mode") as AuthAction | null;
+  const [action, setAction] = useState<AuthAction>(
+    params.has("recovery") ? "change" : requested && authActions.includes(requested) ? requested : "choice",
+  );
   const [checkingSession, setCheckingSession] = useState(Boolean(supabase));
   const [activeSession, setActiveSession] = useState(false);
   const [message, setMessage] = useState(
@@ -237,23 +239,49 @@ export function Auth() {
       : "",
   );
   const [pending, setPending] = useState(false);
+  const [callbackDone, setCallbackDone] = useState(!callback);
   useEffect(() => {
-    if (!supabase) return;
+    if (!callback) return;
+    let active = true;
+    const fail = (text: string) => {
+      fromEmailLink.current = false;
+      setMessage(text);
+      setAction(callback.kind === "recovery" ? "reset" : "signin");
+    };
+    completeAuthCallback(callback)
+      .then(({ session }) => {
+        if (!active) return;
+        if (!session) fail(callback.kind === "recovery" ? RECOVERY_EXPIRED : EMAIL_CONFIRMED);
+      })
+      .catch((e) => {
+        if (active) fail((e as Error).message);
+      })
+      .finally(() => {
+        consumeAuthCallback();
+        if (active) setCallbackDone(true);
+      });
+    return () => {
+      active = false;
+    };
+    // Runs once per arrival from an email link.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!supabase || !callbackDone) return;
     let active = true;
     supabase.auth
       .getSession()
       .then(({ data, error }) => {
         if (!active) return;
-        const keepFlow =
-          params.has("recovery") ||
-          action === "change" ||
-          action === "link" ||
-          action === "reset" ||
-          action === "guest";
+        const keepFlow = keepsAuthFlow(action, params.has("recovery"));
         const hasSession = Boolean(data.session);
         setActiveSession(hasSession && !keepFlow);
         setCheckingSession(false);
-        if (hasSession && !keepFlow) navigate("/home", { replace: true });
+        if (hasSession && !keepFlow) {
+          navigate("/home", { replace: true });
+          // Opened from an email link: now the normal view-mode rules apply (e.g. continue in the phone app).
+          if (fromEmailLink.current) continueInPreferredApp("desktop");
+        }
       })
       .catch(() => {
         if (active) setCheckingSession(false);
@@ -261,7 +289,7 @@ export function Auth() {
     return () => {
       active = false;
     };
-  }, [action, navigate, params]);
+  }, [action, navigate, params, callbackDone]);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
@@ -271,58 +299,21 @@ export function Auth() {
     const password = String(form.get("password") ?? "");
     const username = String(form.get("username") ?? "").trim();
     try {
-      if (action === "signin") {
-        await api.signIn(email, password);
-        const u = await api.currentUser();
-        if (u.requestedUsername) {
-          try {
-            await api.claimUsername(u.requestedUsername);
-          } catch (e) {
-            if (
-              !String((e as Error).message)
-                .toLowerCase()
-                .includes("duplicate") &&
-              !String((e as Error).message)
-                .toLowerCase()
-                .includes("username")
-            )
-              throw e;
-          }
-        }
-        navigate("/home", { replace: true });
-      } else if (action === "signup") {
-        if (!validUsername(username)) throw new Error("Name: 2–24 characters, letters, numbers, spaces, _ or -.");
-        const result = await api.signUp(email, password, username);
-        setMessage(
-          result.needsConfirmation
-            ? "Please confirm your email. After that you can sign in normally."
-            : "Account created. Setting up your profile.",
-        );
-        if (!result.needsConfirmation) {
-          await api.claimUsername(username);
-          navigate("/home", { replace: true });
-        }
-      } else if (action === "guest") {
-        await api.guest();
-        navigate("/onboarding", { replace: true });
-      } else if (action === "reset") {
-        await api.resetPassword(email);
-        setMessage("If the account exists, a recovery message has been requested.");
-      } else if (action === "change") {
-        await api.changePassword(password);
-        navigate("/home");
-      } else {
-        await api.link(email, password);
-        setMessage("Confirm your email if prompted. Your guest ID and progress are kept.");
+      const outcome = await performAuthAction(action, { email, password, username });
+      if (outcome.message) setMessage(outcome.message);
+      if (outcome.next) {
+        const afterRecovery = action === "change" && fromEmailLink.current;
+        navigate(outcome.next === "home" ? "/home" : "/onboarding", { replace: outcome.replace || afterRecovery });
+        if (afterRecovery) continueInPreferredApp("desktop");
       }
     } catch (e) {
-      setMessage(authMessage((e as Error).message));
+      setMessage((e as Error).message);
     } finally {
       setPending(false);
     }
   }
   if (checkingSession || activeSession) return <Loading />;
-  const choose = (next: string) => {
+  const choose = (next: AuthAction) => {
     setAction(next);
     setMessage("");
   };
@@ -341,7 +332,7 @@ export function Auth() {
             </span>
             <span>
               <strong>Play as guest</strong>
-              <small>Ohne Registrierung direkt loslegen</small>
+              <small>Start right away, no sign-up needed</small>
             </span>
             <span className="action-arrow" aria-hidden="true">
               →
@@ -387,16 +378,16 @@ export function Auth() {
       <p className="eyebrow">
         ATLAS ARENA ·{" "}
         {action === "signup"
-          ? "NEUES KONTO"
+          ? "NEW ACCOUNT"
           : action === "signin"
             ? "WELCOME BACK"
             : action === "guest"
-              ? "GASTZUGANG"
-              : "KONTO SICHERN"}
+              ? "GUEST ACCESS"
+              : "SAVE YOUR PROGRESS"}
       </p>
       <h1 tabIndex={-1} className="heading mt-2">
         {action === "guest"
-          ? "Dein Abenteuer wartet."
+          ? "Your adventure awaits."
           : action === "signup"
             ? "Create an account."
             : action === "signin"
@@ -405,13 +396,13 @@ export function Auth() {
                 ? "Reset password."
                 : action === "change"
                   ? "Set a new password."
-                  : "Deine Entdeckungen bleiben."}
+                  : "Keep everything you've discovered."}
       </h1>
       {isDemo ? (
         action === "guest" ? (
           <form className="mt-5" onSubmit={submit}>
             <button className="primary w-full" disabled={pending}>
-              {pending ? "Wird vorbereitet …" : "Continue as guest"}
+              {pending ? "Getting ready…" : "Continue as guest"}
             </button>
           </form>
         ) : (
@@ -503,31 +494,7 @@ export function Auth() {
 
 export function AuthRedirect() {
   const navigate = useNavigate();
-  const [state, setState] = useState<"loading" | "guest" | "account" | "out" | "error">(
-    isDemo ? (localStorage.getItem("atlas-demo-signed-out") === "yes" ? "out" : "guest") : "loading",
-  );
-  useEffect(() => {
-    if (!supabase) return;
-    let active = true;
-    supabase.auth
-      .getSession()
-      .then(({ data, error }) => {
-        if (active)
-          setState(
-            error ? "error" : !data.session ? "out" : data.session.user?.is_anonymous === false ? "account" : "guest",
-          );
-      })
-      .catch(() => {
-        if (active) setState("error");
-      });
-    const subscription = supabase.auth.onAuthStateChange?.((_e, s) =>
-      setState(!s ? "out" : s.user.is_anonymous ? "guest" : "account"),
-    )?.data.subscription;
-    return () => {
-      active = false;
-      subscription?.unsubscribe();
-    };
-  }, []);
+  const state = useLandingState();
   useEffect(() => {
     if (state === "guest" || state === "account") navigate("/home", { replace: true });
   }, [state, navigate]);
@@ -542,104 +509,10 @@ export function AuthRedirect() {
     <Welcome />
   );
 }
-function isDeletedAuthUser(error: unknown) {
-  return /AUTH_REQUIRED|user.*not found|user from sub claim.*does not exist/i.test(
-    (error as Error)?.message ?? String(error),
-  );
-}
 export function Protected({ children }: { children: JSX.Element }) {
   const location = useLocation(),
     navigate = useNavigate();
-  const authClient = supabase;
-  const deletedAccount = useRef(false);
-  const [state, setState] = useState<"loading" | "guest" | "account" | "out" | "deleted" | "onboarding" | "error">(
-    "loading",
-  );
-  useEffect(() => {
-    let active = true;
-    if (isDemo) {
-      if (localStorage.getItem("atlas-demo-signed-out") === "yes") {
-        setState("out");
-        return () => {
-          active = false;
-        };
-      }
-      if (location.pathname === "/onboarding") {
-        setState("guest");
-        return () => {
-          active = false;
-        };
-      }
-      api
-        .dashboard()
-        .then((d) => {
-          if (active)
-            setState(
-              d.profile.username === "Traveler" && !localStorage.getItem("atlas-demo-onboarded")
-                ? "onboarding"
-                : "guest",
-            );
-        })
-        .catch(() => {
-          if (active) setState("error");
-        });
-      return () => {
-        active = false;
-      };
-    }
-    if (!supabase) return;
-    const resolve = async (session: any) => {
-      if (!session) {
-        if (active) setState(deletedAccount.current ? "deleted" : "out");
-        return;
-      }
-      const kind = session.user?.is_anonymous === false ? "account" : "guest";
-      if (location.pathname === "/onboarding") {
-        await api.currentUser();
-        if (active) setState(kind);
-        return;
-      }
-      try {
-        const d = await api.dashboard();
-        const confirmed = await api.usernameConfirmed();
-        const requested = String(session.user?.user_metadata?.requested_username ?? "");
-        if (!confirmed && requested) {
-          try {
-            await api.claimUsername(requested);
-            if (active) setState(kind);
-            return;
-          } catch (e) {
-            if (/duplicate|unique|username_taken/i.test((e as Error).message)) {
-              if (active) setState("onboarding");
-              return;
-            }
-            throw e;
-          }
-        }
-        if (active) setState(!confirmed || !validUsername(d.profile.username) ? "onboarding" : kind);
-      } catch (e) {
-        if (isDeletedAuthUser(e)) {
-          deletedAccount.current = true;
-          try {
-            await api.signOut();
-          } catch {}
-          if (active) setState("deleted");
-        } else if (active) setState("error");
-      }
-    };
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error) {
-        if (active) setState("error");
-      } else void resolve(data.session);
-    });
-    const subscription = supabase.auth.onAuthStateChange?.((_e, s) => {
-      void resolve(s);
-    })?.data.subscription;
-    return () => {
-      active = false;
-      subscription?.unsubscribe();
-    };
-  }, [location.pathname]);
+  const state = useSessionGate(location.pathname, "/onboarding");
   useEffect(() => {
     if (state === "out")
       navigate(isDemo ? "/" : "/auth?mode=signin&next=" + encodeURIComponent(location.pathname), { replace: true });
@@ -648,27 +521,6 @@ export function Protected({ children }: { children: JSX.Element }) {
   useEffect(() => {
     if (state === "onboarding") navigate("/onboarding", { replace: true });
   }, [state, navigate]);
-  useEffect(() => {
-    if (isDemo || !authClient) return;
-    let live = true;
-    const validate = async () => {
-      const { error } = await authClient.auth.getUser();
-      if (error && isDeletedAuthUser(error)) {
-        deletedAccount.current = true;
-        try {
-          await api.signOut();
-        } catch {}
-        if (live) setState("deleted");
-      }
-    };
-    const timer = window.setInterval(() => void validate(), 30000);
-    window.addEventListener("focus", validate);
-    return () => {
-      live = false;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", validate);
-    };
-  }, []);
   if (state === "loading" || state === "out" || state === "deleted" || state === "onboarding") return <Loading />;
   if (state === "error")
     return (

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { EliminationCandidates, EliminationHint, EliminationView } from "./domain";
 import {
+  DEFAULT_HINT_LIMIT,
+  ELIMINATION_DIFFICULTIES,
   candidatesAt,
+  eliminationDifficultyLabel,
+  eliminationHowItWorks,
   filterCandidates,
   foldName,
   groupByLetter,
@@ -157,5 +161,26 @@ describe("hintErrorText", () => {
     expect(hintErrorText("ELIMINATION_HINT_LAST_CLUE")).toMatch(/single place/);
     expect(hintErrorText("ELIMINATION_ROUND_OVER")).toMatch(/round is over/);
     expect(hintErrorText("Network down")).toBe("Network down");
+  });
+});
+
+describe("shared setup texts", () => {
+  it("lists the three difficulties in order with a label and a description", () => {
+    expect(ELIMINATION_DIFFICULTIES.map((item) => item.id)).toEqual(["easy", "medium", "hard"]);
+    expect(ELIMINATION_DIFFICULTIES.every((item) => item.label && item.text)).toBe(true);
+    expect(eliminationDifficultyLabel("medium")).toBe("Medium");
+  });
+
+  it("explains the rules in the words of each device", () => {
+    const desktop = eliminationHowItWorks("desktop").map((step) => step.lead + step.text);
+    const phone = eliminationHowItWorks("phone").map((step) => step.lead + step.text);
+    expect(desktop).toHaveLength(5);
+    expect(phone).toHaveLength(5);
+    expect(desktop[3]).toContain("press Enter");
+    expect(phone[3]).toContain("tap Go");
+    expect(desktop[2]).toContain("select it");
+    expect(phone[2]).toContain("tap it");
+    expect(desktop[4]).toContain(`(${DEFAULT_HINT_LIMIT} per round)`);
+    expect(phone[4]).toBe(desktop[4]);
   });
 });
