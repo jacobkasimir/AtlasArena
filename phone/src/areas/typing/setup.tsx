@@ -30,6 +30,7 @@ import {
   Card,
   Chip,
   ChipGroup,
+  GameButton,
   LinkButton,
   Section,
   StatusMessage,
@@ -56,6 +57,7 @@ const sorted = (codes: string[]) => [...new Set(codes)].sort();
 
 export function PhoneGameSetup({
   game,
+  hero,
   intro,
   modes,
   places,
@@ -69,6 +71,8 @@ export function PhoneGameSetup({
   error,
 }: {
   game: GameId;
+  /** Game header card (ModeHero) above the intro. */
+  hero?: ReactNode;
   intro: ReactNode;
   modes: PhoneMode[];
   places: SetupPlace[];
@@ -146,6 +150,7 @@ export function PhoneGameSetup({
 
   return (
     <div className="ph-stack">
+      {hero}
       <p className="ph-muted">{intro}</p>
 
       {resume.length > 0 && (
@@ -255,9 +260,9 @@ export function PhoneGameSetup({
       </Section>
 
       <ActionBar>
-        <Button variant="primary" size="lg" loading={busy} disabled={!total} onClick={() => void start()}>
+        <GameButton variant="primary" size="lg" block loading={busy} disabled={!total} onClick={() => void start()}>
           {busy ? "Preparing…" : `${startLabel} · ${playCount} ${unit(playCount, effective)}`}
-        </Button>
+        </GameButton>
       </ActionBar>
 
       <BottomSheet open={sheet === "places"} onClose={() => setSheet(null)} title="Which places?" footer={doneFooter}>

@@ -181,3 +181,59 @@ export function choiceStatus(
 export function pageCount(total: number, size = FLAG_PAGE_SIZE) {
   return Math.max(1, Math.ceil(total / size));
 }
+
+/** Entries with the current entry's latest state merged in (the server may send `current` fresher than `entries`). */
+export function mergedEntries<E extends { id: string; position: number; outcome: string }>(entries: E[], current: E | null | undefined) {
+  if (!current) return entries;
+  const known = entries.some((entry) => entry.id === current.id);
+  return known ? entries.map((entry) => (entry.id === current.id ? current : entry)) : [...entries, current];
+}
+
+/** Server streak after the latest answer: correct answers in a row, the current entry included. */
+export function roundStreak(session: { entries: { id: string; position: number; outcome: string }[]; current?: { id: string; position: number; outcome: string } | null }) {
+  return trailingStreak(mergedEntries(session.entries, session.current ?? null));
+}
+
+/**
+ * How a server action result maps to game feel: "right"/"wrong" = an answer the server accepted and judged
+ * (fire feel.answer once), "gentle" = nothing was used up (be more specific / already tried), null = no answer.
+ */
+export type AnswerFeel = "right" | "wrong" | "gentle" | null;
+
+export function flagsAnswerFeel(outcome: string | undefined): AnswerFeel {
+  if (!outcome) return null;
+  if (outcome === "correct") return "right";
+  if (outcome === "ambiguous" || outcome === "duplicate_choice") return "gentle";
+  if (outcome === "wrong_choice" || outcome === "not_solved" || outcome === "incorrect") return "wrong";
+  return null; // skip, hint, …
+}
+
+export function capitalsAnswerFeel(outcome: string | undefined): AnswerFeel {
+  if (outcome === "correct") return "right";
+  if (outcome === "incorrect") return "wrong";
+  if (outcome === "ambiguous") return "gentle";
+  return null;
+}
+
+/** Results order: mistakes first (incorrect, then skipped), then correct; round order inside each group. */
+export function mistakesFirst<E extends { position: number; outcome: string }>(entries: E[]): E[] {
+  const rank = (outcome: string) => (outcome === "incorrect" ? 0 : outcome === "skipped" ? 1 : outcome === "correct" ? 3 : 2);
+  return [...entries].sort((a, b) => rank(a.outcome) - rank(b.outcome) || a.position - b.position);
+}
+
+/** Short word for a finished entry on the results screen. */
+export function outcomeWord(outcome: string) {
+  return outcome === "correct" ? "Correct" : outcome === "skipped" ? "Skipped" : outcome === "incorrect" ? "Incorrect" : "Open";
+}
+
+/** One-line results headline from accuracy (the medal tier itself comes from ResultHero). */
+export function resultHeadline(correct: number, total: number, timeUp = false) {
+  const ratio = total > 0 ? correct / total : 0;
+  const lead = ratio >= 0.9 ? "Outstanding!" : ratio >= 0.7 ? "Great round!" : ratio >= 0.5 ? "Good effort!" : "Keep practising!";
+  return timeUp ? `Time's up – ${lead.toLowerCase().replace("!", "")}!` : lead;
+}
+
+/** Ranked = counts for personal bests: not a random sample / practice round. */
+export function isRanked(round: { ranked?: boolean; sampleSize?: number | null; finalBadge?: string | null }) {
+  return round.ranked !== false && !round.sampleSize && round.finalBadge !== "unranked";
+}

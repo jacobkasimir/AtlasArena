@@ -26,7 +26,7 @@ vi.mock("@shared/api", () => ({
   },
   DEMO_UNAVAILABLE: "ONLINE_ONLY",
 }));
-vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn() }));
+vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn(), playNotes: vi.fn() }));
 vi.mock("@shared/components", async (original) => ({
   ...(await original<typeof import("@shared/components")>()),
   download: vi.fn(),
@@ -35,6 +35,7 @@ vi.mock("@shared/components", async (original) => ({
 import { download } from "@shared/components";
 import { getPrefs, resetPrefs } from "@shared/prefs";
 import { getPhonePrefs, reloadPhonePrefs, setPhonePref } from "@phone/prefs-phone";
+import { feelPattern, resetFeelCooldowns } from "@phone/ui";
 import { PhoneLayout } from "@phone/shell/Layout";
 import ProfileArea from "./profile";
 import SettingsArea from "./settings";
@@ -77,9 +78,14 @@ function renderAt(path: string) {
 }
 const where = () => screen.getByTestId("where").textContent;
 
+let vibrate: ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  resetFeelCooldowns();
+  vibrate = vi.fn();
+  Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
   resetPrefs();
   reloadPhonePrefs();
   mode.demo = false;
@@ -132,13 +138,68 @@ describe("phone Profile", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("opens the leaderboard sheet", async () => {
+  it("opens the leaderboard sheet at /profile/leaderboard and closing returns to /profile", async () => {
     renderAt("/profile");
     fireEvent.click(await screen.findByRole("button", { name: /Leaderboard/ }));
+    await waitFor(() => expect(where()).toBe("/profile/leaderboard"));
     const sheet = await screen.findByRole("dialog", { name: "Leaderboard" });
     expect(await within(sheet).findByRole("list", { name: "Ranking" })).toBeInTheDocument();
-    fireEvent.click(within(sheet).getByRole("button", { name: "This week" }));
+    const week = within(sheet).getByRole("radio", { name: "This week" });
+    fireEvent.click(week);
+    expect(week).toHaveAttribute("aria-checked", "true");
     await waitFor(() => expect(api.leaderboard).toHaveBeenCalledWith("week"));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(where()).toBe("/profile"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("opens the leaderboard sheet from a direct link (Home) and closes to /profile", async () => {
+    renderAt("/profile/leaderboard");
+    const sheet = await screen.findByRole("dialog", { name: "Leaderboard" });
+    expect(await within(sheet).findByRole("list", { name: "Ranking" })).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(where()).toBe("/profile"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Mia")).toBeInTheDocument();
+  });
+
+  it("pins your own row with the gap to the next player when you're outside the top list", async () => {
+    const you = { rank: 12, username: "Mia", avatar: 0, xp: 300, points: 300, level: 1, bestStreak: 4, dailyStreak: 1, isYou: true };
+    api.leaderboard.mockResolvedValue({
+      ...board,
+      players: [{ ...board.players[0], username: "Ana", isYou: false, points: 5000 }],
+      you,
+      ahead: { rank: 11, username: "Ben", gap: 40 },
+      totalPlayers: 30,
+    });
+    renderAt("/profile/leaderboard");
+    const sheet = await screen.findByRole("dialog", { name: "Leaderboard" });
+    const pinned = await within(sheet).findByRole("group", { name: "Your standing" });
+    expect(pinned).toHaveTextContent("#12");
+    expect(within(pinned).getByText("You")).toBeInTheDocument();
+    expect(pinned).toHaveTextContent("#12 of 30 · Earn 40 XP to pass Ben for #11.");
+    // The pinned row sits outside the scrolling ranking list.
+    expect(within(within(sheet).getByRole("list", { name: "Ranking" })).queryByText("Mia")).toBeNull();
+  });
+
+  it("opens an achievement's detail sheet with its progress", async () => {
+    api.achievements.mockResolvedValue([
+      { id: "a1", category: "quiz", tier: "gold", icon: "trophy", title: "Quiz master", description: "Finish 10 quiz games.", current: 4, target: 10, earned: false },
+      { id: "a2", category: "flags", tier: "bronze", icon: "flag", title: "First flag", description: "Finish a Flags round.", current: 1, target: 1, earned: true },
+    ]);
+    renderAt("/profile/achievements");
+    fireEvent.click(await screen.findByRole("button", { name: "Quiz master, Gold. Locked, 4 of 10" }));
+    let sheet = await screen.findByRole("dialog", { name: "Quiz master" });
+    expect(sheet).toHaveTextContent("Finish 10 quiz games.");
+    expect(within(sheet).getByRole("progressbar", { name: "Progress" })).toHaveAttribute("aria-valuenow", "4");
+    expect(sheet).toHaveTextContent("6 to go");
+    fireEvent.click(within(sheet).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "First flag, Bronze. Earned" }));
+    sheet = await screen.findByRole("dialog", { name: "First flag" });
+    expect(within(sheet).getByRole("status")).toHaveTextContent("Earned – nice work!");
+    expect(within(sheet).queryByRole("progressbar")).toBeNull();
   });
 
   it("shows statistics for all five games", async () => {
@@ -224,6 +285,34 @@ describe("phone Account & data", () => {
 });
 
 describe("phone Settings", () => {
+  it("plays the haptics map from the Try it buttons", async () => {
+    renderAt("/settings");
+    const tryIt = await screen.findByRole("group", { name: "Try it" });
+    const expected: [string, number | number[]][] = [
+      ["Tap", feelPattern("tap")],
+      ["Correct", feelPattern("correct")],
+      ["Streak", feelPattern("streak", 5)],
+      ["Wrong", feelPattern("wrong")],
+      ["Timer warning", feelPattern("timerWarning")],
+      ["Level up", feelPattern("levelUp")],
+      ["Reward", feelPattern("reward")],
+    ];
+    for (const [label, pattern] of expected) {
+      vibrate.mockClear();
+      resetFeelCooldowns();
+      fireEvent.click(within(tryIt).getByRole("button", { name: label }));
+      expect(vibrate, label).toHaveBeenCalledWith(pattern);
+    }
+  });
+
+  it("disables the Try it buttons when vibration and sound are both off", async () => {
+    renderAt("/settings");
+    fireEvent.click(await screen.findByRole("switch", { name: /Vibration/ }));
+    fireEvent.click(screen.getByRole("switch", { name: /Sound effects/ }));
+    const tryIt = screen.getByRole("group", { name: "Try it" });
+    expect(within(tryIt).getByRole("button", { name: "Correct" })).toBeDisabled();
+  });
+
   it("saves switches and choices on the device", async () => {
     renderAt("/settings");
     const auto = await screen.findByRole("switch", { name: /Continue automatically/ });

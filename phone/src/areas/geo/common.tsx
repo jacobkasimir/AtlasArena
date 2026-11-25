@@ -1,9 +1,9 @@
 // Building blocks shared by the phone Flags and Capitals screens (geo area only).
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@shared/icons";
-import { CALM_ROUND_MS, showCountdown, usePrefs } from "@shared/prefs";
+import { CALM_ROUND_MS, usePrefs } from "@shared/prefs";
 import { formatClock } from "@shared/game-setup";
-import { BottomSheet, Button } from "@phone/ui";
+import { BottomSheet, Button, TimerBar } from "@phone/ui";
 import { Feedback, localFlagSrc } from "./geo-logic";
 
 /**
@@ -59,34 +59,77 @@ export function useRoundTimer(
   return { elapsed, remaining };
 }
 
-/** Round clock that respects the calm-timer setting (countdown only in the last 30 seconds). */
-export function RoundClock({ remaining, elapsed }: { remaining: number | null; elapsed: number }) {
-  const prefs = usePrefs();
+/**
+ * Round clock. Untimed rounds show the elapsed time; timed rounds get the shared TimerBar (calm-timer setting,
+ * warning state and timerWarning/timeUp feedback in the last 30 seconds). The server owns the deadline.
+ */
+export function RoundClock({
+  remaining,
+  elapsed,
+  totalMs,
+}: {
+  remaining: number | null;
+  elapsed: number;
+  totalMs?: number | null;
+}) {
   if (remaining === null)
     return (
       <span className="ph-geo-clock" role="timer" aria-label={`Time ${formatClock(elapsed)}`}>
         <Icon name="timer" size={16} /> {formatClock(elapsed)}
       </span>
     );
-  if (!showCountdown(prefs, remaining))
-    return (
-      <span
-        className="ph-geo-clock"
-        role="timer"
-        aria-label={`Timed round, the countdown appears for the last ${CALM_ROUND_MS / 1000} seconds`}
-      >
-        <Icon name="timer" size={16} /> Timed
-      </span>
-    );
   return (
-    <span
-      className="ph-geo-clock"
-      data-low={remaining <= 30_000 ? "true" : undefined}
-      role="timer"
-      aria-label={`${formatClock(remaining)} left`}
-    >
-      <Icon name="timer" size={16} /> {formatClock(remaining)}
+    <span className="ph-geo-timer">
+      <TimerBar
+        msLeft={remaining}
+        totalMs={Math.max(remaining, totalMs ?? remaining)}
+        warnAtMs={CALM_ROUND_MS}
+        calmFromMs={CALM_ROUND_MS}
+      />
     </span>
+  );
+}
+
+export type AnswerFx = "pop" | "shake" | null;
+
+/**
+ * Pop (right) or shake (wrong) for the element that holds the answer (flag picture, typed-answer row): put
+ * `className` on it. A typed question is judged once, so the class appears once per question; `clear` on the
+ * next question. No re-mount, so the input keeps focus and the keyboard stays open.
+ * Motion only decorates: the feedback line always says the result in words.
+ */
+export function useAnswerFx() {
+  const [fx, setFx] = useState<{ kind: AnswerFx }>({ kind: null });
+  const play = useCallback((kind: AnswerFx) => setFx({ kind }), []);
+  const clear = useCallback(() => setFx({ kind: null }), []);
+  const className = fx.kind === "pop" ? "ph-pop" : fx.kind === "shake" ? "ph-shake" : "";
+  return { fx: fx.kind, play, clear, className };
+}
+
+/**
+ * The right answer, big, after a miss (learn it right away), with optional extra lines (other accepted names,
+ * a flag picture). Announced politely.
+ */
+export function AnswerReveal({
+  label = "Correct answer",
+  answer,
+  children,
+  media,
+}: {
+  label?: string;
+  answer: string;
+  children?: ReactNode;
+  media?: ReactNode;
+}) {
+  return (
+    <div className="ph-geo-answer-reveal" role="status">
+      {media}
+      <span className="ph-geo-answer-reveal-label">
+        <Icon name="checkCircle" size={18} /> {label}
+      </span>
+      <strong className="ph-geo-answer-reveal-name">{answer}</strong>
+      {children}
+    </div>
   );
 }
 

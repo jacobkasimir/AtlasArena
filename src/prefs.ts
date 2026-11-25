@@ -266,13 +266,21 @@ export const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test
   (typeof navigator !== "undefined" && navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 export function haptic(kind: HapticKind) {
+  vibrate(hapticPatterns[kind] as number | number[]);
+}
+
+/**
+ * Vibrate with any pattern (ms, or on/off ms list) when the player kept haptics on. Android: Vibration API;
+ * iOS: one light tick (the switch trick, see iosTick). Used by the phone app's named feedback patterns.
+ */
+export function vibrate(pattern: number | number[]) {
   if (!read().haptics || typeof navigator === "undefined") return;
   if (typeof navigator.vibrate !== "function") {
     if (isIOS) iosTick();
     return;
   }
   try {
-    navigator.vibrate(hapticPatterns[kind] as number | number[]);
+    navigator.vibrate(pattern);
   } catch {
     /* some browsers throw when vibration is blocked */
   }

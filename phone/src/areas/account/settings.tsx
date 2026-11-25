@@ -1,29 +1,26 @@
-// Phone Settings (/settings/*): every touch-relevant preference from src/prefs.ts, the phone-only answer layout,
+// Phone Settings (/settings/*): game feel (vibration, sound, volume, preview), every touch-relevant preference
+// from src/prefs.ts, the phone-only answer layout,
 // the colour theme, device data actions, the link to the desktop version and About.
 import { useState } from "react";
 import { Route, Routes } from "react-router-dom";
-import { Icon } from "@shared/icons";
 import {
   AutoContinueSpeed,
   Density,
   TextSize,
   TimerDisplay,
-  canVibrate,
   clearSavedSetups,
   defaultPrefs,
-  haptic,
-  isIOS,
   resetPrefs,
   setPref,
   usePrefs,
 } from "@shared/prefs";
-import { playSound } from "@shared/sound";
 import { ThemeChoice, readTheme, saveTheme } from "@shared/theme";
 import { AnswerLayout, defaultPhonePrefs, setPhonePref, usePhonePrefs } from "@phone/prefs-phone";
 import { usePhoneChrome } from "@phone/shell/chrome";
 import { paths } from "@phone/shell/paths";
 import { BottomSheet, Button, LinkCard, Section, StatusMessage, useToast } from "@phone/ui";
 import { ChoiceGroup, RowGroup, SwitchRow } from "./controls";
+import { FeelSettings } from "./feel-settings";
 import { ViewModeSetting } from "./ViewModeSetting";
 import "./account.css";
 
@@ -44,7 +41,6 @@ function SettingsScreen() {
   const [message, setMessage] = useState("");
   const [confirm, setConfirm] = useState<"closed" | "reset" | "setups">("closed");
   const toast = useToast();
-  const vibrationSupported = canVibrate();
 
   const isDefault =
     (Object.keys(defaultPrefs) as (keyof typeof defaultPrefs)[]).every((key) => prefs[key] === defaultPrefs[key]) &&
@@ -71,73 +67,7 @@ function SettingsScreen() {
 
   return (
     <>
-      <Section title="Feedback">
-        <RowGroup>
-          <SwitchRow
-            title="Vibration"
-            description={
-              vibrationSupported
-                ? isIOS
-                  ? "A light tick for answers and finished rounds (iOS 18 or later)."
-                  : "Short vibrations for right and wrong answers and finished rounds."
-                : "This device or browser can't vibrate. The setting is kept for your other devices."
-            }
-            checked={prefs.haptics}
-            onChange={(value) => {
-              setPref("haptics", value);
-              if (value) haptic("tap");
-            }}
-          />
-          {prefs.haptics && vibrationSupported && (
-            <div className="ph-account-row">
-              <Button block onClick={() => haptic("correct")}>
-                Test vibration
-              </Button>
-            </div>
-          )}
-          <SwitchRow
-            title="Sound effects"
-            description="Short sound cues for right, wrong and finished. Made in the app, no downloads."
-            checked={prefs.sound}
-            onChange={(value) => {
-              setPref("sound", value);
-              if (value) playSound("correct", prefs.volume);
-            }}
-          />
-          <div className="ph-account-row ph-account-choice-row" data-disabled={!prefs.sound || undefined}>
-            <label className="ph-account-row-text" htmlFor="ph-account-volume">
-              <strong>Volume</strong>
-              <small className="ph-muted">{prefs.volume}%</small>
-            </label>
-            <input
-              id="ph-account-volume"
-              className="ph-account-range"
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={prefs.volume}
-              disabled={!prefs.sound}
-              aria-valuetext={`${prefs.volume}%`}
-              onChange={(event) => setPref("volume", Number(event.target.value))}
-              onPointerUp={() => playSound("correct")}
-            />
-            <div className="ph-account-buttons" role="group" aria-label="Test sounds">
-              {(
-                [
-                  ["correct", "Right"],
-                  ["wrong", "Wrong"],
-                  ["complete", "Finished"],
-                ] as const
-              ).map(([kind, label]) => (
-                <Button key={kind} disabled={!prefs.sound} onClick={() => playSound(kind, prefs.volume)}>
-                  Play “{label}”
-                </Button>
-              ))}
-            </div>
-          </div>
-        </RowGroup>
-      </Section>
+      <FeelSettings />
 
       <Section title="Gameplay">
         <RowGroup>
@@ -206,9 +136,9 @@ function SettingsScreen() {
             value={theme}
             onChange={chooseTheme}
             options={[
-              { value: "system", label: "System", icon: <Icon name="phone" size={16} /> },
-              { value: "light", label: "Light", icon: <Icon name="sun" size={16} /> },
-              { value: "dark", label: "Dark", icon: <Icon name="moon" size={16} /> },
+              { value: "system", label: "System", icon: "phone" },
+              { value: "light", label: "Light", icon: "sun" },
+              { value: "dark", label: "Dark", icon: "moon" },
             ]}
           />
           <ChoiceGroup<TextSize>
@@ -282,7 +212,7 @@ function SettingsScreen() {
           ) : (
             <div className="ph-stack">
               <p>
-                Feedback, gameplay, display and answer-button preferences go back to their defaults on this device
+                Feel (vibration and sound), gameplay, display and answer-button preferences go back to their defaults on this device
                 (also for the desktop version in this browser).
               </p>
               <p className="ph-muted">Your colour theme, saved setups, progress and account are kept.</p>

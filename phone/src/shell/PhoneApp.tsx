@@ -15,6 +15,7 @@ const Flags = lazy(() => import("@phone/areas/geo/flags"));
 const Capitals = lazy(() => import("@phone/areas/geo/capitals"));
 const Recall = lazy(() => import("@phone/areas/typing/recall"));
 const Elimination = lazy(() => import("@phone/areas/typing/elimination"));
+const Explorer = lazy(() => import("@phone/areas/explore"));
 const Profile = lazy(() => import("@phone/areas/account/profile"));
 const Settings = lazy(() => import("@phone/areas/account/settings"));
 
@@ -40,6 +41,7 @@ export function PhoneApp() {
           <Route path="capitals/*" element={<Capitals />} />
           <Route path="recall/*" element={<Recall />} />
           <Route path="elimination/*" element={<Elimination />} />
+          <Route path="explorer/*" element={<Explorer />} />
           <Route path="profile/*" element={<Profile />} />
           <Route path="settings/*" element={<Settings />} />
           <Route path="*" element={<NotFound />} />

@@ -13,16 +13,17 @@ import {
   ActionBar,
   AnswerButton,
   AnswerList,
-  Button,
   Card,
   LinkButton,
   LoadingState,
+  GameButton,
   ProgressBar,
   StatusMessage,
   TextField,
-  useHaptics,
+  useFeel,
 } from "@phone/ui";
 import type { AnswerState } from "@phone/ui";
+import { Icon } from "@shared/icons";
 import { capitalize } from "./quiz-logic";
 
 export const reviewPath = `${paths.quiz}/review`;
@@ -65,9 +66,8 @@ export function reviewOptionState(item: ReviewItem, optionId: string, chosen: st
 }
 
 export function ReviewStart() {
-  usePhoneChrome({ title: "Review mistakes", back: true });
+  usePhoneChrome({ title: "Review my mistakes", back: true });
   const navigate = useNavigate();
-  const haptics = useHaptics();
   const { data, error, reload } = useLoad<ReviewSummary>(() => api.reviewSummary());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -85,7 +85,6 @@ export function ReviewStart() {
     busyRef.current = true;
     setBusy(true);
     setMessage("");
-    haptics.tap();
     try {
       const session = await api.reviewStart(requestId());
       navigate(`${reviewPath}/${session.id}`);
@@ -129,9 +128,17 @@ export function ReviewStart() {
       <StatusMessage tone="error">{message}</StatusMessage>
       <ActionBar label="Start review">
         {data.open > 0 ? (
-          <Button variant="primary" size="lg" block loading={busy} onClick={() => void start()}>
+          <GameButton
+            variant="tone"
+            tone="review"
+            size="xl"
+            block
+            loading={busy}
+            icon={<Icon name="review" size={22} />}
+            onClick={() => void start()}
+          >
             {busy ? "Preparing…" : `Review ${data.open === 1 ? "1 mistake" : `${Math.min(10, data.open)} mistakes`}`}
-          </Button>
+          </GameButton>
         ) : (
           <LinkButton to={paths.games} variant="primary" size="lg" block>
             Choose a game
@@ -145,7 +152,7 @@ export function ReviewStart() {
 export function ReviewPlay() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const haptics = useHaptics();
+  const feel = useFeel();
   const { answerLayout } = usePhonePrefs();
   const { data, error, reload } = useLoad<ReviewSession>(() => api.reviewView(id), id);
   const [session, setSession] = useState<ReviewSession | null>(null);
@@ -161,7 +168,7 @@ export function ReviewPlay() {
 
   const item = session?.items.find((entry) => entry.position === position);
   const finished = Boolean(session && !item);
-  usePhoneChrome({ title: "Review mistakes", back: finished ? paths.home : true, hideTabBar: !finished });
+  usePhoneChrome({ title: "Review my mistakes", back: finished ? paths.home : true, hideTabBar: !finished });
 
   useEffect(() => {
     if (!data) return;
@@ -189,13 +196,13 @@ export function ReviewPlay() {
     busyRef.current = true;
     setBusy(true);
     setMessage("");
+    // The press itself already gave its light haptic (AnswerButton select / GameButton tap).
     if (item.kind === "quiz") setChosen(value);
-    haptics.tap();
     try {
       const next = await api.reviewAnswer(session.id, item.position, value);
       const result = next.items.find((entry) => entry.position === item.position);
-      if (result?.correct) haptics.correct();
-      else haptics.wrong();
+      // One feedback once the server has checked the answer.
+      feel.answer(Boolean(result?.correct));
       setSession(next);
     } catch (cause) {
       setChosen(null);
@@ -254,9 +261,9 @@ export function ReviewPlay() {
           Back to Home
         </LinkButton>
         <ActionBar label="Next">
-          <Button variant="primary" size="lg" block loading={busy} onClick={() => void more()}>
+          <GameButton variant="tone" tone="review" size="lg" block loading={busy} onClick={() => void more()}>
             {busy ? "Preparing…" : "Review more"}
-          </Button>
+          </GameButton>
         </ActionBar>
       </div>
     );
@@ -321,8 +328,13 @@ export function ReviewPlay() {
       </div>
 
       {item.answered && (
-        <section className="ph-quiz-feedback ph-card" data-correct={Boolean(item.correct)} role="status">
+        <section
+          className={`ph-quiz-feedback ph-card ${item.correct ? "ph-pop" : "ph-shake"}`}
+          data-correct={Boolean(item.correct)}
+          role="status"
+        >
           <div className="ph-quiz-feedback-head">
+            <Icon name={item.correct ? "checkCircle" : "warning"} size={24} />
             <h3>{item.correct ? "Cleared – it won't come back." : "Not yet – it stays on your list."}</h3>
           </div>
           {item.solution && (
@@ -338,15 +350,15 @@ export function ReviewPlay() {
 
       {item.answered ? (
         <ActionBar label="Continue">
-          <Button ref={nextRef} variant="primary" size="lg" block onClick={() => setPosition(nextOpen?.position ?? -1)}>
+          <GameButton ref={nextRef} variant="primary" size="lg" block onClick={() => setPosition(nextOpen?.position ?? -1)}>
             {nextOpen ? "Next" : "See summary"}
-          </Button>
+          </GameButton>
         </ActionBar>
       ) : item.kind !== "quiz" ? (
         <ActionBar label="Check">
-          <Button type="submit" form="ph-review-form" variant="primary" size="lg" block loading={busy} disabled={!text.trim()}>
+          <GameButton type="submit" form="ph-review-form" variant="primary" size="lg" block loading={busy} disabled={!text.trim()}>
             {busy ? "Checking…" : "Check"}
-          </Button>
+          </GameButton>
         </ActionBar>
       ) : null}
     </div>

@@ -1,11 +1,13 @@
 // Phone quiz round at /quiz/play/:id. The server (or the demo engine) decides correctness, points, streaks
 // and the deadline; this screen only shows its responses. Answers sit in the lower part of the screen,
 // "Next" sticks in the action bar, and every action is guarded against double taps.
+// Game feel: every server-accepted answer fires feel.answer(correct, streak) once; the streak meter, combo toast,
+// round dots and the timer bar show the server's numbers. Results get the "complete" feedback from ResultHero.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "@shared/api";
 import type { PlayableQuestion, Review, View } from "@shared/domain";
-import { CALM_QUESTION_MS, autoContinueMs, prefersReducedMotion, showCountdown, useLeaveGuard, usePrefs } from "@shared/prefs";
+import { autoContinueMs, prefersReducedMotion, useLeaveGuard, usePrefs } from "@shared/prefs";
 import { modeNames } from "@shared/quiz-meta";
 import { Icon } from "@shared/icons";
 import { usePhonePrefs } from "@phone/prefs-phone";
@@ -18,18 +20,22 @@ import {
   AnswerList,
   BottomSheet,
   Button,
+  ComboToast,
+  GameButton,
   IconButton,
   LinkButton,
   LoadingState,
-  ProgressBar,
   StatusMessage,
-  useHaptics,
+  StreakMeter,
+  TimerBar,
+  useFeel,
+  useReplayKey,
 } from "@phone/ui";
-import { capitalize, friendlyQuizError, isActive, optionState } from "./quiz-logic";
+import { capitalize, friendlyQuizError, isActive, optionState, roundDots } from "./quiz-logic";
 
 /** Taps on "Next" this soon after feedback appeared are treated as an accidental double tap. */
 export const NEXT_TAP_GUARD_MS = 350;
-const TIMED_ROUND_MS = 60_000;
+export const TIMED_ROUND_MS = 60_000;
 
 function PauseIcon() {
   return (
@@ -45,7 +51,7 @@ export function QuizPlay() {
   const navigate = useNavigate();
   const prefs = usePrefs();
   const { answerLayout } = usePhonePrefs();
-  const haptics = useHaptics();
+  const feel = useFeel();
 
   const [view, setView] = useState<View>();
   const [loadError, setLoadError] = useState("");
@@ -137,9 +143,10 @@ export function QuizPlay() {
   const finish = useCallback(() => {
     if (finished.current) return;
     finished.current = true;
-    haptics.complete();
-    release(() => navigate(`${paths.quiz}/results/${id}`, { replace: true }));
-  }, [haptics, id, navigate, release]);
+    // No feedback here: ResultHero on the results screen plays the one "complete"/"reward"/"levelUp" cue.
+    // `fresh` tells the results screen it may show the XP bar with the player's current XP total.
+    release(() => navigate(`${paths.quiz}/results/${id}`, { replace: true, state: { fresh: true } }));
+  }, [id, navigate, release]);
 
   // A run that completed without a held answer (time up, resumed finished run) goes straight to results.
   useEffect(() => {
@@ -156,23 +163,24 @@ export function QuizPlay() {
       promptRef.current?.focus({ preventScroll: true });
   }, [questionKey]);
 
-  // Feedback arrived: sound + vibration once, bring the explanation into view, focus "Next".
+  // Feedback arrived (the server accepted the answer): one feel.answer with the server's streak, bring the
+  // explanation into view, focus "Next".
   const feedbackKey = feedback && shown ? `${shown.id}:${shown.answered}` : "";
   useEffect(() => {
     if (!feedbackKey || feedbackKey === lastFeedbackKey.current || !feedback) return;
     lastFeedbackKey.current = feedbackKey;
     feedbackAt.current = Date.now();
-    if (feedback.correct) haptics.correct();
-    else haptics.wrong();
+    feel.answer(feedback.correct, shown?.stats.streak ?? 0);
     feedbackRef.current?.scrollIntoView?.({ block: "nearest", behavior: prefersReducedMotion() ? "auto" : "smooth" });
     nextRef.current?.focus({ preventScroll: true });
-  }, [feedbackKey, feedback, haptics]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedbackKey, feedback, feel]);
 
   async function act(kind: "answer" | "next", optionId?: string) {
     if (!view || pendingRef.current) return;
     if (kind === "answer") {
       if (view.status !== "awaiting_answer" || !view.current || timeUp || !optionId) return;
-      haptics.tap();
+      // AnswerButton already gave the light "select" haptic for this press.
       setSelected(optionId);
     }
     pendingRef.current = true;
@@ -251,9 +259,11 @@ export function QuizPlay() {
     );
 
   const question = shown.current;
-  const questionNumber = Math.min(shown.answered + 1, shown.total);
+  // While feedback is shown, "Question n" still names the question just answered.
+  const questionNumber = Math.max(1, Math.min(shown.answered + (shown.status === "awaiting_answer" ? 1 : 0), shown.total));
   const lives = Math.max(0, 3 - shown.stats.incorrect);
   const answersDisabled = pending || shown.status !== "awaiting_answer" || timeUp;
+  const fixedLength = shown.mode === "classic" || shown.mode === "practice";
 
   return (
     <div className="ph-quiz-play" data-feedback={feedback ? (feedback.correct ? "correct" : "wrong") : undefined}>
@@ -275,12 +285,9 @@ export function QuizPlay() {
           {capitalize(question?.difficulty ?? shown.difficulty)}
         </span>
         <span className="ph-quiz-hud-item">
-          <span className="ph-muted">Score</span> <strong>{shown.stats.score.toLocaleString()}</strong>
+          <span className="ph-muted">Score</span> <Score value={shown.stats.score} />
         </span>
-        <span className="ph-quiz-hud-item">
-          <Icon name="flame" size={16} /> <span className="sr-only">Streak </span>
-          <strong>{shown.stats.streak}</strong>
-        </span>
+        <StreakMeter streak={shown.stats.streak} best={shown.stats.bestStreak} />
         {shown.mode === "endless" && (
           <span className="ph-quiz-hud-item" aria-label={`${lives} of 3 lives left`}>
             <span aria-hidden="true" className="ph-quiz-lives">
@@ -294,15 +301,24 @@ export function QuizPlay() {
         )}
       </div>
 
-      {shown.mode === "classic" || shown.mode === "practice" ? (
-        <ProgressBar value={shown.answered} max={shown.total} label={`Question ${questionNumber} of ${shown.total}`} showValue />
+      {fixedLength ? (
+        <RoundDots view={shown} questionNumber={questionNumber} />
       ) : (
         <p className="ph-muted ph-quiz-count-line">
           Question {shown.answered + (shown.status === "awaiting_answer" ? 1 : 0)}
         </p>
       )}
 
-      {shown.deadline && <TimerBar remaining={remaining} calm={prefs.timerDisplay === "calm"} />}
+      {shown.deadline &&
+        (remaining === null ? (
+          <p className="ph-quiz-timer-paused ph-muted">
+            <Icon name="timer" size={16} /> Timer paused while you review
+          </p>
+        ) : (
+          <TimerBar msLeft={remaining} totalMs={TIMED_ROUND_MS} />
+        ))}
+
+      <ComboToast streak={shown.stats.streak} />
 
       <div className="ph-quiz-stage">
         {question && (
@@ -331,21 +347,27 @@ export function QuizPlay() {
         {feedback
           ? feedback.correct
             ? `Correct. Plus ${feedback.points} points.`
-            : `Not quite. The correct answer is ${feedback.correctAnswer}.`
+            : `Incorrect. The correct answer is ${feedback.correctAnswer}.`
           : timeUp
             ? "Time is up."
             : ""}
       </div>
 
       {feedback && (
-        <section ref={feedbackRef} className="ph-quiz-feedback ph-card" data-correct={feedback.correct} aria-label="Answer feedback">
+        <section
+          ref={feedbackRef}
+          key={feedbackKey}
+          className={`ph-quiz-feedback ph-card ${feedback.correct ? "ph-pop" : "ph-shake"}`}
+          data-correct={feedback.correct}
+          aria-label="Answer feedback"
+        >
           <div className="ph-quiz-feedback-head">
             <Icon name={feedback.correct ? "checkCircle" : "warning"} size={24} />
-            <h3>{feedback.correct ? "Correct" : "Not quite"}</h3>
+            <h3>{feedback.correct ? "Correct" : "Incorrect"}</h3>
             <strong className="ph-quiz-points">+{feedback.points} pts</strong>
           </div>
           {!feedback.correct && (
-            <p>
+            <p className="ph-quiz-answer-line">
               <span className="ph-muted">Correct answer: </span>
               <strong>{feedback.correctAnswer}</strong>
             </p>
@@ -371,16 +393,18 @@ export function QuizPlay() {
       )}
       {feedback && (
         <ActionBar label="Continue">
-          <Button
+          <GameButton
             ref={nextRef}
-            variant="primary"
+            variant={finalAnswer ? "tone" : "primary"}
+            tone="quiz"
             size="lg"
             block
             loading={pending}
+            icon={<Icon name={finalAnswer ? "trophy" : "chevronRight"} size={20} />}
             onClick={() => continueOn()}
           >
             {finalAnswer ? "See results" : "Next question"}
-          </Button>
+          </GameButton>
         </ActionBar>
       )}
 
@@ -435,29 +459,46 @@ export function QuizPlay() {
   );
 }
 
-function TimerBar({ remaining, calm }: { remaining: number | null; calm: boolean }) {
-  if (remaining === null)
-    return <p className="ph-quiz-timer is-paused">Timer paused while you review</p>;
-  if (!showCountdown({ timerDisplay: calm ? "calm" : "always" }, remaining, CALM_QUESTION_MS))
-    return <p className="ph-quiz-timer is-paused">The countdown appears for the last {CALM_QUESTION_MS / 1000} seconds</p>;
-  const seconds = Math.ceil(remaining / 1000);
+/** Score in the round header; pops when the server's score changes (decoration only). */
+function Score({ value }: { value: number }) {
+  const replay = useReplayKey(value);
   return (
-    <div className="ph-quiz-timer" data-low={seconds <= 10 ? "true" : undefined}>
-      <div className="ph-quiz-timer-label" aria-hidden="true">
-        <span>Time left</span>
-        <strong>{seconds}s</strong>
-      </div>
-      <div
-        className="ph-quiz-timer-track"
-        role="progressbar"
-        aria-label="Time left"
-        aria-valuemin={0}
-        aria-valuemax={TIMED_ROUND_MS / 1000}
-        aria-valuenow={seconds}
-        aria-valuetext={`${seconds} seconds left`}
-      >
-        <span style={{ width: `${Math.min(100, (remaining / TIMED_ROUND_MS) * 100)}%` }} />
-      </div>
+    <strong key={replay} className={replay ? "ph-quiz-score-value ph-pop" : "ph-quiz-score-value"}>
+      {value.toLocaleString()}
+    </strong>
+  );
+}
+
+/**
+ * One dot per question for fixed-length rounds: green with a tick for right, red with a cross for wrong (from the
+ * server's reviews), a ring for the current question. The text "Question n of m" carries the same information.
+ */
+function RoundDots({ view, questionNumber }: { view: View; questionNumber: number }) {
+  const dots = roundDots(view);
+  const correct = view.stats.correct;
+  return (
+    <div
+      className="ph-quiz-progress"
+      role="progressbar"
+      aria-label={`Question ${questionNumber} of ${view.total}`}
+      aria-valuemin={0}
+      aria-valuemax={view.total}
+      aria-valuenow={view.answered}
+      aria-valuetext={`${view.answered} of ${view.total} answered, ${correct} correct`}
+    >
+      <p className="ph-quiz-progress-label" aria-hidden="true">
+        <span>
+          Question {questionNumber} of {view.total}
+        </span>
+        <span className="ph-muted">{correct} correct</span>
+      </p>
+      <ol className="ph-quiz-dots" aria-hidden="true">
+        {dots.map((state, index) => (
+          <li key={index} className="ph-quiz-dot" data-state={state}>
+            {state === "correct" ? <Icon name="check" size={12} /> : state === "wrong" ? <Icon name="close" size={12} /> : null}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

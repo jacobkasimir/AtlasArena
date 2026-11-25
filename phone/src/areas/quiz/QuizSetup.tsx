@@ -1,10 +1,12 @@
 // Phone quiz setup: mode, difficulty, topic (bottom sheet) and length. Shows the published question counts from
 // arena_quiz_catalog and disables combinations that can't fill a round (same filter as arena_start).
+// A ModeHero in the quiz tone names the chosen mode; the mode itself is a SegmentedControl; Start is a GameButton.
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@shared/api";
 import { useLoad } from "@shared/components";
 import { Difficulty, Mode, difficulties, modes } from "@shared/domain";
+import { Icon } from "@shared/icons";
 import { loadSetup, saveSetup } from "@shared/prefs";
 import { accuracy, modeDescriptions, modeIcons, modeNames } from "@shared/quiz-meta";
 import { usePhoneChrome } from "@phone/shell/chrome";
@@ -17,11 +19,14 @@ import {
   Card,
   Chip,
   ChipGroup,
+  GameButton,
   LinkCard,
+  ModeHero,
   Section,
+  SegmentedControl,
   StatusMessage,
-  useHaptics,
 } from "@phone/ui";
+import type { SegmentOption } from "@phone/ui";
 import {
   availableQuestions,
   canFill,
@@ -34,10 +39,15 @@ import {
   visibleTopics,
 } from "./quiz-logic";
 
+/** Short labels so four modes fit one row at 360 px; the hero shows the full name. */
+const modeOptions: SegmentOption<Mode>[] = modes.map((m) => ({
+  value: m,
+  label: m === "classic" ? "Classic" : m === "timed" ? "Timed" : modeNames[m],
+}));
+
 export function QuizSetup() {
   usePhoneChrome({ title: "Quiz", back: true });
   const navigate = useNavigate();
-  const haptics = useHaptics();
   const [params] = useSearchParams();
   const initial = useMemo(() => initialSetup(params, loadSetup("quiz")), [params]);
   const [mode, setMode] = useState<Mode>(initial.mode);
@@ -68,7 +78,6 @@ export function QuizSetup() {
     startingRef.current = true;
     setPending(true);
     setError("");
-    haptics.tap();
     saveSetup("quiz", { mode, difficulty, category, count });
     try {
       const view = await api.play(mode, category === "all" ? [] : [category], difficulty, country, count);
@@ -115,20 +124,24 @@ export function QuizSetup() {
         </Section>
       )}
 
+      <ModeHero
+        title={modeNames[mode]}
+        subtitle={modeDescriptions[mode]}
+        icon={modeIcons[mode]}
+        tone="quiz"
+        badge={
+          mode === "practice" ? (
+            "Practice · not ranked"
+          ) : dashboard.data?.best[mode] != null ? (
+            <>
+              <Icon name="trophy" size={16} /> Best {dashboard.data.best[mode]!.toLocaleString()}
+            </>
+          ) : undefined
+        }
+      />
+
       <Section title="Mode">
-        <ChipGroup label="Mode">
-          {modes.map((m) => (
-            <Chip key={m} pressed={mode === m} onToggle={() => setMode(m)}>
-              {modeNames[m]}
-            </Chip>
-          ))}
-        </ChipGroup>
-        <p className="ph-muted ph-quiz-hint">
-          {modeDescriptions[mode]}
-          {mode !== "practice" && dashboard.data?.best[mode] != null && (
-            <> Your best: {dashboard.data.best[mode]!.toLocaleString()}.</>
-          )}
-        </p>
+        <SegmentedControl label="Mode" options={modeOptions} value={mode} onChange={setMode} />
       </Section>
 
       <Section title={mode === "endless" ? "Starting difficulty" : "Difficulty"}>
@@ -225,17 +238,18 @@ export function QuizSetup() {
         {summary}
       </p>
       <ActionBar label="Start">
-        <Button
+        <GameButton
           variant="primary"
-          size="lg"
+          size="xl"
           block
           loading={pending}
           disabled={!ready}
+          icon={<Icon name={modeIcons[mode]} size={22} />}
           onClick={() => void start()}
           aria-describedby="ph-quiz-summary"
         >
           {pending ? "Starting…" : "Start game"}
-        </Button>
+        </GameButton>
       </ActionBar>
 
       <BottomSheet

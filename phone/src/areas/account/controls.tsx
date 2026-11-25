@@ -1,6 +1,8 @@
-// Touch controls for the account area: a 48 px switch row (role="switch") and a segmented choice group
-// (role="radiogroup" with arrow-key navigation). Used by Settings; kept here because only this area needs them.
-import { KeyboardEvent, ReactNode, useId, useRef } from "react";
+// Touch controls for the account area: a 48 px switch row (role="switch") and a settings row around the shared
+// SegmentedControl. Used by Settings; kept here because only this area needs them.
+import { ReactNode, useId } from "react";
+import { IconName } from "@shared/icons";
+import { SegmentedControl } from "@phone/ui";
 
 /** One setting row: title, optional description, and a large switch. The whole row is the tap target. */
 export function SwitchRow({
@@ -42,11 +44,11 @@ export function SwitchRow({
   );
 }
 
-export type ChoiceOption<T extends string> = { value: T; label: string; icon?: ReactNode };
+export type ChoiceOption<T extends string> = { value: T; label: string; icon?: IconName };
 
 /**
- * Segmented control: one choice out of a few. Arrow keys move the selection (radio-group pattern);
- * only the selected option is in the tab order.
+ * A settings row with a title, an optional description and the shared SegmentedControl from @phone/ui
+ * (radiogroup, arrow keys, light select haptic). `disabled` disables every option.
  */
 export function ChoiceGroup<T extends string>({
   title,
@@ -63,66 +65,24 @@ export function ChoiceGroup<T extends string>({
   onChange: (value: T) => void;
   disabled?: boolean;
 }) {
-  const titleId = useId();
   const descriptionId = useId();
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const selectedIndex = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  );
-
-  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const keys: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-    let next: number | null = null;
-    if (event.key in keys) next = (selectedIndex + keys[event.key] + options.length) % options.length;
-    if (event.key === "Home") next = 0;
-    if (event.key === "End") next = options.length - 1;
-    if (next === null) return;
-    event.preventDefault();
-    onChange(options[next].value);
-    refs.current[next]?.focus();
-  }
-
   return (
     <div className="ph-account-row ph-account-choice-row" data-disabled={disabled || undefined}>
       <span className="ph-account-row-text">
-        <strong id={titleId}>{title}</strong>
+        <strong aria-hidden="true">{title}</strong>
         {description && (
           <small id={descriptionId} className="ph-muted">
             {description}
           </small>
         )}
       </span>
-      <div
-        role="radiogroup"
-        aria-labelledby={titleId}
-        aria-describedby={description ? descriptionId : undefined}
-        aria-disabled={disabled || undefined}
-        className="ph-account-segmented"
-        onKeyDown={disabled ? undefined : onKeyDown}
-      >
-        {options.map((option, index) => {
-          const selected = index === selectedIndex;
-          return (
-            <button
-              key={option.value}
-              ref={(element) => {
-                refs.current[index] = element;
-              }}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              tabIndex={selected ? 0 : -1}
-              disabled={disabled}
-              className="ph-account-segment"
-              onClick={() => onChange(option.value)}
-            >
-              {option.icon}
-              {option.label}
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedControl<T>
+        label={title}
+        describedBy={description ? descriptionId : undefined}
+        value={value}
+        onChange={onChange}
+        options={options.map((option) => ({ ...option, disabled: disabled || undefined }))}
+      />
     </div>
   );
 }

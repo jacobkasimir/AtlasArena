@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { BottomSheet } from "./BottomSheet";
-import { useBackGuard } from "./useBackGuard";
+import { hasPendingOwnPops, useBackGuard } from "./useBackGuard";
 
 let leaves = 0;
 
@@ -59,13 +59,28 @@ function App() {
 
 const path = () => window.location.pathname;
 const guarded = () => typeof (window.history.state as Record<string, unknown> | null)?.phoneBackGuard === "string";
-const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+// Condition-based waits (no fixed sleeps: under parallel load jsdom's history traversal can take longer).
+let pops = 0;
+window.addEventListener("popstate", () => {
+  pops += 1;
+});
 
+/** Waits until none of our own history.go() calls is queued or on its way and deferred work has run. */
+async function settle() {
+  await waitFor(() => expect(hasPendingOwnPops()).toBe(false));
+  // Deferred cleanups (setTimeout 0) and React updates scheduled by the last pop.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  await waitFor(() => expect(hasPendingOwnPops()).toBe(false));
+}
+
+/** Device Back: waits for the popstate it causes, then for everything it set off. */
 async function back() {
-  await act(async () => {
+  const before = pops;
+  act(() => {
     window.history.back();
-    await new Promise((resolve) => setTimeout(resolve, 20));
   });
+  await waitFor(() => expect(pops).toBeGreaterThan(before));
+  await settle();
 }
 
 /** History: …, /phone/home, /phone/quiz/play/r1 (current). Returns history.length before mounting. */
@@ -79,13 +94,14 @@ async function startRound() {
     </StrictMode>,
   );
   await screen.findByText("Round");
+  await waitFor(() => expect(guarded()).toBe(true));
   await settle();
   return { before, view };
 }
 
 afterEach(async () => {
   cleanup();
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await settle();
 });
 
 describe("useBackGuard", () => {
@@ -119,9 +135,9 @@ describe("useBackGuard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pause or leave" }));
     await screen.findByRole("dialog", { name: "Paused" });
     fireEvent.click(screen.getByRole("button", { name: "Continue playing" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(guarded()).toBe(true));
     await settle();
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(guarded()).toBe(true);
     await back();
     expect(await screen.findByRole("dialog", { name: "Paused" })).toBeInTheDocument();
     expect(window.history.length).toBe(before + 2); // sentinel + the sheet's entry, nothing else
@@ -147,8 +163,8 @@ describe("useBackGuard", () => {
   it("does not trap the player after the results", async () => {
     await startRound();
     fireEvent.click(screen.getByRole("button", { name: "Last answer" })); // round over: sentinel removed
+    await waitFor(() => expect(guarded()).toBe(false));
     await settle();
-    expect(guarded()).toBe(false);
     expect(path()).toBe("/phone/quiz/play/r1");
     fireEvent.click(screen.getByRole("button", { name: "See results" }));
     await waitFor(() => expect(path()).toBe("/phone/quiz/results/r1"));
@@ -160,8 +176,8 @@ describe("useBackGuard", () => {
     const { view } = await startRound();
     expect(guarded()).toBe(true);
     view.unmount();
+    await waitFor(() => expect(guarded()).toBe(false));
     await settle();
-    expect(guarded()).toBe(false);
     expect(path()).toBe("/phone/quiz/play/r1");
   });
 });

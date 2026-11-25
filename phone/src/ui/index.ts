@@ -15,3 +15,29 @@ export { useViewportHeight, useViewportCssVars } from "./useViewportHeight";
 export type { ViewportState } from "./useViewportHeight";
 export { useHaptics } from "./useHaptics";
 export type { Haptics } from "./useHaptics";
+// Game feel: haptics + sound, motion, chunky game components.
+export { feel, useFeel, feelPattern, feelPatterns, feelNotes, streakPattern, isStreakMilestone, resetFeelCooldowns } from "./feel";
+export type { Feel, FeelKind, FeelOptions } from "./feel";
+export { useReducedMotion, useCountUp, useReplayKey, Burst } from "./motion";
+export { GameButton, LinkGameButton, gameButtonClass } from "./GameButton";
+export type { GameButtonProps, GameButtonVariant } from "./GameButton";
+export {
+  ResultHero,
+  ScoreReveal,
+  XpBar,
+  StreakMeter,
+  ComboToast,
+  TimerBar,
+  RetryMissedCard,
+  StatGrid,
+  StatTile,
+  GoalCard,
+  SegmentedControl,
+  ModeHero,
+  MoreLink,
+  medalTier,
+  tierStars,
+  formatDuration,
+  XP_PER_LEVEL,
+} from "./game";
+export type { MedalTier, ResultHeroProps, SegmentOption } from "./game";

@@ -14,7 +14,9 @@ const mocks = vi.hoisted(() => ({
   recallAbandon: vi.fn(),
 }));
 vi.mock("@shared/api", () => ({ api: mocks, isDemo: false, DEMO_UNAVAILABLE: "ONLINE_ONLY" }));
+vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn(), playNotes: vi.fn() }));
 
+import { feelPattern, resetFeelCooldowns } from "@phone/ui";
 import RecallArea from "./recall";
 
 const SALT = "test-salt";
@@ -103,8 +105,16 @@ const input = () => screen.getByLabelText("Type a country") as HTMLInputElement;
 const type = (value: string) => fireEvent.change(input(), { target: { value } });
 const go = () => fireEvent.click(screen.getByRole("button", { name: "Go" }));
 
+let vibrate: ReturnType<typeof vi.fn>;
+/** How often the device vibrated with exactly this feel pattern. */
+const vibratedWith = (pattern: number | number[]) =>
+  vibrate.mock.calls.filter(([value]) => JSON.stringify(value) === JSON.stringify(pattern)).length;
+
 beforeEach(() => {
   localStorage.clear();
+  resetFeelCooldowns();
+  vibrate = vi.fn();
+  Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
   Object.values(mocks).forEach((mock) => mock.mockReset());
 });
 afterEach(() => cleanup());
@@ -169,6 +179,10 @@ describe("phone Recall", { timeout: 15_000 }, () => {
     expect(await screen.findByText("“France” could not be confirmed. Try another spelling.")).toBeInTheDocument();
     const europe = screen.getByRole("region", { name: "Europe" });
     expect(within(europe).getByText("0/2")).toBeInTheDocument();
+    // The instant local "correct" is followed by an error feel once the server says no.
+    expect(vibratedWith(feelPattern("correct"))).toBe(1);
+    expect(vibratedWith(feelPattern("error"))).toBe(1);
+    expect(screen.getByTestId("recall-count")).toHaveTextContent("0");
   });
 
   it("asks before giving up and then shows the results", async () => {
@@ -226,12 +240,47 @@ describe("phone Recall", { timeout: 15_000 }, () => {
       );
     mocks.recallFinish.mockResolvedValue(undefined);
     renderArea("recall", <RecallArea />, "/recall/play/r1");
-    // Under 30 s left: the countdown shows even with calm timers.
-    expect(await screen.findByRole("timer")).toHaveTextContent("0:00");
+    // Under 30 s left: the countdown shows even with calm timers, in the warning state.
+    const timer = await screen.findByRole("timer");
+    expect(timer).toHaveAttribute("data-warn");
+    expect(timer).toHaveAccessibleName(/^Time left: [01] seconds$/);
+    expect(timer).toHaveTextContent(/^\s*[01]s$/);
     await waitFor(() => expect(mocks.recallFinish).toHaveBeenCalledWith("r1"), { timeout: 3000 });
     expect(await screen.findByRole("heading", { name: "Time's up!" })).toBeInTheDocument();
     expect(mocks.recallFinish).toHaveBeenCalledTimes(1);
     expect(screen.getByText("First result for this set")).toBeInTheDocument();
+  });
+
+  it("gives feedback for every accepted find, bumps the counter and celebrates a fast streak", async () => {
+    mocks.recallView.mockResolvedValueOnce(await session());
+    mocks.recallAnswer.mockImplementation(async (_id: string, position: number) => answer(position));
+    renderArea("recall", <RecallArea />, "/recall/play/r1");
+    await screen.findByLabelText("Type a country");
+    const count = () => screen.getByTestId("recall-count");
+    expect(count()).toHaveTextContent("0");
+
+    for (const [name, position] of [["France", 0], ["Germany", 1], ["Nigeria", 3]] as const) {
+      resetFeelCooldowns(); // each find is its own moment; the cooldown is tested in ui/feel.test.tsx
+      type(name);
+      await waitFor(() => expect(mocks.recallAnswer).toHaveBeenCalledWith("r1", position, name));
+    }
+    expect(count()).toHaveTextContent("3");
+    expect(count()).toHaveClass("ph-typing-bump");
+    // Finds 1 and 2 are "correct"; the third within the fast window is a streak milestone.
+    expect(vibratedWith(feelPattern("correct"))).toBe(2);
+    expect(vibratedWith(feelPattern("streak", 3))).toBe(1);
+    expect(vibratedWith(feelPattern("error"))).toBe(0);
+  });
+
+  it("practice samples show 'Practice · not ranked' and never a new best", async () => {
+    mocks.recallView.mockResolvedValueOnce(
+      await session({ state: "completed", endReason: "gave_up", badge: "new_best", size: 10, ranked: false, elapsedMs: 30_000 }, [0, 1]),
+    );
+    renderArea("recall", <RecallArea />, "/recall/results/r1");
+    expect(await screen.findByText(/Practice · not ranked/)).toBeInTheDocument();
+    expect(screen.queryByTestId("ph-new-best")).toBeNull();
+    expect(screen.getByText("2 / 4")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Missed · 2" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("shows missed and found answers in two tabs on the results", async () => {
@@ -241,6 +290,12 @@ describe("phone Recall", { timeout: 15_000 }, () => {
     renderArea("recall", <RecallArea />, "/recall/results/r1");
     expect(await screen.findByText("75%")).toBeInTheDocument();
     expect(screen.getByText(/New personal best/)).toBeInTheDocument();
+    // ResultHero: found of total, the set's own score label and the server's time.
+    expect(screen.getByText("3 / 4")).toBeInTheDocument();
+    expect(screen.getAllByText("Countries named").length).toBeGreaterThan(0);
+    expect(screen.getByText("1:01")).toBeInTheDocument();
+    // Learning loop first: the retry card, then the Missed list (selected) before the found ones.
+    expect(screen.getByText(/^1 \w+ still to learn$/)).toBeInTheDocument();
     const missedTab = screen.getByRole("tab", { name: "Missed · 1" });
     const foundTab = screen.getByRole("tab", { name: "Found · 3" });
     expect(missedTab).toHaveAttribute("aria-selected", "true");

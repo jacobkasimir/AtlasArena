@@ -151,3 +151,76 @@
   .ph-geo-cell { transition: none; transform: none !important; }
 }
 html[data-motion="reduce"] .ph-geo-cell { transform: none !important; }
+
+/* ---------- Game feel (Flags + Capitals) ----------
+ * Motion only decorates: every state is also shown by colour, border, icon and a word. All animation below is
+ * switched off under prefers-reduced-motion and Settings → Reduce motion (html[data-motion="reduce"]) at the end.
+ */
+
+/* Setup: steps keep their rhythm under the SegmentedControl. */
+.ph-geo-steps { gap: var(--ph-gap, 1rem); }
+
+/* Flag tiles are pressable cards: a raised bottom edge that sinks under the thumb. */
+.ph-geo-cell { min-height: max(72px, var(--ph-tap)); border-bottom-width: 5px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .08);
+  transition: transform .08s ease-out, border-bottom-width .08s ease-out, background-color .15s ease; }
+.ph-geo-cell:not(:disabled) { cursor: pointer; }
+.ph-geo-cell:active:not(:disabled) { transform: translateY(3px); border-bottom-width: 2px; }
+.ph-geo-cell:focus-visible { outline: 3px solid rgb(var(--c-focus)); outline-offset: 2px; }
+/* After the server answered: wrong pick shakes, the found flag pops, a missed answer glows to be learnt. */
+.ph-geo-cell[data-status="wrong"] { animation: ph-shake .36s ease-in-out; }
+.ph-geo-cell[data-status="answer"][data-won="true"] { animation: ph-pop .32s cubic-bezier(.3, 1.5, .5, 1); }
+.ph-geo-cell[data-status="answer"]:not([data-won]) { animation: ph-glow 1s ease-out .25s 2; }
+.ph-geo-cell[data-status="answer"] .ph-geo-cell-mark,
+.ph-geo-cell[data-status="wrong"] .ph-geo-cell-mark { font-size: .8rem; }
+html[data-contrast="more"] .ph-geo-cell { border-color: rgb(var(--c-line) / .7); }
+html[data-contrast="more"] .ph-geo-cell[data-status="wrong"] { border-color: rgb(var(--c-danger)); }
+html[data-contrast="more"] .ph-geo-cell[data-status="answer"] { border-color: rgb(var(--c-success)); }
+
+/* Flag → Country: the picture to identify gets the same pop/shake (class from useAnswerFx). */
+.ph-geo-fx { display: grid; justify-items: center; }
+
+/* Typed answers: the input row takes the server's verdict as a coloured edge (the feedback line says it in words). */
+.ph-geo-answer-row { border-radius: var(--ph-radius-sm); }
+.ph-geo-answer-row .ph-input { transition: border-color .15s ease, box-shadow .15s ease; }
+.ph-geo-answer-row[data-result="correct"] .ph-input { border-color: rgb(var(--c-success));
+  box-shadow: 0 0 0 2px rgb(var(--c-success) / .35); background: rgb(var(--c-success) / .08); }
+.ph-geo-answer-row[data-result="incorrect"] .ph-input,
+.ph-geo-answer-row[data-result="not_solved"] .ph-input { border-color: rgb(var(--c-danger));
+  box-shadow: 0 0 0 2px rgb(var(--c-danger) / .3); background: rgb(var(--c-danger) / .06); }
+.ph-geo-answer-row[data-result="skipped"] .ph-input { border-color: rgb(var(--c-warning));
+  box-shadow: 0 0 0 2px rgb(var(--c-warning) / .3); }
+html[data-contrast="more"] .ph-geo-answer-row[data-result] .ph-input { border-width: 3px; }
+
+/* After a miss: the right answer, big and clear, so it can be learnt before moving on. */
+.ph-geo-answer-reveal { display: grid; justify-items: center; gap: .35rem; padding: .9rem 1rem; text-align: center;
+  border-radius: var(--ph-radius); border: 2px solid rgb(var(--c-success)); background: rgb(var(--c-success) / .1);
+  animation: ph-glow 1s ease-out .2s 1; }
+.ph-geo-answer-reveal-label { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 800;
+  letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--c-success)); }
+.ph-geo-answer-reveal-name { font-size: 1.6rem; font-weight: 900; line-height: 1.15; color: rgb(var(--c-text));
+  overflow-wrap: anywhere; }
+.ph-geo-answer-reveal .ph-geo-flag { max-width: 200px; }
+html[data-contrast="more"] .ph-geo-answer-reveal { border-width: 3px; }
+html[data-theme="light"] .ph-geo-answer-reveal-label { color: rgb(var(--c-text)); }
+
+/* Timed rounds: the shared TimerBar takes the right side of the HUD and shrinks on narrow phones. */
+.ph-geo-timer { display: flex; flex: 1 1 9rem; justify-content: flex-end; min-width: 0; margin-left: auto; }
+.ph-geo-timer > .ph-timer { flex: 1; max-width: 14rem; }
+@media (max-width: 380px) { .ph-geo-timer { flex-basis: 100%; } .ph-geo-timer > .ph-timer { max-width: none; } }
+
+/* Results helpers (ResultHero children and the learning-loop link). */
+.ph-geo-hero-setup { margin-top: .35rem; text-align: center; }
+.ph-geo-hero-note { margin: .25rem 0; font-size: .9rem; font-weight: 700; text-align: center; color: rgb(var(--c-muted)); }
+.ph-geo-review-link { display: flex; justify-content: center; }
+.ph-geo-review-link a { min-height: var(--ph-tap); display: inline-flex; align-items: center; }
+html[data-contrast="more"] .ph-geo-review li { border-color: rgb(var(--c-line) / .6); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-geo-cell, .ph-geo-answer-reveal, .ph-geo-fx, .ph-geo-answer-row, .ph-geo-answer-row .ph-input {
+    animation: none !important; transition: none !important; }
+  .ph-geo-cell:active:not(:disabled) { transform: none; }
+}
+html[data-motion="reduce"] :is(.ph-geo-cell, .ph-geo-answer-reveal, .ph-geo-fx, .ph-geo-answer-row, .ph-geo-answer-row .ph-input) {
+  animation: none !important; transition: none !important; }
+html[data-motion="reduce"] .ph-geo-cell:active:not(:disabled) { transform: none; }

@@ -29,11 +29,12 @@ const api = vi.hoisted(() => ({
   personalBests: vi.fn(),
 }));
 vi.mock("@shared/api", () => ({ api, isDemo: false, DEMO_UNAVAILABLE: "ONLINE_ONLY" }));
-vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn() }));
+vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn(), playNotes: vi.fn() }));
 
 import FlagsArea from "./flags";
 import CapitalsArea from "./capitals";
 import { choiceStatus, countrySuggestions, localFlagSrc } from "./geo-logic";
+import { feelPattern, resetFeelCooldowns } from "@phone/ui";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const now = () => new Date().toISOString();
@@ -148,8 +149,16 @@ const capitalsSetupData = {
   activeSessions: [],
 };
 
+let vibrate: ReturnType<typeof vi.fn>;
+/** How often the device vibrated with exactly this feel pattern. */
+const vibratedWith = (pattern: number | number[]) =>
+  vibrate.mock.calls.filter(([value]) => JSON.stringify(value) === JSON.stringify(pattern)).length;
+
 beforeEach(() => {
   localStorage.clear();
+  resetFeelCooldowns();
+  vibrate = vi.fn();
+  Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
   Object.values(api).forEach((fn) => fn.mockReset());
   api.personalBests.mockResolvedValue([]);
   api.flagsPause.mockResolvedValue(flagsSession({ state: "paused", paused: true }));
@@ -293,8 +302,8 @@ describe("phone Capitals", () => {
     api.capitalsStart.mockResolvedValue(capitalsSession());
     api.capitalsView.mockResolvedValue(capitalsSession());
     renderAt("/capitals");
-    fireEvent.click(await screen.findByRole("button", { name: /Capital → Country/ }));
-    expect(screen.getByRole("button", { name: /Capital → Country/ })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(await screen.findByRole("radio", { name: /Capital → Country/ }));
+    expect(screen.getByRole("radio", { name: /Capital → Country/ })).toHaveAttribute("aria-checked", "true");
     fireEvent.click(screen.getByRole("button", { name: /Start round · 2 questions/ }));
     await waitFor(() =>
       expect(api.capitalsStart).toHaveBeenCalledWith("capital_to_country", "all", [], null, expect.any(String), {
@@ -404,6 +413,94 @@ describe("phone Capitals", () => {
         scope: "all", picks: [], size: 10, limit: null,
       }),
     );
+  });
+});
+
+describe("geo game feel and results", () => {
+  it("Capitals: fires the answer feedback once per server-judged answer, none for 'be more specific'", async () => {
+    api.capitalsView.mockResolvedValue(capitalsSession());
+    api.capitalsAnswer
+      .mockResolvedValueOnce(capitalsSession({ actionResult: { outcome: "ambiguous" } }))
+      .mockResolvedValueOnce(
+        capitalsSession({
+          answered: 1, incorrect: 1,
+          current: capitalEntry(1, { outcome: "incorrect", acceptedAnswers: [{ name: "Paris", roles: [], primary: true }], submittedAnswer: "Lyon" }),
+          actionResult: { outcome: "incorrect" },
+        }),
+      );
+    renderAt("/capitals/play/k1");
+    const input = await screen.findByLabelText("Capital");
+
+    fireEvent.change(input, { target: { value: "Congo" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(await screen.findByText(/please be more specific/)).toBeInTheDocument();
+    expect(vibratedWith(feelPattern("wrong"))).toBe(0);
+    expect(vibratedWith(feelPattern("correct"))).toBe(0);
+
+    await waitFor(() => expect(input).not.toHaveAttribute("readonly"));
+    fireEvent.change(input, { target: { value: "Lyon" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(await screen.findByText("Not quite · 0 points.")).toBeInTheDocument();
+    expect(vibratedWith(feelPattern("wrong"))).toBe(1);
+    expect(vibratedWith(feelPattern("correct"))).toBe(0);
+    // The answer row shows the server's verdict, and the main capital is revealed big.
+    expect(input.closest(".ph-geo-answer-row")).toHaveAttribute("data-result", "incorrect");
+    expect(screen.getByText("The capital is").closest(".ph-geo-answer-reveal")).toHaveTextContent("Paris");
+  });
+
+  it("Flags: a correct pick fires the correct feedback exactly once", async () => {
+    api.flagsResume.mockResolvedValue(flagsSession());
+    api.flagsAnswer.mockResolvedValue(
+      flagsSession({
+        answered: 1, score: 100, correct: 1,
+        current: { ...flagEntry(1, { attempts: 1, outcome: "correct", points: 100, correctChoiceId: "c1" }), choices },
+        actionResult: { type: "answer", outcome: "correct", remainingAttempts: 2 },
+      }),
+    );
+    renderAt("/flags/play/f1");
+    fireEvent.click(await screen.findByRole("button", { name: "Flag 1" }));
+    expect(await screen.findByText(/Correct · first try/)).toBeInTheDocument();
+    expect(vibratedWith(feelPattern("correct"))).toBe(1);
+    expect(vibratedWith(feelPattern("wrong"))).toBe(0);
+  });
+
+  it("Capitals results: practice rounds say 'Practice · not ranked', never a new best, and list mistakes first", async () => {
+    api.capitalsResults.mockResolvedValue(
+      capitalsSession({
+        state: "completed", completedAt: now(), current: null, sampleSize: 10, ranked: false, finalBadge: "new_best",
+        answered: 2, correct: 1, incorrect: 1, score: 100, elapsedMs: 42_000,
+        entries: [
+          capitalEntry(1, { outcome: "correct", points: 100, acceptedAnswers: [{ name: "Paris", roles: [], primary: true }] }),
+          capitalEntry(2, { outcome: "incorrect", submittedAnswer: "Munich", acceptedAnswers: [{ name: "Berlin", roles: [], primary: true }] }),
+        ],
+      }),
+    );
+    renderAt("/capitals/results/k1");
+    const hero = await screen.findByRole("region", { name: /Keep practising!|Good effort!/ });
+    expect(within(hero).getByText(/Practice · not ranked/)).toBeInTheDocument();
+    expect(screen.queryByTestId("ph-new-best")).toBeNull();
+    expect(within(hero).getByText("1 / 2")).toBeInTheDocument();
+
+    const missed = screen.getByRole("heading", { name: "Missed · 1" });
+    const correct = screen.getByRole("heading", { name: "Correct · 1" });
+    expect(missed.compareDocumentPosition(correct) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const firstItem = screen.getAllByRole("listitem").find((item) => item.hasAttribute("data-outcome"))!;
+    expect(firstItem).toHaveAttribute("data-outcome", "incorrect");
+    expect(firstItem).toHaveTextContent("Germany");
+    expect(firstItem).toHaveTextContent("Your answer: Munich");
+    expect(screen.getByText("Incorrect")).toBeInTheDocument();
+  });
+
+  it("Flags results: a ranked new best shows the ribbon", async () => {
+    api.flagsResults.mockResolvedValue(
+      flagsSession({
+        state: "completed", completedAt: now(), current: null, finalBadge: "new_best", answered: 3, correct: 3, score: 300,
+        entries: [1, 2, 3].map((n) => flagEntry(n, { outcome: "correct", points: 100 })),
+      }),
+    );
+    renderAt("/flags/results/f1");
+    expect(await screen.findByTestId("ph-new-best")).toHaveTextContent("New personal best");
+    expect(screen.queryByText(/Practice · not ranked/)).toBeNull();
   });
 });
 

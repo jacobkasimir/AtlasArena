@@ -6,7 +6,7 @@ import { Route, Routes, useNavigate, useParams, useSearchParams } from "react-ro
 import { api } from "@shared/api";
 import { useLoad } from "@shared/components";
 import { GameChoice, PersonalBest, SetupPlace, formatClock, initialChoice, setupUrl } from "@shared/game-setup";
-import { useLeaveGuard, usePrefs } from "@shared/prefs";
+import { CALM_ROUND_MS, useLeaveGuard, usePrefs } from "@shared/prefs";
 import {
   RecallAnswerResult,
   RecallChoice,
@@ -28,14 +28,20 @@ import { paths } from "@phone/shell/paths";
 import { useBackGuard } from "@phone/ui/useBackGuard";
 import {
   ActionBar,
-  Button,
   Card,
+  ComboToast,
+  GameButton,
   LinkButton,
   LoadingState,
+  ModeHero,
   ProgressBar,
+  ResultHero,
+  RetryMissedCard,
   Section,
   StatusMessage,
-  useHaptics,
+  TimerBar,
+  feel,
+  useReplayKey,
   useToast,
 } from "@phone/ui";
 import { ConfirmSheet, Flag, RoundClock, Tabs, errorText, requestId, useRoundClock } from "./common";
@@ -44,6 +50,10 @@ import "./typing.css";
 
 /** How long a match that is also the start of another missing name (Niger → Nigeria) waits before it counts. */
 export const PREFIX_WAIT_MS = 900;
+/** Finds closer together than this build a fast-find streak (3, 5, 10, … get the rising streak feedback). */
+export const FAST_STREAK_MS = 5000;
+/** Timed rounds: the timer turns to its warning state for the last 30 seconds. */
+const TIMER_WARN_MS = 30_000;
 
 const KNOWN_ERRORS: Record<string, string> = {
   EMPTY_RECALL_POOL: "There is nothing to recall in that set. Choose another region.",
@@ -69,6 +79,10 @@ function roundTags(round: Pick<RecallSession, "pool" | "selectedCount" | "size" 
     round.timeLimitSeconds ? `${round.timeLimitSeconds / 60} min limit` : null,
   ].filter((tag): tag is string => Boolean(tag));
 }
+
+/** Board slot: found entries are solid; the one just found pops in. */
+const slotClass = (found: boolean, fresh: boolean) =>
+  [found && "is-found", found && fresh && "is-new"].filter(Boolean).join(" ") || undefined;
 
 function Tags({ tags }: { tags: string[] }) {
   if (!tags.length) return null;
@@ -154,6 +168,14 @@ function Setup() {
     <>
       <PhoneGameSetup
         game="recall"
+        hero={
+          <ModeHero
+            title="Name them all"
+            subtitle="A fast memory drill: type, watch your list fill up, beat your time."
+            icon="recall"
+            tone="recall"
+          />
+        }
         intro="Pick a set, then type every place in it from memory – in English, German or French. Each correct answer drops into your list the moment you finish typing it."
         modes={(["countries", "capitals"] as const).map((value) => {
           const progress = recalledIn(value);
@@ -234,8 +256,11 @@ function Play() {
   const [askGiveUp, setAskGiveUp] = useState(false);
   const [askLeave, setAskLeave] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  /** The entry that was just found: it pops into the list. */
+  const [newest, setNewest] = useState<number | null>(null);
+  /** Fast-find streak (finds less than FAST_STREAK_MS apart). */
+  const [fastStreak, setFastStreak] = useState(0);
   const prefs = usePrefs();
-  const haptics = useHaptics();
   const inputRef = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
   const waitTimer = useRef<number>();
@@ -245,6 +270,10 @@ function Play() {
   /** The last accepted answer: a second Go for the same text right after it is ignored, not "already found". */
   const lastAccepted = useRef<{ position: number; at: number } | null>(null);
   const finished = useRef(false);
+  const lastFind = useRef(0);
+  const streakRef = useRef(0);
+  /** Normalized text that last got the "not this" feedback, so a duplicate buzzes once, not on every keystroke. */
+  const lastRejected = useRef("");
 
   const title = session ? setTitle(session.kind, session.scope, session.region) : "Recall";
   const running = session?.state === "active";
@@ -284,6 +313,7 @@ function Play() {
   const ambiguous = useMemo(() => new Set(session?.ambiguous ?? []), [session?.ambiguous]);
   const { elapsed, remaining } = useRoundClock(session, session?.state === "active" && !finishing);
   const timeUp = remaining !== null && remaining <= 0;
+  const bump = useReplayKey(found.size);
 
   useEffect(() => {
     if (session && timeUp) void finish();
@@ -312,7 +342,7 @@ function Play() {
     if (finished.current) return;
     finished.current = true;
     setFinishing(true);
-    haptics.complete();
+    // No feedback here: the results screen (ResultHero) plays the round's one finishing feedback.
     window.setTimeout(() => release(() => navigate(`${paths.recall}/results/${active.id}`, { replace: true })), 900);
   }
 
@@ -324,7 +354,20 @@ function Play() {
       return next;
     });
     setFeed((current) => current.filter((item) => item.position !== position));
+    setNewest((current) => (current === position ? null : current));
+    lastFind.current = 0;
+    streakRef.current = 0;
+    setFastStreak(0);
     setFeedback({ tone: "bad", text: message });
+    feel("error");
+  }
+
+  /** Soft "not this" feedback: light buzz without sound and a shake. Typing is never blocked. */
+  function reject(key: string, commit: boolean) {
+    if (!commit && lastRejected.current === key) return;
+    lastRejected.current = key;
+    feel("error", { sound: false });
+    setShaking(true);
   }
 
   function accept(position: number, lang: RecallLang, typed: string) {
@@ -337,7 +380,14 @@ function Play() {
     setFound((current) => new Map(current).set(position, { name: null, alpha2: entry?.alpha2 ?? null, matched: typed, lang }));
     setFeed((current) => [{ position, text: typed, name: null, lang, at: Date.now() }, ...current].slice(0, 6));
     setText("");
-    haptics.correct();
+    const now = Date.now();
+    const streak = lastFind.current && now - lastFind.current <= FAST_STREAK_MS ? streakRef.current + 1 : 1;
+    lastFind.current = now;
+    streakRef.current = streak;
+    lastRejected.current = "";
+    setFastStreak(streak);
+    setNewest(position);
+    feel("correct", { n: streak });
     setFeedback({ tone: "ok", text: `✓ ${typed}${lang !== "en" ? ` (${langLabel[lang]})` : ""}` });
     inputRef.current?.focus();
     api
@@ -397,6 +447,7 @@ function Play() {
       }
       const name = match.positions.map((position) => found.get(position)?.name).find(Boolean);
       setFeedback({ tone: "warn", text: `Already in your list${name ? `: ${name}` : ""}.` });
+      reject(key, commit);
       if (commit) setText("");
     } else if (match.kind === "ambiguous") {
       setFeedback({ tone: "warn", text: "That name fits more than one place – be more specific." });
@@ -406,8 +457,7 @@ function Play() {
         return;
       }
       setFeedback({ tone: "bad", text: `“${typed}” isn't in this set.` });
-      setShaking(true);
-      haptics.wrong();
+      reject(key, true);
       inputRef.current?.select();
     } else {
       setFeedback(null);
@@ -461,27 +511,42 @@ function Play() {
   return (
     <div className="ph-typing-play">
       <TopBarActions>
-        <Button variant="ghost" disabled={finishing || releasing} onClick={leave}>
+        <GameButton variant="secondary" size="md" className="ph-typing-topbtn" disabled={finishing || releasing} onClick={leave}>
           Leave
-        </Button>
-        <Button
-          variant="ghost"
+        </GameButton>
+        <GameButton
+          variant="secondary"
+          size="md"
+          className="ph-typing-topbtn"
           disabled={finishing || releasing}
           onClick={() => (prefs.confirmGiveUp ? setAskGiveUp(true) : giveUp())}
         >
           Give up
-        </Button>
+        </GameButton>
       </TopBarActions>
 
-      <Card className="ph-typing-hud">
+      <Card className="ph-typing-hud tone-recall">
         <div className="ph-typing-hud-row">
           <p className="ph-typing-found" aria-live="off">
-            <strong>{foundCount}</strong>
+            <strong key={bump} className={bump ? "ph-typing-bump" : undefined} data-testid="recall-count">
+              {foundCount}
+            </strong>
             <span> / {active.total} found</span>
+            <span className="ph-typing-pct"> · {recallPercent(foundCount, active.total)}%</span>
           </p>
-          <RoundClock remaining={remaining} elapsed={elapsed} />
+          {remaining !== null && active.timeLimitSeconds ? (
+            <TimerBar
+              msLeft={remaining}
+              totalMs={active.timeLimitSeconds * 1000}
+              warnAtMs={TIMER_WARN_MS}
+              calmFromMs={CALM_ROUND_MS}
+            />
+          ) : (
+            <RoundClock remaining={remaining} elapsed={elapsed} />
+          )}
         </div>
         <ProgressBar value={foundCount} max={active.total} label="Progress" />
+        <ComboToast streak={fastStreak} />
         <Tags tags={roundTags(active)} />
       </Card>
 
@@ -526,7 +591,7 @@ function Play() {
                     const hit = found.get(entry.position);
                     if (active.kind === "countries") {
                       return (
-                        <li key={entry.position} className={hit ? "is-found" : undefined}>
+                        <li key={entry.position} className={slotClass(Boolean(hit), entry.position === newest)}>
                           {hit ? (
                             <>
                               <Flag code={hit.alpha2} />
@@ -540,7 +605,7 @@ function Play() {
                       );
                     }
                     return (
-                      <li key={entry.position} className={hit ? "is-found" : undefined}>
+                      <li key={entry.position} className={slotClass(Boolean(hit), entry.position === newest)}>
                         <Flag code={entry.alpha2} />
                         <span className="ph-typing-capital-country">{entry.prompt}</span>
                         <span className="ph-typing-capital-answer">
@@ -591,17 +656,20 @@ function Play() {
               maxLength={120}
               autoFocus
             />
-            <Button
+            <GameButton
               type="submit"
               variant="primary"
+              size="md"
               className="ph-typing-go"
               disabled={finishing}
+              // The answer itself gives the feedback (found / not in this set), so Go stays silent.
+              haptic={false}
               // Keep the keyboard open: a tap on Go must not move focus out of the input.
               onPointerDown={(event) => event.preventDefault()}
               onMouseDown={(event) => event.preventDefault()}
             >
               Go
-            </Button>
+            </GameButton>
           </div>
         </form>
       </ActionBar>
@@ -654,7 +722,6 @@ function Results() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [tab, setTab] = useState<"missed" | "found">("missed");
-  const haptics = useHaptics();
   usePhoneChrome({ title: "Recall results", back: paths.recall });
 
   useEffect(() => {
@@ -668,21 +735,22 @@ function Results() {
   const done = session;
   const missed = done.entries.filter((entry) => !entry.found);
   const hits = done.entries.filter((entry) => entry.found);
-  const percent = recallPercent(done.found, done.total);
   const headline =
     done.endReason === "all_found" ? "Perfect recall!" : done.endReason === "time_up" ? "Time's up!" : "Round complete";
-  const badge = {
-    new_best: "New personal best",
-    first_run: "First result for this set",
-    not_best: done.best ? `Your best: ${done.best.found}/${done.best.total} in ${formatClock(done.best.elapsedMs)}` : null,
-    unranked: "Practice round – not ranked",
-  }[done.badge ?? "unranked"];
+  // Random samples (practice) are never ranked; the server says so with ranked/badge as well.
+  const ranked = done.ranked !== false && !done.size && done.badge !== "unranked";
+  const note =
+    done.badge === "first_run"
+      ? "First result for this set"
+      : done.badge === "not_best" && done.best
+        ? `Your best: ${done.best.found}/${done.best.total} in ${formatClock(done.best.elapsedMs)}`
+        : null;
   const list = tab === "missed" ? missed : hits;
+  const named = done.kind === "countries" ? "Countries named" : "Capitals named";
 
   async function again() {
     setBusy(true);
     setMessage("");
-    haptics.tap();
     try {
       const next = await api.recallStart(
         {
@@ -705,37 +773,35 @@ function Results() {
 
   return (
     <div className="ph-stack">
-      <Card className={`ph-typing-result${done.badge === "new_best" ? " is-best" : ""}`}>
-        <div
-          className="ph-typing-ring"
-          style={{ ["--ph-ring" as string]: `${percent * 3.6}deg` }}
-          role="img"
-          aria-label={`${percent} percent`}
-        >
-          <div>
-            <strong>{percent}%</strong>
-            <span>
-              {done.found}/{done.total}
-            </span>
-          </div>
-        </div>
-        <div className="ph-typing-result-text">
+      <ResultHero
+        headline={headline}
+        tone="recall"
+        icon="recall"
+        score={done.found}
+        scoreLabel={named}
+        correct={done.found}
+        total={done.total}
+        timeMs={done.elapsedMs ?? undefined}
+        ranked={ranked}
+        newBest={ranked && done.badge === "new_best"}
+      >
+        <div className="ph-typing-hero-extra">
           <p className="ph-typing-eyebrow">{setTitle(done.kind, done.scope, done.region)}</p>
-          <h2 className="ph-typing-headline">{headline}</h2>
-          <p className="ph-muted">
-            You named <strong>{done.found}</strong> of {done.total} {noun(done.kind, done.total)} in{" "}
-            <strong>{formatClock(done.elapsedMs ?? 0)}</strong>
-            {done.timeLimitSeconds ? ` (limit ${done.timeLimitSeconds / 60} min)` : ""}.
-          </p>
-          {badge && (
-            <p className={`ph-typing-badge${done.badge === "new_best" ? " is-best" : ""}`}>
-              {done.badge === "new_best" ? "★ " : ""}
-              {badge}
-            </p>
-          )}
+          {note && <p className="ph-typing-badge">{note}</p>}
+          {done.timeLimitSeconds ? <p className="ph-muted">Time limit {done.timeLimitSeconds / 60} min</p> : null}
           <Tags tags={roundTags(done)} />
         </div>
-      </Card>
+      </ResultHero>
+
+      <RetryMissedCard
+        count={missed.length}
+        tone="recall"
+        title={`${missed.length} ${noun(done.kind, missed.length)} still to learn`}
+        text="Read them in the Missed list below, then replay the same set to lock them in."
+        cta="Replay this set"
+        loading={busy}
+        onRetry={() => void again()}
+      />
 
       <StatusMessage tone="error">{message}</StatusMessage>
 
@@ -791,9 +857,9 @@ function Results() {
         >
           Change settings
         </LinkButton>
-        <Button variant="primary" loading={busy} onClick={() => void again()}>
+        <GameButton variant="primary" loading={busy} onClick={() => void again()}>
           Play again
-        </Button>
+        </GameButton>
       </ActionBar>
     </div>
   );

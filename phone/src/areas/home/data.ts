@@ -12,8 +12,9 @@ import type {
   ReviewSummary,
 } from "@shared/domain";
 import type { RecallSetup } from "@shared/recall-domain";
-import { describeSetup, regionLabel } from "@shared/game-setup";
+import { bestScore, describeSetup, gameNames, modeNames as setupModeNames, regionLabel, setupUrl } from "@shared/game-setup";
 import type { GameStats, PersonalBest } from "@shared/game-setup";
+import type { IconName, Tone } from "@shared/icons";
 import { modeNames as quizModeNames } from "@shared/quiz-meta";
 import { paths } from "@phone/shell/paths";
 
@@ -239,8 +240,213 @@ export function primaryAction(data: HomeData): PrimaryAction {
   const [first] = continueItems(data);
   if (first) return { kind: "link", label: `Continue ${gameTitles[first.game]}`, to: first.to };
   if (daily.kind === "start") return { kind: "daily-start", label: "Play today's challenge" };
-  return { kind: "link", label: "Choose a game", to: paths.games };
+  return { kind: "link", label: "Play", to: paths.games };
 }
+
+/** Level progress from the server's XP total (display only: the server owns XP). */
+export function levelProgress(xp: number) {
+  const total = Math.max(0, Math.floor(xp || 0));
+  const inLevel = total % XP_PER_LEVEL;
+  return { level: 1 + Math.floor(total / XP_PER_LEVEL), inLevel, toNext: XP_PER_LEVEL - inLevel };
+}
+
+/* ---------- Next goal ---------- */
+
+/**
+ * One "Next goal" for Home, derived only from data the server (or the demo engine) already sent: today's
+ * challenge, a running round, open mistakes, the closest achievement, a game never played, a personal best
+ * that can still be beaten. Never computes scores or XP itself.
+ */
+export type Goal = {
+  id: string;
+  title: string;
+  text: string;
+  icon: IconName;
+  tone: Tone;
+  cta: string;
+  progress?: { value: number; max: number; label: string };
+} & ({ to: string; action?: undefined } | { action: "daily-start"; to?: undefined });
+
+/** Every goal that applies right now, most useful first. */
+export function goalCandidates(data: HomeData): Goal[] {
+  const goals: Goal[] = [];
+  const daily = dailyPlan(data.daily);
+  if (daily.kind === "continue") {
+    goals.push({
+      id: "daily-continue",
+      title: "Finish today's challenge",
+      text: "Your daily round is waiting. One try per day.",
+      icon: "calendar",
+      tone: "daily",
+      cta: "Continue today's challenge",
+      to: daily.to,
+    });
+  } else if (daily.kind === "start") {
+    const streak = daily.status.streak.current;
+    goals.push({
+      id: "daily-start",
+      title: streak > 0 ? `Keep your ${streak}-day streak` : "Play today's challenge",
+      text: "10 questions – the same for everyone today.",
+      icon: "calendar",
+      tone: "daily",
+      cta: "Play today's challenge",
+      action: "daily-start",
+    });
+  }
+
+  for (const item of continueItems(data)) {
+    goals.push({
+      id: `continue-${item.game}-${item.id}`,
+      title: `Finish your ${gameTitles[item.game]} round`,
+      text: `${item.title} · ${item.detail}`,
+      icon: gameIcons[item.game],
+      tone: item.game,
+      cta: "Continue",
+      to: item.to,
+      progress: item.total > 0 ? { value: item.done, max: item.total, label: `${item.done} of ${item.total} done` } : undefined,
+    });
+  }
+
+  const review = valueOf(data.review);
+  if (review && review.open > 0) {
+    goals.push({
+      id: "review",
+      title: review.open === 1 ? "Clear 1 open mistake" : `Clear ${review.open} open mistakes`,
+      text: "Get each one right once and it's cleared for good.",
+      icon: "review",
+      tone: "review",
+      cta: "Review my mistakes",
+      to: `${paths.quiz}/review`,
+    });
+  }
+
+  const achievement = closestAchievement(valueOf(data.achievements) ?? []);
+  if (achievement) {
+    goals.push({
+      id: `achievement-${achievement.id}`,
+      title: `Earn “${achievement.title}”`,
+      text: achievement.description || "Your closest badge.",
+      icon: "medal",
+      tone: "awards",
+      cta: "See achievements",
+      to: `${paths.profile}/achievements`,
+      progress: {
+        value: achievement.current,
+        max: achievement.target,
+        label: `${achievement.title}: ${achievement.current} of ${achievement.target}`,
+      },
+    });
+  }
+
+  const unplayed = unplayedGame(data);
+  if (unplayed) {
+    goals.push({
+      id: `try-${unplayed}`,
+      title: unplayed === "quiz" ? "Play your first quiz" : `Try ${gameTitles[unplayed]}`,
+      text: gameIntros[unplayed],
+      icon: gameIcons[unplayed],
+      tone: unplayed,
+      cta: `Play ${gameTitles[unplayed]}`,
+      to: setupPath[unplayed],
+    });
+  }
+
+  const best = bestToBeat(valueOf(data.bests) ?? []);
+  if (best) {
+    goals.push({
+      id: `best-${best.game}-${best.completedAt}`,
+      title: `Beat your ${gameNames[best.game]} best`,
+      text: `${bestScore(best)} · ${setupModeNames[best.mode] ?? best.mode} · ${regionLabel(best.region)}`,
+      icon: "trophy",
+      tone: best.game,
+      cta: "Try again",
+      to: setupUrl(best.game, {
+        mode: best.mode,
+        scope: best.scope,
+        region: best.region,
+        pool: best.pool,
+        picks: best.selectedCodes,
+        size: null,
+        limit: best.timeLimitSeconds,
+      }),
+      progress: { value: best.correct, max: best.total, label: `Best: ${best.correct} of ${best.total}` },
+    });
+  }
+
+  goals.push({
+    id: "explore",
+    title: "Discover a new country",
+    text: "Browse capitals, flags, languages and neighbours in the atlas.",
+    icon: "explorer",
+    tone: "explorer",
+    cta: "Open Explorer",
+    to: paths.explorer,
+  });
+  return goals;
+}
+
+const primaryKey = (action: PrimaryAction) => (action.kind === "daily-start" ? "daily-start" : action.to);
+const goalKey = (goal: Goal) => (goal.action === "daily-start" ? "daily-start" : goal.to);
+
+/** The one goal Home shows: the first candidate that isn't already the big bottom action. */
+export function nextGoal(data: HomeData): Goal {
+  const taken = primaryKey(primaryAction(data));
+  const goals = goalCandidates(data);
+  return goals.find((goal) => goalKey(goal) !== taken) ?? goals[goals.length - 1];
+}
+
+/** Not-yet-earned achievement with the highest progress (ties: the smaller target). */
+export function closestAchievement(list: Achievement[]): Achievement | null {
+  const open = list.filter((item) => !item.earned && item.target > 0 && item.current < item.target);
+  open.sort((a, b) => b.current / b.target - a.current / a.target || a.target - b.target);
+  return open[0] ?? null;
+}
+
+/** First game (in Games order) the player has never finished a round of; null when unknown or all played. */
+export function unplayedGame(data: HomeData): GameKey | null {
+  if (!data.quiz.totals.games) return "quiz";
+  const stats = valueOf(data.stats);
+  if (!stats) return null;
+  for (const game of ["flags", "capitals", "recall"] as const) {
+    if (stats[game] && stats[game].rounds === 0) return game;
+  }
+  return null;
+}
+
+/** Most recent personal best that is not perfect yet (there is something left to beat). */
+export function bestToBeat(bests: PersonalBest[]): PersonalBest | null {
+  const open = bests.filter((best) => best.total > 0 && best.correct < best.total);
+  open.sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+  return open[0] ?? null;
+}
+
+/** Region names for "Practise a region" (Flags regions from the setup; empty when unknown). */
+export function practiceRegions(data: HomeData): string[] {
+  const regions = valueOf(data.flags)?.regions ?? [];
+  return regions
+    .filter((region) => region.name && region.name !== "__unspecified__" && region.allCount > 0)
+    .map((region) => region.name);
+}
+
+/** A 10-flag random sample of one region: practice (unranked), never a personal best. */
+export const regionPracticePath = (region: string) =>
+  `${paths.flags}?${new URLSearchParams({ mode: "flag_to_country", scope: "un", pool: "all", region, size: "10" })}`;
+
+export const gameIcons: Record<GameKey, IconName> = {
+  quiz: "quiz",
+  flags: "flag",
+  capitals: "capital",
+  recall: "recall",
+  elimination: "funnel",
+};
+
+export const gameIntros: Record<GameKey, string> = {
+  quiz: "Multiple-choice questions in four modes.",
+  flags: "Match flags and countries, region by region.",
+  capitals: "Name capitals from memory – English, German or French.",
+  recall: "Type every country or capital of a region.",
+  elimination: "Chains of clues until only one place is left.",
+};
 
 export function capitalize(text: string) {
   return text ? text[0].toUpperCase() + text.slice(1) : text;

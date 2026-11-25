@@ -4,9 +4,8 @@
 // several places; accepted answers are only shown after the server has finished the question.
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api } from "@shared/api";
-import type { CapitalDirection, CapitalSession, CapitalSetup } from "@shared/domain";
-import { capitalPercentage } from "@shared/capitals-domain";
+import { api, isDemo } from "@shared/api";
+import type { CapitalDirection, CapitalEntry, CapitalSession, CapitalSetup } from "@shared/domain";
 import {
   PersonalBest,
   SetupPlace,
@@ -27,24 +26,32 @@ import { paths } from "@phone/shell/paths";
 import { useBackGuard } from "@phone/ui/useBackGuard";
 import {
   ActionBar,
-  Button,
-  Card,
+  ComboToast,
+  GameButton,
   IconButton,
   LinkButton,
   LoadingState,
+  MoreLink,
   ProgressBar,
+  ResultHero,
+  RetryMissedCard,
   Section,
+  StatGrid,
+  StatTile,
   StatusMessage,
+  StreakMeter,
   TextField,
-  useHaptics,
+  useFeel,
 } from "@phone/ui";
 import {
+  AnswerReveal,
   FeedbackLine,
   RoundClock,
   RoundMenuSheet,
   RoundTags,
   errorText,
   roundTagList,
+  useAnswerFx,
   useRoundTimer,
   useTapGuard,
 } from "./common";
@@ -52,10 +59,15 @@ import {
   Feedback,
   NEXT_TAP_GUARD_MS,
   capitalsActionFeedback,
+  capitalsAnswerFeel,
   capitalsChoiceOf,
   capitalsEntryFeedback,
+  isRanked,
+  mistakesFirst,
+  outcomeWord,
   requestId,
-  trailingStreak,
+  resultHeadline,
+  roundStreak,
 } from "./geo-logic";
 import { GeoSetup } from "./setup";
 import "./geo.css";
@@ -169,7 +181,8 @@ function CapitalsPlay() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const prefs = usePrefs();
-  const haptics = useHaptics();
+  const feel = useFeel();
+  const answerFx = useAnswerFx();
   const [session, setSession] = useState<CapitalSession | null>(null);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -189,11 +202,11 @@ function CapitalsPlay() {
 
   const finish = useCallback(
     (done: CapitalSession) => {
-      haptics.complete();
+      // ResultHero on the results screen plays the round-complete feedback once.
       // Results replace the round's entry, so Back from them never lands in the finished round again.
       release(() => navigate(resultsPath(done.id), { replace: true }));
     },
-    [haptics, navigate, release],
+    [navigate, release],
   );
 
   const load = useCallback(async () => {
@@ -219,6 +232,7 @@ function CapitalsPlay() {
   useEffect(() => {
     if (!current) return;
     setAnswer("");
+    answerFx.clear();
     if (current.outcome === "pending") window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -244,13 +258,22 @@ function CapitalsPlay() {
     setActionError("");
     try {
       const next = await run();
+      // Exactly one answer feedback per answer the server accepted and judged. "Be more specific" uses no
+      // attempt: a light select tick only, and the field stays focused so the keyboard stays open.
+      const outcome = next.actionResult?.outcome;
+      const verdict = capitalsAnswerFeel(outcome);
+      if (verdict === "right" || verdict === "wrong") {
+        feel.answer(verdict === "right", roundStreak(next));
+        answerFx.play(verdict === "right" ? "pop" : "shake");
+      } else if (verdict === "gentle") feel.select();
       if (next.state === "completed") return finish(next);
       setSession(next);
       setFeedback(capitalsActionFeedback(next) ?? capitalsEntryFeedback(next.current));
-      const outcome = next.actionResult?.outcome;
-      if (outcome === "correct") haptics.correct();
-      else if (outcome === "incorrect") haptics.wrong();
-      if (outcome === "ambiguous") window.setTimeout(() => inputRef.current?.select(), 0);
+      if (outcome === "ambiguous")
+        window.setTimeout(() => {
+          inputRef.current?.focus();
+          inputRef.current?.select();
+        }, 0);
     } catch (cause) {
       setActionError(errorText(cause));
       void load();
@@ -297,13 +320,11 @@ function CapitalsPlay() {
       inputRef.current?.focus();
       return;
     }
-    haptics.tap();
     void act(() => api.capitalsAnswer(session.id, current.id, answer, null, requestId()));
   }
 
   function skip() {
     if (!session || !current || busy || finalized) return;
-    haptics.tap();
     void act(() => api.capitalsSkip(session.id, current.id, requestId()));
   }
 
@@ -346,6 +367,11 @@ function CapitalsPlay() {
   const position = current?.position ?? Math.min(session.answered + 1, session.total);
   const toCapital = session.direction === "country_to_capital";
   const accepted = finalized ? (current?.acceptedAnswers ?? []) : [];
+  const streak = roundStreak(session);
+  const missedIt = finalized && current?.outcome !== "correct";
+  const mainAnswer = accepted.find((item) => item.primary) ?? accepted[0];
+  // After a miss the main answer is shown big; the card lists only the other accepted names.
+  const others = missedIt && mainAnswer ? accepted.filter((item) => item !== mainAnswer) : accepted;
 
   return (
     <div className="ph-geo-play">
@@ -361,12 +387,14 @@ function CapitalsPlay() {
         <span>
           <span className="ph-muted">Score</span> <strong>{session.score}</strong>
         </span>
-        <span>
-          <Icon name="flame" size={16} /> <span className="sr-only">Streak </span>
-          <strong>{trailingStreak(session.entries)}</strong>
-        </span>
-        <RoundClock remaining={remaining} elapsed={elapsed} />
+        <StreakMeter streak={streak} />
+        <RoundClock
+          remaining={remaining}
+          elapsed={elapsed}
+          totalMs={session.timeLimitSeconds ? session.timeLimitSeconds * 1000 : null}
+        />
       </div>
+      <ComboToast streak={streak} />
       <ProgressBar
         value={session.answered}
         max={session.total}
@@ -385,6 +413,10 @@ function CapitalsPlay() {
         <form id="ph-geo-capital-form" className="ph-geo-identify" onSubmit={submit} noValidate>
           <p className="ph-geo-eyebrow">{toCapital ? "Name a capital of" : "Which country has the capital"}</p>
           <h2 className="ph-geo-prompt">{current.prompt}</h2>
+          <div
+            className={`ph-geo-answer-row ${answerFx.className}`}
+            data-result={finalized ? current.outcome : undefined}
+          >
           <TextField
             ref={inputRef}
             label={toCapital ? "Capital" : "Country"}
@@ -402,23 +434,31 @@ function CapitalsPlay() {
             enterKeyHint="go"
             inputMode="text"
           />
+          </div>
           <FeedbackLine feedback={feedback} />
-          {finalized && current && (
-            <Card className="ph-geo-reveal">
-              <p className="ph-muted">{toCapital ? "Accepted capital names" : "Country"}</p>
-              {accepted.length ? (
-                <ul className="ph-geo-accepted">
-                  {accepted.map((item, index) => (
-                    <li key={`${item.name}-${index}`}>
-                      <strong>{item.name}</strong>
-                      {item.primary && <small>Primary</small>}
-                      {item.roles.length > 0 && <small>{item.roles.join(" · ")}</small>}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>Not available.</p>
-              )}
+          {missedIt && mainAnswer && (
+            <AnswerReveal label={toCapital ? "The capital is" : "The country is"} answer={mainAnswer.name} />
+          )}
+          {finalized && current && (others.length > 0 || !missedIt || !mainAnswer || current.catalogKind === "non_iso" || current.sourceLinks.length > 0) && (
+            <div className="ph-geo-reveal ph-card">
+              {others.length > 0 ? (
+                <>
+                  <p className="ph-muted">
+                    {missedIt && mainAnswer ? "Also accepted" : toCapital ? "Accepted capital names" : "Country"}
+                  </p>
+                  <ul className="ph-geo-accepted">
+                    {others.map((item, index) => (
+                      <li key={`${item.name}-${index}`}>
+                        <strong>{item.name}</strong>
+                        {item.primary && <small>Primary</small>}
+                        {item.roles.length > 0 && <small>{item.roles.join(" · ")}</small>}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : !mainAnswer ? (
+                <p>Accepted answers are not available.</p>
+              ) : null}
               {current.catalogKind === "non_iso" && (
                 <p className="ph-muted">This place has no official ISO country code.</p>
               )}
@@ -432,7 +472,7 @@ function CapitalsPlay() {
                   ))}
                 </p>
               )}
-            </Card>
+            </div>
           )}
         </form>
       )}
@@ -448,17 +488,26 @@ function CapitalsPlay() {
       {current && (
         <ActionBar label={finalized ? "Continue" : "Answer"}>
           {finalized ? (
-            <Button variant="primary" size="lg" block loading={busy} onClick={() => void next()}>
+            <GameButton variant="primary" size="lg" block loading={busy} onClick={() => void next()}>
               {session.answered >= session.total ? "See results" : "Next question"}
-            </Button>
+            </GameButton>
           ) : (
             <>
-              <Button size="lg" disabled={busy} onClick={skip}>
+              <GameButton variant="secondary" size="lg" disabled={busy} onClick={skip}>
                 Skip
-              </Button>
-              <Button type="submit" form="ph-geo-capital-form" variant="primary" size="lg" loading={busy}>
+              </GameButton>
+              <GameButton
+                type="submit"
+                form="ph-geo-capital-form"
+                variant="primary"
+                size="lg"
+                loading={busy}
+                // Keep focus (and the keyboard) in the answer field while submitting.
+                onPointerDown={(event) => event.preventDefault()}
+                onMouseDown={(event) => event.preventDefault()}
+              >
                 Submit
-              </Button>
+              </GameButton>
             </>
           )}
         </ActionBar>
@@ -511,6 +560,15 @@ function CapitalsResults() {
 
   const result = data;
   const choice = capitalsChoiceOf(result);
+  const ranked = isRanked(result);
+  const timeUp = endedOnTime(result);
+  const review = mistakesFirst(result.entries);
+  const missed = review.filter((entry) => entry.outcome === "incorrect" || entry.outcome === "skipped");
+  const solved = review.filter((entry) => entry.outcome === "correct");
+  const note =
+    result.finalBadge === "first_run" || result.finalBadge === "not_best" || timeUp
+      ? badgeText(ranked ? result.finalBadge : "unranked", timeUp)
+      : null;
 
   async function replay() {
     if (replaying) return;
@@ -532,53 +590,94 @@ function CapitalsResults() {
     }
   }
 
+  const reviewItem = (entry: CapitalEntry) => (
+    <li key={entry.id} data-outcome={entry.outcome}>
+      <span className="ph-geo-review-num">Q{entry.position}</span>
+      <div>
+        <strong>{entry.prompt}</strong>
+        <p>
+          <Icon name={entry.outcome === "correct" ? "checkCircle" : entry.outcome === "skipped" ? "warning" : "close"} size={16} />{" "}
+          {outcomeWord(entry.outcome)} · {entry.points} points
+        </p>
+        {entry.submittedAnswer && entry.outcome !== "correct" && (
+          <p className="ph-muted">
+            Your answer: <b>{entry.submittedAnswer}</b>
+          </p>
+        )}
+        <p>
+          <span className="ph-muted">
+            {entry.outcome === "correct" ? "Accepted" : "Answer"}
+            {(entry.acceptedAnswers?.length ?? 0) === 1 ? "" : "s"}:{" "}
+          </span>
+          <b>{entry.acceptedAnswers?.map((item) => item.name).join(", ") || "Not available"}</b>
+        </p>
+      </div>
+    </li>
+  );
+
   return (
     <div className="ph-stack">
-      <Card className="ph-geo-hero">
-        <p className="ph-geo-eyebrow">
+      <ResultHero
+        headline={resultHeadline(result.correct, result.total, timeUp)}
+        tone="capitals"
+        icon="capital"
+        score={result.score}
+        scoreLabel={`Points of ${result.total * 100}`}
+        correct={result.correct}
+        total={result.total}
+        timeMs={result.elapsedMs}
+        ranked={ranked}
+        newBest={ranked && result.finalBadge === "new_best"}
+      >
+        <p className="ph-geo-eyebrow ph-geo-hero-setup">
           {directionName(result.direction)} · {regionLabel(result.region)}
         </p>
-        <p className="ph-geo-score">
-          <strong>{result.score}</strong> <span className="ph-muted">/ {result.total * 100} points</span>
-        </p>
-        <p className="ph-geo-badge" data-badge={result.finalBadge ?? "done"}>
-          <Icon name={result.finalBadge === "new_best" ? "trophy" : "checkCircle"} size={18} />
-          {badgeText(result.finalBadge, endedOnTime(result))}
-        </p>
+        {note && <p className="ph-geo-hero-note">{note}</p>}
         <RoundTags tags={roundTagList({ ...result, pool: result.poolMode, picks: result.selectedCodes.length })} />
-      </Card>
+      </ResultHero>
 
-      <dl className="ph-geo-stats">
-        <div>
-          <dt>Correct</dt>
-          <dd>
-            {result.correct}/{result.total}{" "}
-            <small>{capitalPercentage(result.correct, result.total).toFixed(1)}%</small>
-          </dd>
-        </div>
-        <div>
-          <dt>Not quite</dt>
-          <dd>{result.incorrect}</dd>
-        </div>
-        <div>
-          <dt>Skipped</dt>
-          <dd>{result.skipped}</dd>
-        </div>
-        <div>
-          <dt>Time</dt>
-          <dd>
-            {formatClock(result.elapsedMs ?? 0)}
-            {result.timeLimitSeconds ? <small> of {result.timeLimitSeconds / 60} min</small> : null}
-          </dd>
-        </div>
-      </dl>
+      <RetryMissedCard
+        count={missed.length}
+        tone="capitals"
+        text="Play this setup again and type them from memory – a fresh round asks every question once more."
+        cta="Play this setup again"
+        loading={replaying}
+        onRetry={() => void replay()}
+      />
+      {missed.length > 0 && !isDemo && (
+        <p className="ph-geo-review-link">
+          <MoreLink to={`${paths.quiz}/review`}>Review my mistakes</MoreLink>
+        </p>
+      )}
+
+      <StatGrid label="Round details">
+        <StatTile label="Incorrect" value={result.incorrect} icon="close" />
+        <StatTile label="Skipped" value={result.skipped} icon="warning" />
+        <StatTile
+          label="Time"
+          value={formatClock(result.elapsedMs ?? 0)}
+          icon="timer"
+          hint={result.timeLimitSeconds ? `of ${result.timeLimitSeconds / 60} min` : undefined}
+        />
+      </StatGrid>
       <p className="ph-muted">
-        Correct answers divided by all questions; skipped questions stay in the count. Time is measured by the
-        server and includes feedback screens and time away.
+        Accuracy is correct answers divided by all questions; skipped questions stay in the count. Time is measured
+        by the server and includes feedback screens and time away.
       </p>
 
-      <Section title={result.ranked === false ? "Practice round" : "Five best for this setup"}>
-        {result.ranked === false ? (
+      {missed.length > 0 && (
+        <Section title={`Missed · ${missed.length}`}>
+          <ol className="ph-geo-review">{missed.map(reviewItem)}</ol>
+        </Section>
+      )}
+      {solved.length > 0 && (
+        <Section title={`Correct · ${solved.length}`}>
+          <ol className="ph-geo-review">{solved.map(reviewItem)}</ol>
+        </Section>
+      )}
+
+      <Section title={ranked ? "Five best for this setup" : "Practice round"}>
+        {!ranked ? (
           <p className="ph-muted">Random picks don't count for personal bests. Play the whole set to rank this setup.</p>
         ) : result.topFive.length ? (
           <ol className="ph-geo-top">
@@ -595,43 +694,14 @@ function CapitalsResults() {
         )}
       </Section>
 
-      <Section title={`Review · ${result.total} questions`}>
-        <ol className="ph-geo-review">
-          {result.entries.map((entry) => (
-            <li key={entry.id} data-outcome={entry.outcome}>
-              <span className="ph-geo-review-num">Q{entry.position}</span>
-              <div>
-                <strong>{entry.prompt}</strong>
-                <p>
-                  <Icon name={entry.outcome === "correct" ? "checkCircle" : "warning"} size={16} />{" "}
-                  {entry.outcome === "correct" ? "Correct" : entry.outcome === "skipped" ? "Skipped" : "Not quite"} ·{" "}
-                  {entry.points} points
-                </p>
-                {entry.submittedAnswer && (
-                  <p className="ph-muted">
-                    Your answer: <b>{entry.submittedAnswer}</b>
-                  </p>
-                )}
-                <p>
-                  <span className="ph-muted">
-                    Accepted answer{(entry.acceptedAnswers?.length ?? 0) === 1 ? "" : "s"}:{" "}
-                  </span>
-                  {entry.acceptedAnswers?.map((item) => item.name).join(", ") || "Not available"}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </Section>
-
       <StatusMessage tone="error">{message}</StatusMessage>
       <LinkButton to={setupUrl("capitals", choice)} block>
         Change settings
       </LinkButton>
       <ActionBar>
-        <Button variant="primary" size="lg" loading={replaying} onClick={() => void replay()}>
+        <GameButton variant="primary" size="lg" block loading={replaying} onClick={() => void replay()}>
           {replaying ? "Preparing…" : "Play again"}
-        </Button>
+        </GameButton>
       </ActionBar>
     </div>
   );

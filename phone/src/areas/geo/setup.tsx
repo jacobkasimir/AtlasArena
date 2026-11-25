@@ -21,7 +21,7 @@ import {
   scopeNames,
 } from "@shared/game-setup";
 import { saveSetup } from "@shared/prefs";
-import { IconName, IconTile } from "@shared/icons";
+import { IconName } from "@shared/icons";
 import {
   ActionBar,
   ActionCard,
@@ -30,8 +30,11 @@ import {
   Card,
   Chip,
   ChipGroup,
+  GameButton,
   LinkButton,
+  ModeHero,
   Section,
+  SegmentedControl,
   StatusMessage,
   TextField,
 } from "@phone/ui";
@@ -138,8 +141,17 @@ export function GeoSetup({
     </Button>
   );
 
+  const mode = modes.find((item) => item.value === choice.mode) ?? modes[0];
+
   return (
     <div className="ph-stack">
+      <ModeHero
+        title={mode.title}
+        subtitle={mode.text}
+        icon={mode.icon}
+        tone={game}
+        badge={practice ? "Practice" : best ? `Best ${bestScore(best)}` : undefined}
+      />
       <p className="ph-muted">{intro}</p>
 
       {resume.length > 0 && (
@@ -170,23 +182,12 @@ export function GeoSetup({
       )}
 
       <Section title="1 · How do you want to play?">
-        <div className="ph-geo-modes" role="group" aria-label="Mode">
-          {modes.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              className="ph-geo-mode"
-              aria-pressed={item.value === choice.mode}
-              onClick={() => set({ mode: item.value })}
-            >
-              <IconTile name={item.icon} tone={game} />
-              <span className="ph-geo-mode-text">
-                <strong>{item.title}</strong>
-                <small>{item.text}</small>
-              </span>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Mode"
+          options={modes.map((item) => ({ value: item.value, label: item.title, icon: item.icon }))}
+          value={mode.value}
+          onChange={(value) => set({ mode: value })}
+        />
       </Section>
 
       <Section title="Your setup">
@@ -257,9 +258,9 @@ export function GeoSetup({
       </Section>
 
       <ActionBar>
-        <Button variant="primary" size="lg" loading={busy} disabled={!total} onClick={() => void start()}>
+        <GameButton variant="primary" size="lg" block loading={busy} disabled={!total} onClick={() => void start()}>
           {busy ? "Preparing…" : `Start round · ${playCount} ${unit(playCount)}`}
-        </Button>
+        </GameButton>
       </ActionBar>
 
       <BottomSheet open={sheet === "places"} onClose={() => setSheet(null)} title="Which places?" footer={done}>

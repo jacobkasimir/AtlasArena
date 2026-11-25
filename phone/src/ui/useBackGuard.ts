@@ -59,6 +59,11 @@ function readState(): HistoryState {
   return state && typeof state === "object" ? (state as HistoryState) : {};
 }
 
+/** True while one of our own history.go() calls is queued or on its way (tests wait for this to turn false). */
+export function hasPendingOwnPops(): boolean {
+  return pendingDepth() > 0 || flushScheduled || settleWaiters.size > 0;
+}
+
 /** True while the current popstate event was caused by one of our own history.go() calls. */
 export function isOwnPop(): boolean {
   return currentPopIsOwn;

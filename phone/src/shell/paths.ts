@@ -13,6 +13,8 @@ export const paths = {
   capitals: "/capitals",
   recall: "/recall",
   elimination: "/elimination",
+  /** Compact atlas (read-only, same data as the desktop Explorer: api.explore). */
+  explorer: "/explorer",
   profile: "/profile",
   settings: "/settings",
   welcome: "/welcome",
@@ -34,6 +36,7 @@ const titles: [string, string][] = [
   [paths.capitals, "Capitals"],
   [paths.recall, "Recall"],
   [paths.elimination, "Elimination"],
+  [paths.explorer, "Explorer"],
   [paths.profile, "Profile"],
   [paths.settings, "Settings"],
 ];

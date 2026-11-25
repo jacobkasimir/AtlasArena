@@ -7,7 +7,7 @@ vi.hoisted(() => {
   vi.stubEnv("VITE_SUPABASE_URL", "");
   vi.stubEnv("VITE_SUPABASE_ANON_KEY", "");
 });
-vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn() }));
+vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn(), playNotes: vi.fn() }));
 
 import FlagsArea from "./flags";
 import CapitalsArea from "./capitals";
@@ -50,6 +50,9 @@ describe("geo screens in the demo", () => {
     fireEvent.change(input, { target: { value: "Atlantis" } });
     fireEvent.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByText("Not quite · 0 points.")).toBeInTheDocument();
-    expect(screen.getByText("Accepted capital names")).toBeInTheDocument();
+    // A miss reveals the main capital big and clear (the demo knows the answer once the server-side engine judged it).
+    const reveal = screen.getByText("The capital is").closest(".ph-geo-answer-reveal") as HTMLElement;
+    expect(reveal).toHaveAttribute("role", "status");
+    expect(reveal.querySelector(".ph-geo-answer-reveal-name")?.textContent).toBeTruthy();
   });
 });

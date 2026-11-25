@@ -1,7 +1,7 @@
 // Short game sound cues, synthesized with WebAudio (no audio files, no extra hosts).
 import { HapticKind, getPrefs, haptic } from "./prefs";
 
-type Note = { frequency: number; start: number; duration: number; type: OscillatorType; slideTo?: number };
+export type Note = { frequency: number; start: number; duration: number; type: OscillatorType; slideTo?: number };
 
 const cues: Record<Exclude<HapticKind, "tap">, Note[]> = {
   correct: [
@@ -44,14 +44,24 @@ function audioContext(): AudioContext | null {
  * `volume` overrides the saved volume (used by the Settings preview).
  */
 export function playSound(kind: HapticKind, volume?: number) {
+  if (kind === "tap") return;
+  playNotes(cues[kind], volume);
+}
+
+/**
+ * Play a short synthesized phrase (same envelope and gain cap as the built-in cues). Respects sound on/off and
+ * the saved volume unless `volume` is given. Browsers only allow audio after a user gesture; before that the
+ * context stays suspended and nothing is heard.
+ */
+export function playNotes(notes: readonly Note[], volume?: number) {
   const prefs = getPrefs();
   const level = (volume ?? prefs.volume) / 100;
-  if (kind === "tap" || (volume === undefined && !prefs.sound) || level <= 0) return;
+  if ((volume === undefined && !prefs.sound) || level <= 0) return;
   const ctx = audioContext();
   if (!ctx) return;
   try {
     const now = ctx.currentTime + 0.01;
-    for (const note of cues[kind]) {
+    for (const note of notes) {
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();
       const begin = now + note.start;

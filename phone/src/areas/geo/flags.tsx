@@ -18,6 +18,7 @@ import {
   roundOptions,
   setupUrl,
 } from "@shared/game-setup";
+import { isDemo } from "@shared/api";
 import { autoContinueMs, useLeaveGuard, usePrefs } from "@shared/prefs";
 import { useLoad } from "@shared/components";
 import { Icon } from "@shared/icons";
@@ -27,18 +28,27 @@ import { useBackGuard } from "@phone/ui/useBackGuard";
 import {
   ActionBar,
   Button,
-  Card,
+  ComboToast,
   Chip,
+  GameButton,
   IconButton,
   LinkButton,
   LoadingState,
+  MoreLink,
   ProgressBar,
+  ResultHero,
+  RetryMissedCard,
   Section,
+  StatGrid,
+  StatTile,
   StatusMessage,
+  StreakMeter,
   TextField,
-  useHaptics,
+  feel as fireFeel,
+  useFeel,
 } from "@phone/ui";
 import {
+  AnswerReveal,
   ConfirmSheet,
   FeedbackLine,
   FlagPicture,
@@ -47,6 +57,7 @@ import {
   RoundTags,
   errorText,
   roundTagList,
+  useAnswerFx,
   useRoundTimer,
   useTapGuard,
 } from "./common";
@@ -58,11 +69,16 @@ import {
   countrySuggestions,
   flagsActionFeedback,
   flagsChoiceOf,
+  flagsAnswerFeel,
   flagsEntryFeedback,
+  isRanked,
+  mistakesFirst,
   ordinal,
+  outcomeWord,
   pageCount,
   requestId,
-  trailingStreak,
+  resultHeadline,
+  roundStreak,
 } from "./geo-logic";
 import { GeoSetup } from "./setup";
 import "./geo.css";
@@ -204,7 +220,8 @@ function FlagsPlay() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const prefs = usePrefs();
-  const haptics = useHaptics();
+  const feel = useFeel();
+  const answerFx = useAnswerFx();
   const [session, setSession] = useState<FlagsSession | null>(null);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
@@ -237,11 +254,11 @@ function FlagsPlay() {
   const finish = useCallback(
     (done: FlagsSession) => {
       latest.current = done;
-      haptics.complete();
+      // ResultHero on the results screen plays the round-complete feedback once.
       // Results replace the round's entry, so Back from them never lands in the finished round again.
       release(() => navigate(resultsPath(done.id), { replace: true }));
     },
-    [haptics, navigate, release],
+    [navigate, release],
   );
 
   const load = useCallback(async () => {
@@ -279,6 +296,7 @@ function FlagsPlay() {
     if (!current) return;
     setAnswer("");
     setPage(0);
+    answerFx.clear();
     window.setTimeout(() => {
       if (current.outcome !== "pending") return;
       if (session?.direction === "flag_to_country") inputRef.current?.focus();
@@ -308,13 +326,17 @@ function FlagsPlay() {
     setActionError("");
     try {
       const next = await run();
+      // Exactly one answer feedback per answer the server accepted and judged.
+      const outcome = next.actionResult?.outcome;
+      const verdict = flagsAnswerFeel(outcome);
+      if (verdict === "right" || verdict === "wrong") {
+        feel.answer(verdict === "right", roundStreak(next));
+        answerFx.play(verdict === "right" ? "pop" : "shake");
+      } else if (verdict === "gentle") feel.select();
       if (next.state === "completed") return finish(next);
       accept(next);
       const line = flagsActionFeedback(next, attemptsBefore);
       setFeedback(line);
-      const outcome = next.actionResult?.outcome;
-      if (outcome === "correct") haptics.correct();
-      else if (outcome && outcome !== "ambiguous" && outcome !== "duplicate_choice") haptics.wrong();
       if (outcome === "ambiguous") window.setTimeout(() => inputRef.current?.select(), 0);
     } catch (cause) {
       setActionError(errorText(cause));
@@ -368,11 +390,15 @@ function FlagsPlay() {
   const safePage = Math.min(page, pages - 1);
   const shown = visible.slice(safePage * FLAG_PAGE_SIZE, (safePage + 1) * FLAG_PAGE_SIZE);
 
-  // After a question ends, make sure the right flag is on screen.
+  // After a question ends, make sure the right flag is on screen (and stays there until Next).
   useEffect(() => {
     if (!finalized) return;
     const index = visible.findIndex((cell) => cell.status === "answer");
-    if (index >= 0) setPage(Math.floor(index / FLAG_PAGE_SIZE));
+    if (index < 0) return;
+    setPage(Math.floor(index / FLAG_PAGE_SIZE));
+    window.setTimeout(() => {
+      gridRef.current?.querySelector?.('[data-status="answer"]')?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    }, 60);
   }, [finalized, current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function goToPage(target: number) {
@@ -382,7 +408,6 @@ function FlagsPlay() {
 
   function choose(choice: FlagsChoice) {
     if (!session || !current || finalized || busy) return;
-    haptics.tap();
     void act(() => api.flagsAnswer(session.id, current.id, choice.id, null, requestId()), current.attempts);
   }
 
@@ -395,7 +420,6 @@ function FlagsPlay() {
       inputRef.current?.focus();
       return;
     }
-    haptics.tap();
     void act(() => api.flagsAnswer(session.id, current.id, null, answer, requestId()));
   }
 
@@ -451,7 +475,7 @@ function FlagsPlay() {
     );
 
   const position = current?.position ?? Math.min(session.answered + 1, session.total);
-  const streak = trailingStreak(session.entries);
+  const streak = roundStreak(session);
   const pickMode = session.direction === "country_to_flag";
   const triesLeft = current ? Math.max(0, 3 - current.attempts) : 0;
   const suggestions =
@@ -473,12 +497,14 @@ function FlagsPlay() {
         <span>
           <span className="ph-muted">Score</span> <strong>{session.score}</strong>
         </span>
-        <span>
-          <Icon name="flame" size={16} /> <span className="sr-only">Streak </span>
-          <strong>{streak}</strong>
-        </span>
-        <RoundClock remaining={remaining} elapsed={elapsed} />
+        <StreakMeter streak={streak} />
+        <RoundClock
+          remaining={remaining}
+          elapsed={elapsed}
+          totalMs={session.timeLimitSeconds ? session.timeLimitSeconds * 1000 : null}
+        />
       </div>
+      <ComboToast streak={streak} />
       <ProgressBar value={session.answered} max={session.total} label={`Flag ${position} of ${session.total}`} showValue />
       <RoundTags tags={[directionName(session.direction), regionLabel(session.region), ...roundTagList({ ...session, pool: session.poolTier, picks: session.selectedCount })]} />
 
@@ -511,6 +537,7 @@ function FlagsPlay() {
                 choice={choice}
                 number={number}
                 status={status}
+                won={current.outcome === "correct"}
                 disabled={busy || finalized || status !== "open"}
                 onPick={() => choose(choice)}
               />
@@ -538,15 +565,18 @@ function FlagsPlay() {
 
       {current && !pickMode && (
         <form id="ph-geo-flag-form" className="ph-geo-identify" onSubmit={submitAnswer} noValidate>
-          <FlagPicture
-            url={current.flagSvgUrl}
-            label={current.flagDescription || "Flag to identify"}
-            className="is-large"
-            eager
-          />
+          <div className={`ph-geo-fx ${answerFx.className}`} data-fx={answerFx.fx ?? undefined}>
+            <FlagPicture
+              url={current.flagSvgUrl}
+              label={current.flagDescription || "Flag to identify"}
+              className="is-large"
+              eager
+            />
+          </div>
           <h2 ref={promptRef} tabIndex={-1} className="ph-geo-prompt is-small">
             Which country or territory is this?
           </h2>
+          <div className={`ph-geo-answer-row ${answerFx.className}`} data-result={finalized ? current.outcome : undefined}>
           <TextField
             ref={inputRef}
             label="Your answer"
@@ -563,6 +593,7 @@ function FlagsPlay() {
             enterKeyHint="go"
             inputMode="text"
           />
+          </div>
           <div className="ph-geo-suggest-slot">
             {suggestions.length > 0 && !exact && (
               <ul className="ph-geo-suggest" aria-label="Matching countries">
@@ -586,12 +617,7 @@ function FlagsPlay() {
             )}
           </div>
           <FeedbackLine feedback={feedback} />
-          {correctName && (
-            <p className="ph-geo-answer">
-              <span className="ph-muted">Correct country: </span>
-              <strong>{correctName}</strong>
-            </p>
-          )}
+          {correctName && <AnswerReveal label="Correct country" answer={correctName} />}
           {!session.region && current.hintUsed && current.region && (
             <p className="ph-geo-hint" role="status">
               Region hint: <strong>{current.region}</strong>
@@ -620,21 +646,31 @@ function FlagsPlay() {
       {current && (finalized || !pickMode) && (
         <ActionBar label={finalized ? "Continue" : "Answer"}>
           {finalized ? (
-            <Button variant="primary" size="lg" block loading={busy} onClick={() => void next()}>
+            <GameButton variant="primary" size="lg" block loading={busy} onClick={() => void next()}>
               {session.answered >= session.total ? "See results" : "Next flag"}
-            </Button>
+            </GameButton>
           ) : (
             <>
-              <Button
+              <GameButton
+                variant="secondary"
                 size="lg"
                 disabled={busy}
                 onClick={() => void act(() => api.flagsSkip(session.id, current.id, requestId()))}
               >
                 Skip
-              </Button>
-              <Button type="submit" form="ph-geo-flag-form" variant="primary" size="lg" loading={busy}>
+              </GameButton>
+              <GameButton
+                type="submit"
+                form="ph-geo-flag-form"
+                variant="primary"
+                size="lg"
+                loading={busy}
+                // Keep focus (and the keyboard) in the answer field while checking.
+                onPointerDown={(event) => event.preventDefault()}
+                onMouseDown={(event) => event.preventDefault()}
+              >
                 Check
-              </Button>
+              </GameButton>
             </>
           )}
         </ActionBar>
@@ -660,25 +696,30 @@ const statusText: Record<string, string> = {
   missed: "Answered earlier",
 };
 
+/**
+ * One flag in the Country → Flag grid: a card that presses down under the thumb. After the server answered, a
+ * wrong pick shakes and says "✕ Wrong" with the country it belongs to; the right flag pops ("✓ Correct") when
+ * the player found it, or glows ("✓ Correct flag") after a miss so it can be learnt before moving on.
+ */
 function FlagCell({
   choice,
   number,
   status,
+  won,
   disabled,
   onPick,
 }: {
   choice: FlagsChoice;
   number: number;
   status: string;
+  /** The current question was solved (the "answer" flag is the player's own pick). */
+  won: boolean;
   disabled: boolean;
   onPick: () => void;
 }) {
   const descId = choice.flagDescription ? `ph-geo-desc-${choice.id}` : undefined;
-  const label = [
-    `Flag ${number}`,
-    statusText[status],
-    status === "wrong" && choice.name ? choice.name : null,
-  ]
+  const word = status === "answer" && won ? "Correct" : statusText[status];
+  const label = [`Flag ${number}`, statusText[status], status === "wrong" && choice.name ? choice.name : null]
     .filter(Boolean)
     .join(", ");
   return (
@@ -686,10 +727,14 @@ function FlagCell({
       type="button"
       className="ph-geo-cell"
       data-status={status}
+      data-won={status === "answer" && won ? "true" : undefined}
       aria-label={label}
       aria-describedby={descId}
       disabled={disabled}
-      onClick={onPick}
+      onClick={() => {
+        fireFeel("select");
+        onPick();
+      }}
     >
       <FlagPicture url={choice.flagSvgUrl} label="" />
       <span className="ph-geo-cell-num" aria-hidden="true">
@@ -698,7 +743,10 @@ function FlagCell({
       {status !== "open" && (
         <span className="ph-geo-cell-mark" aria-hidden="true">
           <Icon name={status === "wrong" ? "close" : "check"} size={16} />
-          {status === "wrong" && choice.name ? choice.name : statusText[status]}
+          <span>
+            {word}
+            {status === "wrong" && choice.name ? <small> · {choice.name}</small> : null}
+          </span>
         </span>
       )}
       {descId && (
@@ -744,11 +792,18 @@ function FlagsResults() {
 
   const result = data;
   const choice: GameChoice = flagsChoiceOf(result);
-  const percent = (value: number) => (result.total ? Math.round((value / result.total) * 100) : 0);
+  const ranked = isRanked(result);
+  const timeUp = endedOnTime(result);
   const byAttempt = [1, 2, 3].map(
     (attempt) => result.entries.filter((entry) => entry.outcome === "correct" && entry.attempts === attempt).length,
   );
-  const review = [...result.entries].sort((a, b) => a.position - b.position);
+  const review = mistakesFirst(result.entries);
+  const missed = review.filter((entry) => entry.outcome === "incorrect" || entry.outcome === "skipped");
+  const solved = review.filter((entry) => entry.outcome === "correct");
+  const note =
+    result.finalBadge === "first_run" || result.finalBadge === "not_best" || timeUp
+      ? badgeText(ranked ? result.finalBadge : "unranked", timeUp)
+      : null;
 
   async function replay() {
     if (replaying) return;
@@ -763,45 +818,67 @@ function FlagsResults() {
     }
   }
 
+  const reviewItem = (entry: FlagsEntry) => (
+    <li key={entry.id} data-outcome={entry.outcome}>
+      <FlagPicture url={entry.flagSvgUrl} label="" className="is-small" />
+      <div>
+        <strong>{entry.name || "Catalog entry"}</strong>
+        <p>
+          <Icon name={entry.outcome === "correct" ? "checkCircle" : entry.outcome === "skipped" ? "warning" : "close"} size={16} />{" "}
+          {outcomeWord(entry.outcome)}
+          {entry.outcome === "correct" && result.direction === "country_to_flag" ? ` · ${ordinal(entry.attempts)} try` : ""} ·{" "}
+          {entry.points} points
+        </p>
+        {entry.hintUsed && <small className="ph-muted">Region hint used · 60 point maximum</small>}
+      </div>
+    </li>
+  );
+
   return (
     <div className="ph-stack">
-      <Card className="ph-geo-hero">
-        <p className="ph-geo-eyebrow">
+      <ResultHero
+        headline={resultHeadline(result.correct, result.total, timeUp)}
+        tone="flags"
+        icon="flag"
+        score={result.score}
+        scoreLabel={`Points of ${result.maxScore}`}
+        correct={result.correct}
+        total={result.total}
+        timeMs={result.elapsedMs}
+        ranked={ranked}
+        newBest={ranked && result.finalBadge === "new_best"}
+      >
+        <p className="ph-geo-eyebrow ph-geo-hero-setup">
           {directionName(result.direction)} · {regionLabel(result.region)}
         </p>
-        <p className="ph-geo-score">
-          <strong>{result.score}</strong> <span className="ph-muted">/ {result.maxScore} points</span>
-        </p>
-        <p className="ph-geo-badge" data-badge={result.finalBadge ?? "done"}>
-          <Icon name={result.finalBadge === "new_best" ? "trophy" : "checkCircle"} size={18} />
-          {badgeText(result.finalBadge, endedOnTime(result))}
-        </p>
+        {note && <p className="ph-geo-hero-note">{note}</p>}
         <RoundTags tags={roundTagList({ ...result, pool: result.poolTier, picks: result.selectedCount })} />
-      </Card>
+      </ResultHero>
 
-      <dl className="ph-geo-stats">
-        <div>
-          <dt>Correct</dt>
-          <dd>
-            {result.correct}/{result.total} <small>{percent(result.correct)}%</small>
-          </dd>
-        </div>
-        <div>
-          <dt>Not solved</dt>
-          <dd>{result.incorrect}</dd>
-        </div>
-        <div>
-          <dt>Skipped</dt>
-          <dd>{result.skipped}</dd>
-        </div>
-        <div>
-          <dt>Time</dt>
-          <dd>
-            {formatClock(result.elapsedMs ?? 0)}
-            {result.timeLimitSeconds ? <small> of {result.timeLimitSeconds / 60} min</small> : null}
-          </dd>
-        </div>
-      </dl>
+      <RetryMissedCard
+        count={missed.length}
+        tone="flags"
+        text="Play this setup again and look out for them – a fresh round shows every flag once more."
+        cta="Play this setup again"
+        loading={replaying}
+        onRetry={() => void replay()}
+      />
+      {missed.length > 0 && !isDemo && (
+        <p className="ph-geo-review-link">
+          <MoreLink to={`${paths.quiz}/review`}>Review my mistakes</MoreLink>
+        </p>
+      )}
+
+      <StatGrid label="Round details">
+        <StatTile label="Incorrect" value={result.incorrect} icon="close" />
+        <StatTile label="Skipped" value={result.skipped} icon="warning" />
+        <StatTile
+          label="Time"
+          value={formatClock(result.elapsedMs ?? 0)}
+          icon="timer"
+          hint={result.timeLimitSeconds ? `of ${result.timeLimitSeconds / 60} min` : undefined}
+        />
+      </StatGrid>
       <p className="ph-muted">
         {result.direction === "country_to_flag"
           ? `Found on the first try: ${byAttempt[0]} · second: ${byAttempt[1]} · third: ${byAttempt[2]}.`
@@ -809,8 +886,19 @@ function FlagsResults() {
         Time is measured by the server from the start of the round. There is no speed bonus.
       </p>
 
-      <Section title={result.ranked === false ? "Practice round" : "Top five for this setup"}>
-        {result.ranked === false ? (
+      {missed.length > 0 && (
+        <Section title={`Missed · ${missed.length}`}>
+          <ol className="ph-geo-review">{missed.map(reviewItem)}</ol>
+        </Section>
+      )}
+      {solved.length > 0 && (
+        <Section title={`Correct · ${solved.length}`}>
+          <ol className="ph-geo-review">{solved.map(reviewItem)}</ol>
+        </Section>
+      )}
+
+      <Section title={ranked ? "Top five for this setup" : "Practice round"}>
+        {!ranked ? (
           <p className="ph-muted">Random picks don't count for personal bests. Play the whole set to rank this setup.</p>
         ) : result.topFive.length ? (
           <ol className="ph-geo-top">
@@ -828,37 +916,14 @@ function FlagsResults() {
         )}
       </Section>
 
-      <Section title={`Review · ${result.total} flags`}>
-        <ol className="ph-geo-review">
-          {review.map((entry) => (
-            <li key={entry.id} data-outcome={entry.outcome}>
-              <FlagPicture url={entry.flagSvgUrl} label="" className="is-small" />
-              <div>
-                <strong>{entry.name || "Catalog entry"}</strong>
-                <p>
-                  <Icon name={entry.outcome === "correct" ? "checkCircle" : "warning"} size={16} />{" "}
-                  {entry.outcome === "correct"
-                    ? `Correct · ${ordinal(entry.attempts)} try`
-                    : entry.outcome === "skipped"
-                      ? "Skipped"
-                      : "Not solved"}{" "}
-                  · {entry.points} points
-                </p>
-                {entry.hintUsed && <small className="ph-muted">Region hint used · 60 point maximum</small>}
-              </div>
-            </li>
-          ))}
-        </ol>
-      </Section>
-
       <StatusMessage tone="error">{message}</StatusMessage>
       <LinkButton to={setupUrl("flags", choice)} block>
         Change settings
       </LinkButton>
       <ActionBar>
-        <Button variant="primary" size="lg" loading={replaying} onClick={() => void replay()}>
+        <GameButton variant="primary" size="lg" block loading={replaying} onClick={() => void replay()}>
           {replaying ? "Preparing…" : "Play again"}
-        </Button>
+        </GameButton>
       </ActionBar>
     </div>
   );

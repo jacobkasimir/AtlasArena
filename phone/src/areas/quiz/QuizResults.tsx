@@ -1,22 +1,46 @@
-// Phone quiz results at /quiz/results/:id: score, XP, accuracy and the answer review, all as the server
-// (or demo engine) reported them. "Play again" starts the same setup again; mistakes are listed first.
+// Phone quiz results at /quiz/results/:id. Everything shown comes from the server (or the demo engine):
+// ResultHero (medal, count-up score, accuracy, new best, XP bar), then the learning loop (Retry missed →
+// Review my mistakes, online only), then the answers with mistakes first, then "Play again".
 import { useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { api } from "@shared/api";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { api, isDemo } from "@shared/api";
 import { useLoad } from "@shared/components";
-import { ResultView, challengeSetupUrl, setsNewPersonalBest } from "@shared/domain";
+import { Dashboard, ResultView, challengeSetupUrl, setsNewPersonalBest } from "@shared/domain";
 import { Icon } from "@shared/icons";
-import { accuracy, modeNames } from "@shared/quiz-meta";
+import { modeIcons, modeNames } from "@shared/quiz-meta";
 import { usePhoneChrome } from "@phone/shell/chrome";
 import { paths } from "@phone/shell/paths";
-import { ActionBar, Button, Card, LinkButton, LoadingState, StatusMessage, useHaptics } from "@phone/ui";
-import { capitalize, friendlyQuizError, resultHeadline } from "./quiz-logic";
+import {
+  ActionBar,
+  GameButton,
+  LinkButton,
+  LoadingState,
+  ResultHero,
+  RetryMissedCard,
+  StatGrid,
+  StatTile,
+  StatusMessage,
+} from "@phone/ui";
+import { capitalize, friendlyQuizError, mistakesFirst, resultHeadline } from "./quiz-logic";
+import { reviewPath } from "./QuizReview";
+
+/** True when the player arrived straight from the round (QuizPlay passes `{ fresh: true }`). */
+function useFreshResult() {
+  const state = useLocation().state as { fresh?: unknown } | null;
+  return Boolean(state && state.fresh === true);
+}
 
 export function QuizResults() {
-  usePhoneChrome({ title: "Results", back: paths.quiz });
+  usePhoneChrome({ title: "Quiz results", back: paths.quiz });
   const { id = "" } = useParams();
+  const fresh = useFreshResult();
   const { data, error, reload } = useLoad<ResultView>(() => api.result(id), id);
-  if (!data)
+  // The XP total is only meaningful right after the round (later rounds would have added to it): fetch it then,
+  // and wait for it so ResultHero fires its one feedback (levelUp/reward/complete) with the final values.
+  const profile = useLoad<Dashboard | null>(() => (fresh ? api.dashboard() : Promise.resolve(null)), `${id}:${fresh}`);
+  const profileSettled = !fresh || profile.data !== undefined || Boolean(profile.error);
+
+  if (!data || !profileSettled)
     return error ? (
       <StatusMessage tone="error" retry={reload}>
         {friendlyQuizError(error)}
@@ -33,24 +57,25 @@ export function QuizResults() {
         </LinkButton>
       </div>
     );
-  return <ResultsBody result={data} />;
+  const xpTotal = fresh && typeof profile.data?.profile?.xp === "number" ? profile.data.profile.xp : null;
+  return <ResultsBody result={data} xpTotal={xpTotal} />;
 }
 
-function ResultsBody({ result }: { result: ResultView }) {
+function ResultsBody({ result, xpTotal }: { result: ResultView; xpTotal: number | null }) {
   const navigate = useNavigate();
-  const haptics = useHaptics();
   const [replayPending, setReplayPending] = useState(false);
   const [replayError, setReplayError] = useState("");
   const replayRef = useRef(false);
-  const mistakesRef = useRef<HTMLHeadingElement>(null);
+  const missedRef = useRef<HTMLHeadingElement>(null);
   const { stats } = result;
+  const ranked = result.mode !== "practice";
   const newBest = setsNewPersonalBest(result.mode, stats.score, result.previousBest);
   // challengeSetupUrl returns "/quiz?…", which is also the phone setup path.
   const setupUrl = challengeSetupUrl(result);
-  const mistakes = result.reviews.filter((review) => !review.correct);
-  const ordered = [...result.reviews]
-    .map((review, index) => ({ review, index }))
-    .sort((a, b) => Number(a.review.correct) - Number(b.review.correct) || a.index - b.index);
+  const ordered = mistakesFirst(result.reviews);
+  const missed = ordered.filter(({ review }) => !review.correct);
+  const right = ordered.filter(({ review }) => review.correct);
+  const answered = stats.correct + stats.incorrect;
 
   async function playAgain() {
     if (replayRef.current) return;
@@ -61,7 +86,6 @@ function ResultsBody({ result }: { result: ResultView }) {
     replayRef.current = true;
     setReplayPending(true);
     setReplayError("");
-    haptics.tap();
     try {
       const next = await api.play(
         result.mode,
@@ -78,15 +102,27 @@ function ResultsBody({ result }: { result: ResultView }) {
     }
   }
 
-  function showMistakes() {
-    mistakesRef.current?.scrollIntoView?.({ block: "start" });
-    mistakesRef.current?.focus({ preventScroll: true });
+  function showMissed() {
+    missedRef.current?.scrollIntoView?.({ block: "start" });
+    missedRef.current?.focus({ preventScroll: true });
   }
 
   return (
     <div className="ph-quiz-results ph-stack">
-      <Card as="section" className="ph-quiz-hero" aria-labelledby="ph-quiz-result-title">
-        <p className="ph-muted">
+      <ResultHero
+        headline={resultHeadline(stats.correct, stats.incorrect)}
+        tone="quiz"
+        icon={modeIcons[result.mode]}
+        score={stats.score}
+        correct={stats.correct}
+        total={answered}
+        ranked={ranked}
+        newBest={newBest}
+        previousBest={result.previousBest}
+        xpGained={ranked ? stats.xp : null}
+        xpTotal={ranked ? xpTotal : null}
+      >
+        <p className="ph-quiz-result-context">
           {modeNames[result.mode]} · {capitalize(result.difficulty)} ·{" "}
           {result.contextSaved
             ? result.categories?.length
@@ -95,86 +131,59 @@ function ResultsBody({ result }: { result: ResultView }) {
             : "Original filters unavailable"}
           {result.country ? ` · ${result.country}` : ""}
         </p>
-        <h2 id="ph-quiz-result-title" className="ph-quiz-headline">
-          {resultHeadline(stats.correct, stats.incorrect)}
-        </h2>
-        <p className="ph-quiz-score">
-          <strong>{stats.score.toLocaleString()}</strong> <span className="ph-muted">points</span>
-        </p>
-        {newBest && (
-          <p className="ph-quiz-best" role="status">
-            <Icon name="trophy" size={20} />
-            <span>
-              <strong>New personal best</strong>
-              <small>
-                {result.previousBest === null
-                  ? " Your first completed score in this mode."
-                  : ` Previous best: ${result.previousBest.toLocaleString()} points.`}
-              </small>
-            </span>
-          </p>
-        )}
-      </Card>
+      </ResultHero>
 
-      <dl className="ph-quiz-stats">
-        <Stat label="Accuracy" value={accuracy(stats.correct, stats.incorrect)} />
-        <Stat label="XP earned" value={result.mode === "practice" ? "0" : stats.xp.toLocaleString()} />
-        <Stat label="Correct" value={stats.correct} />
-        <Stat label="Wrong" value={stats.incorrect} />
-        <Stat label="Best streak" value={stats.bestStreak} />
-        <Stat label="Avg. response" value={result.answered ? `${(stats.averageMs / 1000).toFixed(1)}s` : "—"} />
-      </dl>
-      {result.mode === "practice" && <p className="ph-muted">Practice rounds don't earn XP.</p>}
+      {/* Learning loop: wrong answers land in Review my mistakes (online only; the demo has no review). */}
+      {!isDemo && (
+        <RetryMissedCard
+          count={missed.length}
+          to={reviewPath}
+          text="They're waiting in Review my mistakes. Answer each one right once to clear it."
+        />
+      )}
+      {isDemo && missed.length > 0 && (
+        <GameButton variant="secondary" size="md" block onClick={showMissed}>
+          See what you missed ({missed.length})
+        </GameButton>
+      )}
+
+      <StatGrid label="Round stats">
+        <StatTile label="XP earned" icon="sparkles" tone="awards" value={ranked ? stats.xp.toLocaleString() : "0"} />
+        <StatTile label="Incorrect" icon="warning" value={stats.incorrect} />
+        <StatTile label="Best streak" icon="flame" tone="quiz" value={stats.bestStreak} />
+        <StatTile
+          label="Avg. response"
+          icon="timer"
+          value={result.answered ? `${(stats.averageMs / 1000).toFixed(1)}s` : "—"}
+        />
+      </StatGrid>
+      {!ranked && <p className="ph-muted">Practice rounds don't earn XP or set personal bests.</p>}
       {!result.contextSaved && (
         <StatusMessage>This run predates saved settings. Choose its topic again before playing.</StatusMessage>
       )}
 
-      {mistakes.length > 0 && (
-        <Button block onClick={showMistakes}>
-          Review {mistakes.length === 1 ? "1 mistake" : `${mistakes.length} mistakes`}
-        </Button>
+      {result.reviews.length === 0 ? (
+        <p className="ph-muted">No answers were accepted in this run.</p>
+      ) : (
+        <>
+          {missed.length > 0 && (
+            <section className="ph-section" aria-labelledby="ph-quiz-missed">
+              <h2 id="ph-quiz-missed" ref={missedRef} tabIndex={-1} className="ph-section-title">
+                Missed <span className="ph-muted">· {missed.length}</span>
+              </h2>
+              <ReviewList items={missed} />
+            </section>
+          )}
+          {right.length > 0 && (
+            <section className="ph-section" aria-labelledby="ph-quiz-right">
+              <h2 id="ph-quiz-right" className="ph-section-title">
+                Correct <span className="ph-muted">· {right.length}</span>
+              </h2>
+              <ReviewList items={right} />
+            </section>
+          )}
+        </>
       )}
-
-      <section className="ph-section">
-        <h2 ref={mistakesRef} tabIndex={-1} className="ph-section-title">
-          Your answers <span className="ph-muted">({result.reviews.length})</span>
-        </h2>
-        {result.reviews.length === 0 ? (
-          <p className="ph-muted">No answers were accepted in this run.</p>
-        ) : (
-          <ol className="ph-quiz-review">
-            {ordered.map(({ review, index }) => (
-              <li key={review.questionId} className="ph-card ph-quiz-review-item" data-correct={review.correct}>
-                <p className="ph-quiz-review-head">
-                  <span className="ph-muted">#{index + 1}</span>
-                  <strong className="ph-quiz-review-status">
-                    <Icon name={review.correct ? "checkCircle" : "warning"} size={18} />
-                    {review.correct ? "Correct" : "Mistake"}
-                  </strong>
-                  <span className="ph-muted">+{review.points} pts</span>
-                </p>
-                <h3 className="ph-quiz-review-prompt">{review.prompt}</h3>
-                <p>
-                  <span className="ph-muted">Correct answer: </span>
-                  <strong>{review.correctAnswer}</strong>
-                </p>
-                {!review.correct && (
-                  <p>
-                    <span className="ph-muted">Your answer: </span>
-                    {review.chosen}
-                  </p>
-                )}
-                {review.explanation && <p className="ph-quiz-explanation">{review.explanation}</p>}
-                {review.source && (
-                  <a className="ph-quiz-source" href={review.source} target="_blank" rel="noopener noreferrer">
-                    Source reference<span className="sr-only"> (opens in a new tab)</span>
-                  </a>
-                )}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
 
       <div className="ph-quiz-more">
         <LinkButton to={setupUrl} block>
@@ -187,19 +196,53 @@ function ResultsBody({ result }: { result: ResultView }) {
 
       {replayError && <StatusMessage tone="error">{replayError}</StatusMessage>}
       <ActionBar label="Next round">
-        <Button variant="primary" size="lg" block loading={replayPending} onClick={() => void playAgain()}>
+        <GameButton
+          variant="primary"
+          size="xl"
+          block
+          loading={replayPending}
+          icon={<Icon name="rocket" size={22} />}
+          onClick={() => void playAgain()}
+        >
           {replayPending ? "Starting…" : "Play again"}
-        </Button>
+        </GameButton>
       </ActionBar>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
+function ReviewList({ items }: { items: { review: ResultView["reviews"][number]; index: number }[] }) {
   return (
-    <div className="ph-quiz-stat">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
+    <ol className="ph-quiz-review">
+      {items.map(({ review, index }) => (
+        <li key={review.questionId} className="ph-card ph-quiz-review-item" data-correct={review.correct}>
+          <p className="ph-quiz-review-head">
+            <span className="ph-muted">#{index + 1}</span>
+            <strong className="ph-quiz-review-status">
+              <Icon name={review.correct ? "checkCircle" : "warning"} size={18} />
+              {review.correct ? "Correct" : "Incorrect"}
+            </strong>
+            <span className="ph-muted">+{review.points} pts</span>
+          </p>
+          <h3 className="ph-quiz-review-prompt">{review.prompt}</h3>
+          <p>
+            <span className="ph-muted">Correct answer: </span>
+            <strong>{review.correctAnswer}</strong>
+          </p>
+          {!review.correct && (
+            <p>
+              <span className="ph-muted">Your answer: </span>
+              {review.chosen}
+            </p>
+          )}
+          {review.explanation && <p className="ph-quiz-explanation">{review.explanation}</p>}
+          {review.source && (
+            <a className="ph-quiz-source" href={review.source} target="_blank" rel="noopener noreferrer">
+              Source reference<span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          )}
+        </li>
+      ))}
+    </ol>
   );
 }

@@ -231,3 +231,67 @@ html[data-contrast="more"] .ph-elim-cand.is-ruledOut { opacity: .75; }
 @media (prefers-reduced-motion: reduce) {
   .ph-typing-feed li, .ph-typing-input.is-shaking { animation: none; }
 }
+
+/* ---------- Game feel (Recall + Elimination) ----------
+ * Decoration only: every state is also shown by colour, border, icon and words. All motion here is switched off
+ * under prefers-reduced-motion and Settings → Reduce motion (html[data-motion="reduce"]) at the end of the file.
+ */
+
+/* Top bar: Leave / Give up as compact chunky buttons that still keep a 48 px target. */
+.ph-typing-topbtn { min-height: var(--ph-tap); padding-inline: .8rem; font-size: .92rem; white-space: nowrap; }
+
+/* HUD: the found/solved counter bumps on every accepted find (key change replays the animation). */
+.ph-typing-found strong { display: inline-block; }
+.ph-typing-bump { animation: ph-typing-bump .32s cubic-bezier(.3, 1.6, .5, 1); color: rgb(var(--c-success)); }
+@keyframes ph-typing-bump { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+.ph-typing-pct { font-size: .9rem; font-weight: 700; color: rgb(var(--c-muted)); }
+.ph-typing-hud-row > .ph-timer { flex: 1 1 9rem; max-width: 14rem; margin-left: auto; }
+@media (max-width: 380px) { .ph-typing-hud-row > .ph-timer { flex-basis: 100%; max-width: none; } }
+
+/* Recall board: the slot that was just found pops once; found slots stay marked by a solid border + tint. */
+.ph-typing-slots li.is-new, .ph-typing-capitals li.is-new { animation: ph-typing-pop .36s cubic-bezier(.3, 1.5, .5, 1);
+  border-color: rgb(var(--c-success)); box-shadow: 0 0 0 2px rgb(var(--c-success) / .3); }
+@keyframes ph-typing-pop { 0% { transform: scale(.9); } 55% { transform: scale(1.06); } 100% { transform: scale(1); } }
+html[data-contrast="more"] .ph-typing-slots li, html[data-contrast="more"] .ph-typing-capitals li { border-color: rgb(var(--c-line) / .7); }
+html[data-contrast="more"] .ph-typing-slots li.is-found,
+html[data-contrast="more"] .ph-typing-capitals li.is-found { border-color: rgb(var(--c-success)); border-width: 2px; }
+
+/* Results: extras inside ResultHero (set name, note, tags) centred under the score. */
+.ph-typing-hero-extra { display: grid; justify-items: center; gap: .4rem; margin-top: .5rem; text-align: center; }
+.ph-typing-hero-extra .ph-typing-tags { justify-content: center; }
+
+/* Elimination: each colour group is a game card with a colour stripe on the left (colour name is always in text). */
+.ph-elim-group { position: relative; overflow: hidden; border-left-width: 6px; border-radius: var(--ph-radius);
+  box-shadow: 0 2px 0 rgb(var(--ph-elim) / .35), 0 1px 3px rgb(0 0 0 / .1); }
+.ph-elim-group-head .ph-elim-dot { width: .9rem; height: .9rem; box-shadow: 0 0 0 2px rgb(var(--c-surface)), 0 0 0 3px rgb(var(--ph-elim) / .6); }
+.ph-elim-group.is-complete { border-color: rgb(var(--ph-elim)); }
+html[data-contrast="more"] .ph-elim-group { border-top: 1px solid rgb(var(--c-line) / .7); border-right: 1px solid rgb(var(--c-line) / .7);
+  border-bottom: 1px solid rgb(var(--c-line) / .7); }
+
+/* Clue chain: a thin line in the group colour links the count badges from one clue to the next. */
+.ph-elim-clues { position: relative; }
+.ph-elim-clue { position: relative; }
+.ph-elim-clue:not(:last-child)::after { content: ""; position: absolute; left: calc(.5rem + 1.2rem - 1px); top: calc(50% + 1rem);
+  height: calc(100% - 1.7rem); width: 2px; border-radius: 1px; background: rgb(var(--ph-elim) / .45); pointer-events: none; }
+.ph-elim-clue.is-locked:not(:last-child)::after { background: rgb(var(--c-line) / .3); }
+.ph-elim-clue.is-answered .ph-elim-count { border-color: rgb(var(--ph-elim) / .7); background: rgb(var(--ph-elim) / .16); }
+html[data-contrast="more"] .ph-elim-clue.is-current { box-shadow: inset 0 0 0 2px rgb(var(--ph-elim)); }
+/* The clue just answered and the clue it revealed pop in. */
+.ph-elim-clue.is-fresh { animation: ph-typing-pop .4s cubic-bezier(.3, 1.5, .5, 1); }
+
+/* Hint row: the cost is always spelled out under or beside the button. */
+.ph-elim-hint-row { flex-wrap: wrap; }
+.ph-elim-hint-row .ph-gbtn { min-height: var(--ph-tap); }
+.ph-elim-hint-cost { flex: 1 1 10rem; font-size: .82rem; line-height: 1.3; color: rgb(var(--c-muted)); }
+
+/* Candidate / hint sheet: content aligned to the sheet padding, step tabs at least 48 px tall. */
+.ph-elim-sheet { align-content: start; justify-items: stretch; text-align: left; }
+.ph-elim-step { min-height: var(--ph-tap); }
+.ph-elim-step:focus-visible { outline: 3px solid rgb(var(--c-focus)); outline-offset: 2px; }
+.ph-elim-cand { min-height: var(--ph-tap-min); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-typing-bump, .ph-typing-slots li.is-new, .ph-typing-capitals li.is-new, .ph-elim-clue.is-fresh { animation: none; }
+}
+html[data-motion="reduce"] :is(.ph-typing-feed li, .ph-typing-input.is-shaking, .ph-typing-bump, .ph-typing-slots li.is-new,
+  .ph-typing-capitals li.is-new, .ph-elim-clue.is-fresh) { animation: none; }

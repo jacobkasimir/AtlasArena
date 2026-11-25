@@ -1,15 +1,20 @@
-// Phone Home hub (route "/"): greeting + level, continue unfinished rounds, today's challenge, review, achievements
-// and progress per game. The one primary action sits in the sticky bar at the bottom, under the thumb.
+// Phone Home hub (route "/"): player header (avatar, level, XP bar, streak, leaderboard), one "Next goal", the
+// newest resumable round, today's challenge, Review my mistakes, achievements, region practice and chunky game
+// cards. Information sits at the top; the actions sit in the lower half, and the one big primary action
+// ("Play" / "Continue …") sticks to the bottom under the thumb.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@shared/api";
-import { ActionBar, Button, LinkButton, Section, StatusMessage, useHaptics } from "@phone/ui";
+import { Icon } from "@shared/icons";
+import { ActionBar, Button, GameButton, LinkGameButton, Section, StatusMessage, useFeel } from "@phone/ui";
 import { usePhoneChrome } from "@phone/shell/chrome";
 import {
   continueItems,
   dailyPlan,
   isOnlineOnly,
+  nextGoal,
   playPath,
+  practiceRegions,
   primaryAction,
   readableError,
   useHomeData,
@@ -22,6 +27,8 @@ import {
   DailyCard,
   Hero,
   HomeSkeleton,
+  NextGoal,
+  PracticeRegions,
   ProgressList,
   ReviewCard,
 } from "./HomeCards";
@@ -30,12 +37,11 @@ import "./home.css";
 /** Starts today's challenge on the server and opens it in the quiz area. */
 function useDailyStart() {
   const navigate = useNavigate();
-  const haptics = useHaptics();
+  const haptics = useFeel();
   const [starting, setStarting] = useState(false);
   const [message, setMessage] = useState("");
   async function start() {
     if (starting) return;
-    haptics.tap();
     setStarting(true);
     setMessage("");
     try {
@@ -43,6 +49,7 @@ function useDailyStart() {
       navigate(playPath.quiz(view.id));
     } catch (cause) {
       const text = cause instanceof Error ? cause.message : String(cause);
+      haptics.error();
       setMessage(
         text.includes("DAILY_NOT_ENOUGH")
           ? "Not enough published questions for today's challenge yet."
@@ -80,10 +87,14 @@ export default function Home() {
   const bests = valueOf(data.bests) ?? [];
   const roundsUnchecked = [data.flags, data.capitals, data.recall].some((part) => part.state === "error");
   const streak = valueOf(data.daily)?.streak ?? null;
+  const goal = nextGoal(data);
+  const regions = practiceRegions(data);
 
   return (
     <div className="ph-home">
       <Hero dashboard={data.quiz} streak={streak} />
+
+      <NextGoal goal={goal} onDailyStart={() => void daily.start()} starting={daily.starting} />
 
       {(items.length > 0 || roundsUnchecked) && (
         <Section title="Continue">
@@ -110,7 +121,13 @@ export default function Home() {
         </div>
       </Section>
 
-      <Section title="Your progress">
+      {regions.length > 0 && (
+        <Section title="Practise a region">
+          <PracticeRegions regions={regions} />
+        </Section>
+      )}
+
+      <Section title="Your games">
         <ProgressList data={data} />
       </Section>
 
@@ -129,13 +146,24 @@ export default function Home() {
 
       <ActionBar label="Main action">
         {action.kind === "daily-start" ? (
-          <Button variant="primary" size="lg" block loading={daily.starting} onClick={() => void daily.start()}>
+          <GameButton
+            size="xl"
+            block
+            icon={<Icon name="calendar" size={24} />}
+            loading={daily.starting}
+            onClick={() => void daily.start()}
+          >
             {action.label}
-          </Button>
+          </GameButton>
         ) : (
-          <LinkButton variant="primary" size="lg" block to={action.to}>
+          <LinkGameButton
+            size="xl"
+            block
+            icon={<Icon name={action.label === "Play" ? "gamepad" : "zap"} size={24} />}
+            to={action.to}
+          >
             {action.label}
-          </LinkButton>
+          </LinkGameButton>
         )}
       </ActionBar>
     </div>

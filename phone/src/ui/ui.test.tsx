@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import {
@@ -15,11 +15,13 @@ import {
   StatusMessage,
   TextField,
   ToastProvider,
+  resetFeelCooldowns,
   useHaptics,
   useToast,
   useViewportHeight,
 } from "@phone/ui";
 import { reloadPrefs, setPref } from "@shared/prefs";
+import { hasPendingOwnPops } from "./useBackGuard";
 import { defaultPhonePrefs, getPhonePrefs, normalizePhonePrefs, reloadPhonePrefs, setPhonePref } from "@phone/prefs-phone";
 
 afterEach(() => {
@@ -27,6 +29,7 @@ afterEach(() => {
   localStorage.clear();
   reloadPrefs();
   reloadPhonePrefs();
+  resetFeelCooldowns();
   vi.restoreAllMocks();
 });
 
@@ -120,9 +123,7 @@ describe("TextField", () => {
 describe("BottomSheet", () => {
   // Closing a sheet goes back one history entry asynchronously; let that finish before the next test.
   afterEach(async () => {
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 30));
-    });
+    await waitFor(() => expect(hasPendingOwnPops()).toBe(false));
   });
 
   function Harness({ onClose }: { onClose?: () => void }) {
@@ -164,20 +165,19 @@ describe("BottomSheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open options" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Close" }).at(-1)!);
     expect(onClose).toHaveBeenCalledTimes(1);
-    // Closing removed the extra history entry again.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20));
+    // Closing removed the extra history entry again (asynchronously: wait for the state, not a fixed time).
+    await waitFor(() => {
+      expect(hasPendingOwnPops()).toBe(false);
+      expect(window.history.state?.phoneOverlay).toBeFalsy();
     });
-    expect(window.history.state?.phoneOverlay).toBeFalsy();
 
     fireEvent.click(screen.getByRole("button", { name: "Open options" }));
-    expect(window.history.state?.phoneOverlay).toBeTruthy();
-    await act(async () => {
+    await waitFor(() => expect(window.history.state?.phoneOverlay).toBeTruthy());
+    act(() => {
       window.history.back();
-      await new Promise((resolve) => setTimeout(resolve, 20));
     });
-    expect(onClose).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 });
 

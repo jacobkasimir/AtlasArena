@@ -25,23 +25,29 @@ import {
 } from "@shared/elimination-domain";
 import { formatClock } from "@shared/game-setup";
 import { Icon } from "@shared/icons";
-import { useLeaveGuard, usePrefs } from "@shared/prefs";
+import { CALM_ROUND_MS, useLeaveGuard, usePrefs } from "@shared/prefs";
 import { TopBarActions, usePhoneChrome } from "@phone/shell/chrome";
 import { paths } from "@phone/shell/paths";
 import {
   ActionBar,
   BottomSheet,
+  Burst,
   Button,
   Card,
   Chip,
   ChipGroup,
+  GameButton,
   LinkButton,
   LinkCard,
   LoadingState,
+  ModeHero,
   ProgressBar,
+  ResultHero,
   Section,
   StatusMessage,
-  useHaptics,
+  TimerBar,
+  feel,
+  useReplayKey,
 } from "@phone/ui";
 import { ConfirmSheet, Flag, RoundClock, errorText, requestId, useRoundClock } from "./common";
 import { CandidatesSheet, colourNames } from "./elim-sheet";
@@ -103,7 +109,6 @@ function HowItWorks() {
 function Setup() {
   usePhoneChrome({ title: "Elimination", back: paths.games });
   const navigate = useNavigate();
-  const haptics = useHaptics();
   const catalog = useLoad<EliminationPuzzle[]>(() => api.elimCatalog());
   const [difficulty, setDifficulty] = useState<EliminationDifficulty>(readDifficulty);
   const [busy, setBusy] = useState<string | null>(null);
@@ -119,7 +124,7 @@ function Setup() {
 
   async function start(puzzle: EliminationPuzzle) {
     if (busy) return;
-    haptics.tap();
+    feel("tap");
     if (puzzle.activeId) {
       navigate(`${paths.elimination}/play/${puzzle.activeId}`);
       return;
@@ -143,6 +148,12 @@ function Setup() {
 
   return (
     <div className="ph-stack">
+      <ModeHero
+        title="Narrow it down"
+        subtitle="Each clue rules places out – name the one that fits them all."
+        icon="funnel"
+        tone="elimination"
+      />
       <p className="ph-muted">
         Four colour groups, each a chain of clues. Every place you name must fit all clues revealed so far – until a
         single place is left.
@@ -272,20 +283,31 @@ function Setup() {
 /* Group card (play and results)                                             */
 /* ------------------------------------------------------------------------ */
 
-type GroupHint = { availability: HintAvailability; left: number; busy: boolean; onHint: () => void };
+type GroupHint = { availability: HintAvailability; left: number; hinted: boolean; busy: boolean; onHint: () => void };
+
+/** What a hint costs, in plain words, next to the button. */
+function hintCost(availability: HintAvailability, hinted: boolean) {
+  if (availability === "owned") return "Free – you already have this hint.";
+  if (availability === "noneLeft") return "You have used every hint for this round.";
+  return hinted
+    ? "Costs 1 hint. This round already doesn't count for personal bests."
+    : "Costs 1 hint, and this round stops counting for personal bests.";
+}
 
 function HintButton({ colour, hint }: { colour: string; hint: GroupHint }) {
-  const { availability, left, busy, onHint } = hint;
+  const { availability, left, hinted, busy, onHint } = hint;
   if (availability === "closed") return null;
   if (availability === "lastClue") {
     return <p className="ph-elim-hint-note">No hint for a clue that leaves one place.</p>;
   }
   const owned = availability === "owned";
-  const label = owned ? "Show hint" : availability === "noneLeft" ? "No hints left" : `Hint (${left} left)`;
+  const label = owned ? "Show hint" : availability === "noneLeft" ? "No hints left" : `Hint · ${left} left`;
   return (
     <div className="ph-elim-hint-row">
-      <Button
-        variant={owned ? "secondary" : "ghost"}
+      <GameButton
+        variant={owned ? "secondary" : "tone"}
+        tone="elimination"
+        size="md"
         icon={<Icon name="search" size={16} />}
         disabled={busy || availability === "noneLeft"}
         aria-haspopup="dialog"
@@ -299,7 +321,8 @@ function HintButton({ colour, hint }: { colour: string; hint: GroupHint }) {
         onClick={onHint}
       >
         {label}
-      </Button>
+      </GameButton>
+      <small className="ph-elim-hint-cost">{hintCost(availability, hinted)}</small>
     </div>
   );
 }
@@ -320,12 +343,18 @@ function GroupCard({
   const complete = group.solved >= group.size;
   const hidden = Math.max(0, group.size - group.steps.length);
   const name = colourNames[group.colour];
+  // Motion only for changes during play: the clue just answered and the clue it revealed pop in, and a group
+  // solved in this round gets a small burst. Nothing animates for groups that were already solved on load.
+  const replay = useReplayKey(group.solved);
+  const completeOnLoad = useRef(complete);
+  const celebrate = !done && complete && !completeOnLoad.current;
   return (
     <Card
       as="section"
       className={`ph-elim-group ph-elim-${group.colour}${complete ? " is-complete" : ""}`}
       aria-label={`${name} group, ${group.solved} of ${group.size} solved`}
     >
+      <Burst fireKey={celebrate ? `${group.colour}-solved` : null} count={16} />
       <h3 className="ph-elim-group-head">
         <span className="ph-elim-dot" aria-hidden="true" />
         <span>{name}</span>
@@ -339,10 +368,17 @@ function GroupCard({
           const current = !done && !step.answer && index === group.solved;
           const missed = done && !step.answer;
           const fits = `${step.remaining} ${step.remaining === 1 ? "place fits" : "places fit"}`;
+          const fresh = Boolean(replay) && !done && (index === group.solved - 1 || index === group.solved);
           return (
             <li
-              key={index}
-              className={["ph-elim-clue", current && "is-current", missed && "is-missed", step.answer && "is-answered"]
+              key={fresh ? `${index}-${replay}` : index}
+              className={[
+                "ph-elim-clue",
+                current && "is-current",
+                missed && "is-missed",
+                step.answer && "is-answered",
+                fresh && "is-fresh",
+              ]
                 .filter(Boolean)
                 .join(" ")}
               aria-current={current ? "step" : undefined}
@@ -414,7 +450,7 @@ export function feedbackText(guess: EliminationGuess, typed: string): Feedback {
         text: `✓ ${guess.place?.name ?? typed} fits ${colours.join(" and ")}${colours.length > 1 ? " – several groups moved on" : ""}.`,
       };
     case "no_match":
-      return { tone: "bad", text: `${guess.place?.name ?? typed} doesn't fit any open clue.` };
+      return { tone: "bad", text: `${guess.place?.name ?? typed} doesn't fit any open clue – that only costs time.` };
     case "unknown":
       return { tone: "bad", text: `“${typed}” isn't a place in this puzzle.` };
     case "ambiguous":
@@ -425,6 +461,13 @@ export function feedbackText(guess: EliminationGuess, typed: string): Feedback {
 }
 
 const IDLE_HINT = "English, German or French. Wrong guesses only cost time.";
+/** The timer turns to its warning state for the last 30 seconds. */
+const TIMER_WARN_MS = 30_000;
+
+/** True when the guess finished a group that was still open before it. */
+export function solvedAGroup(before: EliminationGroup[], after: EliminationGroup[]) {
+  return after.some((group, index) => group.solved >= group.size && (before[index]?.solved ?? 0) < group.size);
+}
 
 function Play() {
   const { id = "" } = useParams();
@@ -446,7 +489,6 @@ function Play() {
   /** Set synchronously, so a fast second Go (or Enter) never sends the same guess twice. */
   const sending = useRef(false);
   const prefs = usePrefs();
-  const haptics = useHaptics();
 
   useEffect(() => {
     if (initial.data) setView(initial.data);
@@ -467,6 +509,7 @@ function Play() {
     setLeaveSheet("menu");
   });
   const { remaining } = useRoundClock(current, Boolean(current && !done));
+  const solvedBump = useReplayKey(current?.solved ?? 0);
 
   // A finished round lives on the results screen.
   useEffect(() => {
@@ -513,11 +556,17 @@ function Play() {
       const guess = await api.elimGuess(round.id, typed);
       setView(guess.view);
       setFeedback(feedbackText(guess, typed));
-      if (guess.view.state !== "active") haptics.complete();
-      else if (guess.result === "advanced") haptics.correct();
-      else if (guess.result === "no_match" || guess.result === "unknown") {
-        haptics.wrong();
-        setShaking(true);
+      // The last guess of a round gets its feedback from the results screen (ResultHero), once.
+      if (guess.view.state === "active") {
+        if (guess.result === "advanced") feel(solvedAGroup(round.groups, guess.view.groups) ? "reward" : "correct");
+        else if (guess.result === "no_match") {
+          feel("wrong");
+          setShaking(true);
+        } else if (guess.result === "unknown") {
+          // Not a place at all (typo): soft feedback, no sound.
+          feel("error", { sound: false });
+          setShaking(true);
+        }
       }
       if (guess.result === "advanced" || guess.result === "no_match") setText("");
       else inputRef.current?.select();
@@ -546,7 +595,6 @@ function Play() {
       const next = await api.elimGiveUp(round.id);
       setAskGiveUp(false);
       setLeaveSheet("closed");
-      haptics.complete();
       setView(next);
     } catch (cause) {
       setAskGiveUp(false);
@@ -571,7 +619,6 @@ function Play() {
 
   function askHint(groupIndex: number) {
     if (busy) return;
-    haptics.tap();
     const availability = hintAvailability(round, groupIndex);
     const group = groupIndex + 1;
     if (availability === "owned") setHintSheet({ group, step: round.groups[groupIndex].solved + 1 });
@@ -606,26 +653,38 @@ function Play() {
   return (
     <div className="ph-typing-play">
       <TopBarActions>
-        <Button
-          variant="ghost"
+        <GameButton
+          variant="secondary"
+          size="md"
+          className="ph-typing-topbtn"
           disabled={busy}
           onClick={() => {
-            haptics.tap();
             if (prefs.confirmGiveUp) setAskGiveUp(true);
             else void giveUp();
           }}
         >
           Give up
-        </Button>
+        </GameButton>
       </TopBarActions>
 
-      <Card className="ph-typing-hud">
+      <Card className="ph-typing-hud tone-elimination">
         <div className="ph-typing-hud-row">
           <p className="ph-typing-found">
-            <strong>{round.solved}</strong>
+            <strong key={solvedBump} className={solvedBump ? "ph-typing-bump" : undefined}>
+              {round.solved}
+            </strong>
             <span> / {round.total} answers</span>
           </p>
-          <RoundClock remaining={remaining} />
+          {remaining !== null ? (
+            <TimerBar
+              msLeft={remaining}
+              totalMs={round.timeLimitSeconds * 1000}
+              warnAtMs={TIMER_WARN_MS}
+              calmFromMs={CALM_ROUND_MS}
+            />
+          ) : (
+            <RoundClock remaining={remaining} />
+          )}
         </div>
         <ProgressBar value={round.solved} max={round.total} label="Answers found" />
         <p className="ph-elim-hud-meta">
@@ -652,6 +711,7 @@ function Play() {
             hint={{
               availability: hintAvailability(round, index),
               left: round.hintsLeft,
+              hinted: round.hinted,
               busy,
               onHint: () => askHint(index),
             }}
@@ -686,17 +746,20 @@ function Play() {
               maxLength={80}
               autoFocus
             />
-            <Button
+            <GameButton
               type="submit"
               variant="primary"
+              size="md"
               className="ph-typing-go"
               aria-busy={busy || undefined}
+              // The server's answer gives the feedback (fits / doesn't fit), so Go stays silent.
+              haptic={false}
               // Keep the keyboard open: a tap on Go must not move focus out of the input.
               onPointerDown={(event) => event.preventDefault()}
               onMouseDown={(event) => event.preventDefault()}
             >
               Go
-            </Button>
+            </GameButton>
           </div>
         </form>
       </ActionBar>
@@ -831,7 +894,6 @@ function Results() {
   const [message, setMessage] = useState("");
   const [sheet, setSheet] = useState<{ group: number; step: number } | null>(null);
   const candidateCache = useRef(new Map<number, Promise<EliminationCandidates>>());
-  const haptics = useHaptics();
   usePhoneChrome({ title: "Elimination results", back: paths.elimination });
   const view = result.data;
 
@@ -859,7 +921,7 @@ function Results() {
   }
   const done = view;
   const best = catalog.data?.find((puzzle) => puzzle.id === done.puzzleId)?.best;
-  const percent = done.total > 0 ? Math.round((done.solved / done.total) * 100) : 0;
+  const timeMs = Math.min(done.elapsedMs, done.timeLimitSeconds * 1000);
 
   function loadCandidates(group: number) {
     const cached = candidateCache.current.get(group);
@@ -873,7 +935,6 @@ function Results() {
   async function play(puzzleId: string) {
     setBusy(true);
     setMessage("");
-    haptics.tap();
     try {
       const started = await api.elimStart(puzzleId, requestId());
       navigate(`${paths.elimination}/play/${started.id}`);
@@ -887,55 +948,57 @@ function Results() {
 
   return (
     <div className="ph-stack">
-      <Card className={`ph-typing-result${done.endReason === "all_solved" ? " is-best" : ""}`}>
-        <p className="ph-typing-eyebrow">{puzzleLabel(done)}</p>
-        <div className="ph-elim-score">
-          <strong>{percent}%</strong>
-          <span className="ph-muted">
-            {done.solved} of {done.total} answers
-          </span>
-        </div>
-        <h2 className="ph-typing-headline">{resultTitle(done)}</h2>
-        <dl className="ph-elim-stats">
-          <div>
-            <dt>Time</dt>
-            <dd>{formatClock(Math.min(done.elapsedMs, done.timeLimitSeconds * 1000))}</dd>
-          </div>
-          <div>
-            <dt>Guesses</dt>
-            <dd>{done.guesses}</dd>
-          </div>
-          <div>
-            <dt>Didn't fit</dt>
-            <dd>{done.wrong}</dd>
-          </div>
-          {best && (
+      <ResultHero
+        headline={resultTitle(done)}
+        tone="elimination"
+        icon="funnel"
+        score={done.solved}
+        scoreLabel="Answers found"
+        correct={done.solved}
+        total={done.total}
+        timeMs={timeMs}
+        ranked={!done.hinted}
+        unrankedLabel="Hinted · not ranked"
+      >
+        <div className="ph-typing-hero-extra">
+          <p className="ph-typing-eyebrow">{puzzleLabel(done)}</p>
+          <dl className="ph-elim-stats">
             <div>
-              <dt>Your best</dt>
-              <dd>
-                {best.solved}/{done.total}
-              </dd>
+              <dt>Guesses</dt>
+              <dd>{done.guesses}</dd>
             </div>
-          )}
+            <div>
+              <dt>Didn't fit</dt>
+              <dd>{done.wrong}</dd>
+            </div>
+            {best && (
+              <div>
+                <dt>Your best</dt>
+                <dd>
+                  {best.solved}/{done.total}
+                </dd>
+              </div>
+            )}
+            {done.hinted && (
+              <div>
+                <dt>Hints</dt>
+                <dd>{done.hintsUsed}</dd>
+              </div>
+            )}
+          </dl>
           {done.hinted && (
-            <div>
-              <dt>Hints</dt>
-              <dd>{done.hintsUsed}</dd>
-            </div>
+            <p className="ph-muted">
+              <span className="ph-elim-badge">Hinted</span> This round used{" "}
+              {done.hintsUsed === 1 ? "a hint" : `${done.hintsUsed} hints`}, so it doesn't count as a personal best.
+            </p>
           )}
-        </dl>
-        {done.hinted && (
-          <p className="ph-muted">
-            <span className="ph-elim-badge">Hinted</span> This round used{" "}
-            {done.hintsUsed === 1 ? "a hint" : `${done.hintsUsed} hints`}, so it doesn't count as a personal best.
-          </p>
-        )}
-        {next && (
-          <Button block disabled={busy} onClick={() => void play(next.id)}>
-            Next puzzle · {puzzleLabel(next)}
-          </Button>
-        )}
-      </Card>
+          {next && (
+            <GameButton variant="secondary" size="md" block disabled={busy} onClick={() => void play(next.id)}>
+              Next puzzle · {puzzleLabel(next)}
+            </GameButton>
+          )}
+        </div>
+      </ResultHero>
 
       <StatusMessage tone="error">{message}</StatusMessage>
 
@@ -967,9 +1030,9 @@ function Results() {
 
       <ActionBar>
         <LinkButton to={paths.elimination}>All puzzles</LinkButton>
-        <Button variant="primary" loading={busy} onClick={() => void play(done.puzzleId)}>
+        <GameButton variant="primary" loading={busy} onClick={() => void play(done.puzzleId)}>
           Play again
-        </Button>
+        </GameButton>
       </ActionBar>
     </div>
   );

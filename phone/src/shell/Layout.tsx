@@ -23,6 +23,7 @@ export function PhoneLayout() {
   const context = useMemo(() => ({ setChrome, actionsTarget }), [setChrome, actionsTarget]);
 
   const title = chrome?.title ?? titleForPath(location.pathname);
+  const section = location.pathname.split("/")[1] ?? "";
   const hideTabBar = chrome?.hideTabBar ?? false;
   const back = chrome?.back;
 
@@ -92,7 +93,11 @@ export function PhoneLayout() {
           <OfflineNotice />
           <main id="ph-main" ref={mainRef} tabIndex={-1} className="ph-main">
             <Suspense fallback={<LoadingState />}>
-              <Outlet />
+              {/* Keyed by the top-level section only: switching tabs/areas plays a short rise-in; moving inside an
+                  area (setup → play → results) keeps the area mounted. */}
+              <div className="ph-page" key={section}>
+                <Outlet />
+              </div>
             </Suspense>
           </main>
           {!hideTabBar && <TabBar />}

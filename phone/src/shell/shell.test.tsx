@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 
@@ -11,7 +11,24 @@ vi.hoisted(() => {
 import { PhoneApp } from "./PhoneApp";
 import { parentPath, titleForPath } from "./paths";
 
-const lazyRoute = { timeout: 5000 };
+const lazyRoute = { timeout: 10_000 };
+
+// Load (transform) the lazy areas once up front: under parallel load the first dynamic import of an area can take
+// seconds, which made the tab-navigation test race its own timeouts.
+beforeAll(async () => {
+  await Promise.all([
+    import("@phone/areas/home"),
+    import("@phone/areas/home/Games"),
+    import("@phone/areas/quiz"),
+    import("@phone/areas/geo/flags"),
+    import("@phone/areas/geo/capitals"),
+    import("@phone/areas/typing/recall"),
+    import("@phone/areas/typing/elimination"),
+    import("@phone/areas/explore"),
+    import("@phone/areas/account/profile"),
+    import("@phone/areas/account/settings"),
+  ]);
+}, 60_000);
 
 function Where() {
   const location = useLocation();
@@ -37,7 +54,7 @@ afterEach(() => {
   delete document.documentElement.dataset.phTabbar;
 });
 
-describe("phone shell", { timeout: 15_000 }, () => {
+describe("phone shell", { timeout: 30_000 }, () => {
   it("sends a signed-out visitor to the welcome screen", async () => {
     localStorage.setItem("atlas-demo-signed-out", "yes");
     renderAt("/quiz");
@@ -80,19 +97,19 @@ describe("phone shell", { timeout: 15_000 }, () => {
     fireEvent.click(screen.getByRole("link", { name: "Games" }));
     await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/games"));
     expect(await screen.findByRole("link", { name: /Flags/ }, lazyRoute)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 1, name: "Games" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Games" })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByRole("heading", { level: 1, name: "Games" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("link", { name: "Games" })).toHaveAttribute("aria-current", "page"));
 
     fireEvent.click(screen.getByRole("link", { name: /Flags/ }));
     await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/flags"));
     expect(await screen.findByRole("heading", { level: 1, name: "Flags" }, lazyRoute)).toBeInTheDocument();
     // Inside a game area the Games tab stays highlighted.
-    expect(screen.getByRole("link", { name: "Games" })).toHaveAttribute("aria-current", "page");
+    await waitFor(() => expect(screen.getByRole("link", { name: "Games" })).toHaveAttribute("aria-current", "page"));
 
     fireEvent.click(screen.getByRole("link", { name: "Settings" }));
     await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/settings"));
     expect(await screen.findByRole("link", { name: "Desktop version" }, lazyRoute)).toHaveAttribute("href", "/");
-    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toHaveFocus();
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toHaveFocus());
 
     fireEvent.click(screen.getByRole("link", { name: "Profile" }));
     await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/profile"));
@@ -104,6 +121,7 @@ describe("phone shell", { timeout: 15_000 }, () => {
     ["/capitals", "Capitals"],
     ["/recall", "Recall"],
     ["/elimination", "Elimination"],
+    ["/explorer", "Explorer"],
   ])("loads the %s area", async (path, title) => {
     localStorage.setItem("atlas-demo-onboarded", "yes");
     renderAt(path);
@@ -128,6 +146,7 @@ describe("phone paths", () => {
     expect(titleForPath("/")).toBe("Atlas Arena");
     expect(titleForPath("/flags/play/1")).toBe("Flags");
     expect(titleForPath("/settings")).toBe("Settings");
+    expect(titleForPath("/explorer")).toBe("Explorer");
     expect(parentPath("/flags/play/1")).toBe("/flags");
     expect(parentPath("/flags")).toBe("/games");
     expect(parentPath("/games")).toBe("/");

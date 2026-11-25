@@ -21,27 +21,35 @@ button.ph-account-row:active:not(:disabled) { background: rgb(var(--c-raised)); 
 .ph-account-switch[data-on="true"] { background: rgb(var(--c-mint)); border-color: rgb(var(--c-mint)); }
 .ph-account-switch[data-on="true"] .ph-account-switch-thumb { transform: translateX(20px); background: rgb(var(--c-mint-ink)); }
 
-/* ---------- Segmented choice ---------- */
+/* ---------- Choice row (SegmentedControl from @phone/ui) ---------- */
 .ph-account-choice-row { flex-direction: column; align-items: stretch; }
-.ph-account-segmented { display: flex; gap: .25rem; padding: .25rem; border-radius: var(--ph-radius-sm);
-  background: rgb(var(--c-raised)); }
-.ph-account-segment { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
-  min-height: var(--ph-tap-min); padding: .4rem .5rem; border-radius: calc(var(--ph-radius-sm) - .2rem);
-  font-size: .92rem; font-weight: 700; color: rgb(var(--c-muted)); }
-.ph-account-segment[aria-checked="true"] { background: rgb(var(--c-surface)); color: rgb(var(--c-text));
-  box-shadow: 0 0 0 2px rgb(var(--c-mint)); }
 
 /* ---------- Volume ---------- */
 .ph-account-range { width: 100%; min-height: var(--ph-tap); accent-color: rgb(var(--c-mint)); }
 .ph-account-buttons { display: flex; flex-wrap: wrap; gap: .5rem; }
 .ph-account-buttons > * { flex: 1 1 8rem; }
 
-/* ---------- Profile header ---------- */
-.ph-account-hero { display: grid; gap: .85rem; }
-.ph-account-hero-top { display: flex; align-items: center; gap: .9rem; }
+/* ---------- Profile header (player card) ---------- */
+.ph-account-hero { position: relative; display: grid; gap: 1rem; padding: 1.1rem 1rem; border-radius: 1.4rem;
+  background: radial-gradient(120% 90% at 0% 0%, rgb(var(--c-violet) / .22), rgb(var(--c-mint) / .06) 65%), rgb(var(--c-surface));
+  border: 1px solid rgb(var(--c-violet) / .3); }
+html[data-contrast="more"] .ph-account-hero { border-color: rgb(var(--c-line) / .7); }
+.ph-account-hero-top { display: flex; align-items: center; gap: 1rem; }
+.ph-account-hero-id { min-width: 0; display: grid; gap: .3rem; }
 .ph-account-avatar { flex: none; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 999px;
   font-size: 2.2rem; background: rgb(var(--c-raised)); border: 2px solid rgb(var(--c-mint) / .5); }
-.ph-account-name { font-size: 1.3rem; font-weight: 850; line-height: 1.15; overflow-wrap: anywhere; }
+.ph-account-avatar-wrap { position: relative; flex: none; }
+.ph-account-avatar-xl { width: 88px; height: 88px; font-size: 3rem; border-width: 3px; border-color: rgb(var(--c-violet));
+  box-shadow: 0 6px 18px rgb(var(--c-violet) / .3); }
+.ph-account-level { position: absolute; right: -6px; bottom: -4px; display: grid; place-items: center; min-width: 34px; height: 34px;
+  padding: 0 .35rem; border-radius: 999px; font-weight: 900; font-size: 1rem; font-variant-numeric: tabular-nums;
+  background: rgb(var(--c-violet)); color: rgb(var(--c-surface)); border: 3px solid rgb(var(--c-surface));
+  box-shadow: 0 2px 0 rgb(var(--c-violet) / .45); }
+.ph-account-name { font-size: 1.4rem; font-weight: 900; line-height: 1.15; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.ph-account-streak { display: inline-flex; align-items: center; gap: .45rem; font-size: .85rem; font-weight: 700;
+  color: rgb(var(--c-muted)); }
+.ph-account-hero .ph-stat { background: rgb(var(--c-bg) / .45); }
+.ph-account-hero .ph-stat dd { font-size: 1.3rem; }
 .ph-account-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
 .ph-account-fact { display: grid; justify-items: center; gap: .1rem; padding: .6rem .3rem; border-radius: var(--ph-radius-sm);
   background: rgb(var(--c-raised)); text-align: center; }
@@ -49,10 +57,6 @@ button.ph-account-row:active:not(:disabled) { background: rgb(var(--c-raised)); 
 .ph-account-fact small { font-size: .75rem; color: rgb(var(--c-muted)); }
 
 /* ---------- Stats ---------- */
-.ph-account-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem .75rem; margin-top: .75rem; }
-.ph-account-stats div { display: grid; }
-.ph-account-stats dt { font-size: .8rem; color: rgb(var(--c-muted)); }
-.ph-account-stats dd { font-size: 1.1rem; font-weight: 800; margin: 0; }
 .ph-account-card-head { display: flex; align-items: center; gap: .65rem; }
 .ph-account-card-head h3 { flex: 1; font-size: 1.05rem; font-weight: 800; }
 .ph-account-list { display: grid; gap: .5rem; }
@@ -64,17 +68,6 @@ button.ph-account-row:active:not(:disabled) { background: rgb(var(--c-raised)); 
 .ph-account-tag { display: inline-block; margin-right: .35rem; padding: 0 .45rem; border-radius: 999px; font-size: .75rem;
   font-weight: 800; background: rgb(var(--c-mint) / .16); color: rgb(var(--c-text)); }
 
-/* ---------- Achievements ---------- */
-.ph-account-badges { display: grid; gap: .5rem; }
-.ph-account-badge { display: flex; gap: .75rem; align-items: flex-start; padding: .8rem; border-radius: var(--ph-radius-sm);
-  background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-line) / .17); }
-.ph-account-badge[data-earned="true"] { border-color: rgb(var(--c-success) / .6); }
-.ph-account-badge-icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px;
-  background: rgb(var(--c-raised)); color: rgb(var(--c-muted)); }
-.ph-account-badge[data-earned="true"] .ph-account-badge-icon { background: rgb(var(--c-success) / .16); color: rgb(var(--c-success)); }
-.ph-account-badge-body { flex: 1; display: grid; gap: .3rem; }
-.ph-account-badge-body p { font-size: .88rem; color: rgb(var(--c-muted)); }
-
 /* ---------- Avatar picker / leaderboard ---------- */
 .ph-account-avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: .4rem; }
 .ph-account-avatar-option { display: grid; place-items: center; min-height: 52px; border-radius: var(--ph-radius-sm);
@@ -82,8 +75,14 @@ button.ph-account-row:active:not(:disabled) { background: rgb(var(--c-raised)); 
 .ph-account-avatar-option[aria-checked="true"] { border-color: rgb(var(--c-mint)); background: rgb(var(--c-mint) / .16); }
 .ph-account-lb-row { display: flex; align-items: center; gap: .7rem; padding: .65rem .75rem; border-radius: var(--ph-radius-sm);
   background: rgb(var(--c-raised)); }
-.ph-account-lb-row[data-you="true"] { box-shadow: 0 0 0 2px rgb(var(--c-mint)); }
-.ph-account-lb-rank { min-width: 2.5rem; font-weight: 850; }
+.ph-account-lb-row[data-you="true"] { background: rgb(var(--c-mint) / .14); box-shadow: inset 0 0 0 2px rgb(var(--c-mint)); }
+.ph-account-lb-rank { display: inline-flex; align-items: center; gap: .15rem; min-width: 3rem; font-weight: 850;
+  font-variant-numeric: tabular-nums; }
+.ph-account-lb-rank[data-medal="gold"] svg { color: rgb(var(--ph-gold)); }
+.ph-account-lb-rank[data-medal="silver"] svg { color: rgb(var(--ph-silver)); }
+.ph-account-lb-rank[data-medal="bronze"] svg { color: rgb(var(--ph-bronze)); }
+.ph-account-lb-you { display: grid; gap: .4rem; }
+.ph-account-lb-you .ph-account-lb-row { background: rgb(var(--c-mint) / .16); }
 .ph-account-lb-avatar { font-size: 1.5rem; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -91,3 +90,69 @@ button.ph-account-row:active:not(:disabled) { background: rgb(var(--c-raised)); 
 }
 html[data-motion="reduce"] .ph-account-switch, html[data-motion="reduce"] .ph-account-switch-thumb { transition: none; }
 .ph-account-facts-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* ---------- Statistics ---------- */
+.ph-account-game { display: grid; gap: .75rem; }
+.ph-account-game .ph-stat { background: rgb(var(--c-raised) / .6); }
+.ph-account-best-icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px;
+  color: rgb(var(--ph-gold)); background: rgb(var(--ph-gold) / .16); }
+
+/* ---------- Achievements: summary, grid, medallions, detail ---------- */
+.ph-account-ach-summary { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .85rem 1rem; padding: 1rem;
+  border-radius: 1.25rem; border: 1px solid rgb(var(--ph-gold) / .4);
+  background: linear-gradient(150deg, rgb(var(--ph-gold) / .2), rgb(var(--ph-gold) / .03) 65%), rgb(var(--c-surface)); }
+.ph-account-ach-summary .ph-account-facts { grid-column: 1 / -1; }
+.ph-account-ach-trophy { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 999px;
+  color: rgb(var(--ph-gold)); background: rgb(var(--ph-gold) / .2); box-shadow: inset 0 0 0 2px rgb(var(--ph-gold) / .7); }
+.ph-account-fact[data-tier="bronze"] strong { color: rgb(var(--ph-bronze)); }
+.ph-account-fact[data-tier="gold"] strong { color: rgb(var(--ph-gold)); }
+.ph-account-fact[data-tier="platinum"] strong { color: rgb(var(--c-violet)); }
+html[data-contrast="more"] .ph-account-fact strong { color: rgb(var(--c-text)); }
+
+.ph-account-ach-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+.ph-account-ach { display: grid; justify-items: center; align-content: start; gap: .4rem; width: 100%; min-height: 128px;
+  padding: .75rem .4rem .7rem; border-radius: var(--ph-radius-sm); text-align: center; color: rgb(var(--c-text));
+  background: rgb(var(--c-surface)); border: 1px solid rgb(var(--c-line) / .17); box-shadow: 0 3px 0 rgb(var(--c-line) / .2);
+  transition: transform .08s ease, box-shadow .08s ease; }
+.ph-account-ach:active { transform: translateY(2px); box-shadow: 0 1px 0 rgb(var(--c-line) / .2); }
+.ph-account-ach[data-earned="true"] { border-color: rgb(var(--ph-gold) / .55); }
+.ph-account-ach-title { font-size: .82rem; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.ph-account-ach-state { display: inline-flex; align-items: center; gap: .2rem; font-size: .75rem; font-weight: 800; color: rgb(var(--c-success)); }
+html[data-contrast="more"] .ph-account-ach-state { color: rgb(var(--c-text)); }
+.ph-account-ach-meter { display: block; width: 80%; height: 6px; border-radius: 999px; background: rgb(var(--c-raised)); overflow: hidden; }
+.ph-account-ach-meter > span { display: block; height: 100%; border-radius: inherit; background: rgb(var(--c-mint)); }
+
+.ph-account-medallion { --medal: var(--ph-bronze); position: relative; display: grid; place-items: center; width: 56px; height: 56px;
+  border-radius: 999px; color: rgb(var(--c-muted)); background: rgb(var(--c-raised)); box-shadow: inset 0 0 0 3px rgb(var(--c-line) / .35); }
+.ph-account-medallion[data-tier="silver"] { --medal: var(--ph-silver); }
+.ph-account-medallion[data-tier="gold"] { --medal: var(--ph-gold); }
+.ph-account-medallion[data-tier="platinum"] { --medal: var(--c-violet); }
+.ph-account-medallion[data-earned="true"] { color: rgb(var(--medal));
+  background: radial-gradient(circle at 35% 30%, rgb(var(--medal) / .45), rgb(var(--medal) / .14));
+  box-shadow: inset 0 0 0 3px rgb(var(--medal) / .8), 0 4px 12px rgb(var(--medal) / .3); }
+.ph-account-medallion[data-earned="false"] svg:first-child { opacity: .55; }
+.ph-account-medallion.is-lg { width: 96px; height: 96px; }
+.ph-account-medallion-lock { position: absolute; right: -2px; bottom: -2px; display: grid; place-items: center; width: 22px; height: 22px;
+  border-radius: 999px; color: rgb(var(--c-text)); background: rgb(var(--c-surface)); box-shadow: 0 0 0 2px rgb(var(--c-line) / .4); }
+.is-lg .ph-account-medallion-lock { width: 32px; height: 32px; }
+
+.ph-account-ach-detail { display: grid; gap: .8rem; justify-items: stretch; text-align: center; }
+.ph-account-ach-detail-medal { position: relative; display: grid; place-items: center; padding: .5rem 0; }
+.ph-account-ach-detail-medal .ph-burst { top: 50%; }
+.ph-account-ach-detail[data-earned="true"] .ph-account-medallion { animation: ph-star-in .5s cubic-bezier(.3, 1.5, .5, 1) backwards; }
+.ph-account-ach-detail-tags { display: flex; justify-content: center; gap: .35rem; }
+.ph-account-ach-earned { display: inline-flex; align-items: center; justify-content: center; gap: .35rem; justify-self: center;
+  padding: .45rem .9rem; border-radius: 999px; font-weight: 850; background: rgb(var(--c-success) / .16);
+  border: 1px solid rgb(var(--c-success) / .6); }
+
+/* ---------- Settings → Feel preview ---------- */
+.ph-account-feel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: .5rem; }
+.ph-account-feel-btn { justify-content: flex-start; }
+
+/* ---------- Reduced motion (OS or Settings) ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ph-account-ach, .ph-account-ach-detail .ph-account-medallion { animation: none !important; transition: none !important; }
+  .ph-account-ach:active { transform: none; }
+}
+html[data-motion="reduce"] :is(.ph-account-ach, .ph-account-ach-detail .ph-account-medallion) { animation: none !important; transition: none !important; }
+html[data-motion="reduce"] .ph-account-ach:active { transform: none; }

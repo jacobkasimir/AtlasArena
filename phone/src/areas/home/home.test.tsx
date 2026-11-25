@@ -19,7 +19,7 @@ vi.mock("@shared/api", () => ({ api, isDemo: false, DEMO_UNAVAILABLE: "ONLINE_ON
 
 import Home from "./index";
 import Games from "./Games";
-import { continueItems, dailyPlan, loadHome, primaryAction } from "./data";
+import { continueItems, dailyPlan, levelProgress, loadHome, nextGoal, primaryAction } from "./data";
 
 const onlineOnly = (feature: string) =>
   Promise.reject(new Error(`ONLINE_ONLY: ${feature} needs an online account and isn't available in the local demo.`));
@@ -129,7 +129,8 @@ describe("phone Home", () => {
     }
     expect(within(daily).queryByRole("button")).toBeNull();
     expect(screen.getByRole("link", { name: /Elimination.*Needs an online account/ })).toBeInTheDocument();
-    expect(within(actionBar()).getByRole("link", { name: "Choose a game" })).toHaveAttribute("href", "/games");
+    // Nothing to continue and no daily in the demo: the one big action opens the games list.
+    expect(within(actionBar()).getByRole("link", { name: "Play" })).toHaveAttribute("href", "/games");
   });
 
   it("lists running rounds of every game and continues one", async () => {
@@ -207,6 +208,16 @@ describe("phone Games", () => {
     expect(await screen.findByText("1 round in progress")).toBeInTheDocument();
   });
 
+  it("has an Explorer card that opens the atlas", async () => {
+    online();
+    renderAt("/games");
+    const card = await screen.findByRole("article", { name: "Explorer" });
+    const link = within(card).getByRole("link", { name: /^Explorer/ });
+    expect(link).toHaveAttribute("href", "/explorer");
+    fireEvent.click(link);
+    expect(screen.getByTestId("where")).toHaveTextContent("/explorer");
+  });
+
   it("still lists the games when progress cannot be loaded", async () => {
     online();
     api.dashboard.mockRejectedValue(new Error("offline"));
@@ -232,5 +243,109 @@ describe("home data", () => {
     api.flagsSetup.mockRejectedValue(new Error("boom"));
     const data = await loadHome();
     expect(data.flags).toEqual({ state: "error", message: "boom" });
+  });
+});
+
+describe("level progress", () => {
+  it.each([
+    [0, { level: 1, inLevel: 0, toNext: 500 }],
+    [499, { level: 1, inLevel: 499, toNext: 1 }],
+    [500, { level: 2, inLevel: 0, toNext: 500 }],
+    [1240, { level: 3, inLevel: 240, toNext: 260 }],
+    [-20, { level: 1, inLevel: 0, toNext: 500 }],
+    [Number.NaN, { level: 1, inLevel: 0, toNext: 500 }],
+  ])("%s XP → %o", (xp, expected) => {
+    expect(levelProgress(xp)).toEqual(expected);
+  });
+});
+
+describe("next goal", () => {
+  const running = { id: "f1", direction: "flag_to_country", region: "Europe", poolTier: "all", total: 20, answered: 5, score: 50, createdAt: "", paused: false, scope: "un" };
+  const played = { flags: stat, capitals: stat, recall: stat };
+
+  type Case = [name: string, arrange: () => void, id: string | RegExp, primary: string];
+  const cases: Case[] = [
+    // Today's challenge is already the big bottom action, so the goal card shows the next useful thing.
+    ["daily open → open mistakes", () => undefined, "review", "daily-start"],
+    [
+      "daily running → still the mistakes (daily is the bottom action)",
+      () => api.dailyStatus.mockResolvedValue({ ...daily, sessionId: "d9", state: "awaiting_answer" }),
+      "review",
+      "/quiz/play/d9",
+    ],
+    [
+      "running round is the bottom action → today's challenge",
+      () => api.flagsSetup.mockResolvedValue({ activeSessions: [running] }),
+      "daily-start",
+      "/flags/play/f1",
+    ],
+    [
+      "daily done, no mistakes → closest achievement",
+      () => {
+        api.dailyStatus.mockResolvedValue({ ...daily, sessionId: "d9", state: "completed" });
+        api.reviewSummary.mockResolvedValue({ open: 0, byKind: {}, activeId: null, cleared: 3 });
+      },
+      "achievement-b",
+      "/games",
+    ],
+    [
+      "demo, first visit → play your first quiz",
+      () => {
+        demo();
+        api.dashboard.mockResolvedValue({ ...dashboard, totals: { games: 0, correct: 0, incorrect: 0 } });
+      },
+      "try-quiz",
+      "/games",
+    ],
+    [
+      "demo, a game never played → try it",
+      () => {
+        demo();
+        api.gameStats.mockResolvedValue({ ...played, capitals: { ...stat, rounds: 0 } });
+      },
+      "try-capitals",
+      "/games",
+    ],
+    [
+      "demo, a personal best below perfect → beat it",
+      () => {
+        demo();
+        api.personalBests.mockResolvedValue([
+          { game: "flags", mode: "flag_to_country", scope: "un", region: "Europe", pool: "all", selectedCodes: [], timeLimitSeconds: null, score: 900, maxScore: 1000, correct: 9, total: 10, elapsedMs: 60000, completedAt: "2026-11-20T10:00:00Z", runCount: 2 },
+        ]);
+      },
+      /^best-flags-/,
+      "/games",
+    ],
+    ["demo, everything played → discover the atlas", () => demo(), "explore", "/games"],
+  ];
+
+  it.each(cases)("%s", async (_name, arrange, id, primary) => {
+    online();
+    arrange();
+    const data = await loadHome();
+    const action = primaryAction(data);
+    expect(action.kind === "daily-start" ? "daily-start" : action.to).toBe(primary);
+    const goal = nextGoal(data);
+    if (typeof id === "string") expect(goal.id).toBe(id);
+    else expect(goal.id).toMatch(id);
+    // The goal never repeats the bottom action.
+    expect(goal.action === "daily-start" ? "daily-start" : goal.to).not.toBe(primary);
+  });
+
+  it("shows the closest achievement with its progress", async () => {
+    online();
+    api.dailyStatus.mockResolvedValue({ ...daily, sessionId: "d9", state: "completed" });
+    api.reviewSummary.mockResolvedValue({ open: 0, byKind: {}, activeId: null, cleared: 3 });
+    const goal = nextGoal(await loadHome());
+    expect(goal).toMatchObject({ title: "Earn “Ten games”", to: "/profile/achievements", progress: { value: 4, max: 10 } });
+  });
+
+  it("renders the goal card on Home with its action", async () => {
+    online();
+    renderAt();
+    const card = await screen.findByRole("region", { name: "Next goal: Clear 3 open mistakes" });
+    expect(within(card).getByRole("link", { name: "Review my mistakes" })).toHaveAttribute("href", "/quiz/review");
+    expect(within(actionBar()).getByRole("button", { name: "Play today's challenge" })).toBeInTheDocument();
   });
 });

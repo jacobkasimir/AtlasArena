@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Icon } from "@shared/icons";
+import { feel } from "./feel";
 
 /**
  * idle: not answered yet · selected: chosen, waiting for the server · correct: chosen and right ·
@@ -16,22 +17,41 @@ const stateText: Record<AnswerState, string> = {
   missed: "Correct answer",
 };
 
-/** Big tap target for a multiple-choice answer (≥ 60 px, no swipe). State is shown by colour, icon and text. */
+/** Short visible tag next to the icon, so the state never depends on colour alone. */
+const stateTag: Record<AnswerState, string> = {
+  idle: "",
+  selected: "",
+  correct: "Correct",
+  wrong: "Wrong",
+  missed: "Answer",
+};
+
+/**
+ * Big tap target for a multiple-choice answer (≥ 64 px, no swipe), with a chunky pressed state.
+ * State is shown by colour, icon and a visible word; correct pops, wrong shakes (not under reduced motion).
+ * Pressing gives a light "select" haptic; the screen fires correct/wrong once the server answered.
+ */
 export function AnswerButton({
   index,
   state = "idle",
   onSelect,
   disabled,
+  badge = "letter",
+  detail,
   children,
 }: {
-  /** 0-based position; shown as A, B, C, D. */
+  /** 0-based position; shown as A, B, C, D (or 1–4 with badge="number"). */
   index: number;
   state?: AnswerState;
   onSelect: () => void;
   disabled?: boolean;
+  /** Key badge style; "none" hides it (e.g. flag images in a grid). */
+  badge?: "letter" | "number" | "none";
+  /** Optional second line (e.g. the region), shown smaller. */
+  detail?: ReactNode;
   children: ReactNode;
 }) {
-  const key = String.fromCharCode(65 + index);
+  const key = badge === "number" ? String(index + 1) : String.fromCharCode(65 + index);
   const mark =
     state === "correct" || state === "missed" ? "checkCircle" : state === "wrong" ? "warning" : null;
   return (
@@ -39,18 +59,28 @@ export function AnswerButton({
       type="button"
       className="ph-answer"
       data-state={state}
-      onClick={onSelect}
+      onClick={() => {
+        feel("select");
+        onSelect();
+      }}
       disabled={disabled || state !== "idle"}
     >
-      <span className="ph-answer-key" aria-hidden="true">
-        {key}
+      {badge !== "none" && (
+        <span className="ph-answer-key" aria-hidden="true">
+          {key}
+        </span>
+      )}
+      <span className="ph-answer-label">
+        {children}
+        {detail && <small className="ph-answer-detail">{detail}</small>}
       </span>
-      <span className="ph-answer-label">{children}</span>
       {mark && (
         <span className="ph-answer-mark" aria-hidden="true">
           <Icon name={mark} size={22} />
+          <span className="ph-answer-tag">{stateTag[state]}</span>
         </span>
       )}
+      {state === "selected" && <span className="ph-spinner ph-answer-spinner" aria-hidden="true" />}
       {state !== "idle" && <span className="sr-only">, {stateText[state]}</span>}
     </button>
   );

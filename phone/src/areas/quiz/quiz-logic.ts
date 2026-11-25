@@ -111,3 +111,26 @@ export function resultHeadline(correct: number, incorrect: number) {
   const share = total ? correct / total : 0;
   return share >= 0.8 ? "Great run!" : share >= 0.5 ? "Solid run." : total ? "Keep practising." : "Run complete.";
 }
+
+export type RoundDot = "correct" | "wrong" | "current" | "upcoming";
+
+/**
+ * Round progress for fixed-length rounds, one entry per question: right/wrong from the server's reviews (in
+ * answer order), the question on screen as "current", the rest "upcoming". Never judges an answer itself.
+ */
+export function roundDots(view: Pick<View, "total" | "answered" | "reviews" | "status">): RoundDot[] {
+  const total = Math.max(0, Math.min(view.total, 50));
+  return Array.from({ length: total }, (_, index) => {
+    const review = view.reviews[index];
+    if (index < view.answered && review) return review.correct ? "correct" : "wrong";
+    if (index === view.answered && view.status === "awaiting_answer") return "current";
+    return "upcoming";
+  });
+}
+
+/** Mistakes first, then right answers; round order inside each group. */
+export function mistakesFirst<T extends { correct: boolean }>(reviews: T[]) {
+  return reviews
+    .map((review, index) => ({ review, index }))
+    .sort((a, b) => Number(a.review.correct) - Number(b.review.correct) || a.index - b.index);
+}

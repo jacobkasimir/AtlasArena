@@ -2,21 +2,35 @@
 import { ReactNode, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { Icon, IconTile, games } from "@shared/icons";
-import { avatars, level } from "@shared/domain";
+import { avatars } from "@shared/domain";
 import type { Achievement, Dashboard, ReviewSummary } from "@shared/domain";
 import { bestScore, describeSetup, formatClock, gameNames, modeNames } from "@shared/game-setup";
 import type { PersonalBest } from "@shared/game-setup";
 import { accuracy } from "@shared/quiz-meta";
-import { Button, Card, LinkButton, LinkCard, ProgressBar, StatusMessage } from "@phone/ui";
+import {
+  Button,
+  Card,
+  GameButton,
+  GoalCard,
+  LinkGameButton,
+  ProgressBar,
+  StatusMessage,
+  StreakMeter,
+  XP_PER_LEVEL,
+  feel,
+} from "@phone/ui";
 import { paths } from "@phone/shell/paths";
 import {
   ContinueItem,
   DailyPlan,
+  GameKey,
+  Goal,
   HomeData,
   Part,
-  XP_PER_LEVEL,
   gameTitles,
+  levelProgress,
   percent,
+  regionPracticePath,
   setupPath,
   valueOf,
 } from "./data";
@@ -66,55 +80,111 @@ function PartProblem({ part, retry }: { part: Exclude<Part<unknown>, { state: "o
 
 /* ---------- Greeting, level and streak ---------- */
 
+/**
+ * Player header: avatar, name, level badge, XP bar (XpBar look, server XP only), daily streak flame and a
+ * shortcut to the leaderboard. Information only – the actions live in the lower half of the screen.
+ */
 export function Hero({ dashboard, streak }: { dashboard: Dashboard; streak: { current: number; best: number } | null }) {
   const { username, avatar, xp } = dashboard.profile;
-  const lvl = level(xp);
-  const inLevel = Math.max(0, xp) % XP_PER_LEVEL;
-  const toNext = XP_PER_LEVEL - inLevel;
+  const { level: lvl, inLevel, toNext } = levelProgress(xp);
   return (
-    <Card as="section" className="ph-home-hero" aria-labelledby="ph-home-greeting">
+    <section className="ph-home-hero" aria-labelledby="ph-home-greeting">
       <div className="ph-home-hero-row">
         <span className="ph-home-avatar" aria-hidden="true">
           {avatars[avatar] ?? "🌍"}
+          <span className="ph-home-level-badge">{lvl}</span>
         </span>
         <div className="ph-home-hero-text">
           <h2 id="ph-home-greeting" className="ph-home-greeting">
             Hi, {username || "explorer"}
           </h2>
-          <p className="ph-muted">Pick up where you left off, or start something new.</p>
-        </div>
-      </div>
-      <div className="ph-home-level">
-        <span className="ph-home-level-badge" aria-hidden="true">
-          {lvl}
-        </span>
-        <div className="ph-home-level-text">
           <p className="ph-home-level-line">
             <strong>Level {lvl}</strong>
             <span className="ph-muted">{xp.toLocaleString("en")} XP</span>
           </p>
-          <ProgressBar value={inLevel} max={XP_PER_LEVEL} label={`Level ${lvl}: ${inLevel} of ${XP_PER_LEVEL} XP`} />
-          <p className="ph-home-small ph-muted">
+        </div>
+        {streak && (
+          <span className="ph-home-hero-streak" title="Daily challenge streak">
+            <StreakMeter streak={streak.current} best={streak.best} />
+          </span>
+        )}
+      </div>
+      <div className="ph-xp ph-home-xp">
+        <div
+          className="ph-xp-track"
+          role="progressbar"
+          aria-label={`Level ${lvl}: ${inLevel} of ${XP_PER_LEVEL} XP`}
+          aria-valuemin={0}
+          aria-valuemax={XP_PER_LEVEL}
+          aria-valuenow={inLevel}
+          aria-valuetext={`${inLevel} of ${XP_PER_LEVEL} XP`}
+        >
+          <div className="ph-xp-fill ph-home-xp-fill" style={{ width: `${(inLevel / XP_PER_LEVEL) * 100}%` }} />
+        </div>
+        <div className="ph-xp-line">
+          <span>
             {toNext} XP to level {lvl + 1}
-          </p>
+          </span>
+          {streak && streak.current > 0 && (
+            <span>
+              <strong className="ph-home-streak-text">{streak.current}-day streak</strong> · best {streak.best}
+            </span>
+          )}
         </div>
       </div>
-      {streak && streak.current > 0 && (
-        <p className="ph-home-streak">
-          <Icon name="flame" size={18} />
-          <span>
-            <strong>{streak.current}-day streak</strong>
-            <span className="ph-muted"> · best {streak.best}</span>
-          </span>
-        </p>
-      )}
-    </Card>
+      <Link className="ph-home-hero-link" to={`${paths.profile}/leaderboard`} onClick={() => feel("tap")}>
+        <Icon name="podium" size={18} />
+        Leaderboard
+        <Icon name="chevronRight" size={16} />
+      </Link>
+    </section>
+  );
+}
+
+/* ---------- Next goal ---------- */
+
+export function NextGoal({ goal, onDailyStart, starting }: { goal: Goal; onDailyStart: () => void; starting: boolean }) {
+  return (
+    <div className="ph-home-goal ph-home-enter">
+      <GoalCard
+        title={goal.title}
+        text={goal.text}
+        icon={goal.icon}
+        tone={goal.tone}
+        progress={goal.progress}
+        to={goal.to}
+        onClick={goal.action === "daily-start" ? (starting ? () => undefined : onDailyStart) : undefined}
+        cta={goal.action === "daily-start" && starting ? "Preparing…" : goal.cta}
+      />
+    </div>
   );
 }
 
 /* ---------- Continue ---------- */
 
 const CONTINUE_PREVIEW = 3;
+
+/** The newest resumable round as one big card in the game's tone. */
+export function ContinueHero({ item }: { item: ContinueItem }) {
+  return (
+    <Link to={item.to} className={`ph-home-resume tone-${item.game} ph-home-enter`} onClick={() => feel("tap")}>
+      <IconTile name={games[item.game].icon} tone={games[item.game].tone} size="lg" />
+      <span className="ph-home-resume-text">
+        <span className="ph-home-eyebrow">Continue · {gameTitles[item.game]}</span>
+        <strong className="ph-home-resume-title">{item.title}</strong>
+        <small className="ph-muted">{item.detail}</small>
+        {item.total > 0 ? (
+          <ProgressBar value={item.done} max={item.total} label={`${item.done} of ${item.total} done`} />
+        ) : item.done > 0 ? (
+          <small className="ph-muted">{item.done} answered</small>
+        ) : null}
+      </span>
+      <span className="ph-home-resume-go" aria-hidden="true">
+        <Icon name="chevronRight" size={24} />
+      </span>
+    </Link>
+  );
+}
 
 export function ContinueList({ items }: { items: ContinueItem[] }) {
   const [showAll, setShowAll] = useState(false);
@@ -123,9 +193,12 @@ export function ContinueList({ items }: { items: ContinueItem[] }) {
   return (
     <>
       <ul id={listId} className="ph-stack" aria-label="Rounds in progress">
-        {shown.map((item) => (
+        {shown.map((item, index) => (
           <li key={`${item.game}-${item.id}`}>
-            <Link to={item.to} className="ph-home-continue">
+            {index === 0 ? (
+              <ContinueHero item={item} />
+            ) : (
+            <Link to={item.to} className="ph-home-continue" onClick={() => feel("tap")}>
               <IconTile name={games[item.game].icon} tone={games[item.game].tone} />
               <span className="ph-home-continue-text">
                 <span className="ph-home-eyebrow">{gameTitles[item.game]}</span>
@@ -141,6 +214,7 @@ export function ContinueList({ items }: { items: ContinueItem[] }) {
                 <Icon name="chevronRight" size={20} />
               </span>
             </Link>
+            )}
           </li>
         ))}
       </ul>
@@ -182,7 +256,7 @@ export function DailyCard({
       icon="daily"
       title="Daily challenge"
       text="10 questions – the same for everyone today. One try."
-      className="ph-home-daily"
+      className="ph-home-daily tone-daily"
       aside={
         streak > 0 ? (
           <span className="ph-home-pill" aria-label={`Daily streak: ${streak} days`}>
@@ -248,15 +322,15 @@ export function DailyCard({
         </>
       )}
       {plan.kind === "continue" && (
-        <LinkButton to={plan.to} block>
+        <LinkGameButton to={plan.to} variant="tone" tone="daily" size="md" block>
           Continue today's challenge
-        </LinkButton>
+        </LinkGameButton>
       )}
       {plan.kind === "start" && (
         <>
-          <Button block loading={starting} onClick={onStart}>
+          <GameButton variant="tone" tone="daily" size="md" block loading={starting} onClick={onStart}>
             {starting ? "Preparing…" : "Play today's challenge"}
-          </Button>
+          </GameButton>
           <p className="ph-muted">
             {plan.status.players
               ? `${plan.status.players} ${plan.status.players === 1 ? "player has" : "players have"} played today.`
@@ -287,9 +361,9 @@ export function ReviewCard({ part, retry }: { part: Part<ReviewSummary>; retry: 
               <dd>{summary.cleared}</dd>
             </div>
           </dl>
-          <LinkButton to={`${paths.quiz}/review`} block>
+          <LinkGameButton to={`${paths.quiz}/review`} variant="tone" tone="review" size="md" block>
             {summary.activeId ? "Continue review" : `Review ${summary.open === 1 ? "1 mistake" : `${Math.min(10, summary.open)} mistakes`}`}
-          </LinkButton>
+          </LinkGameButton>
         </>
       ) : (
         <p className="ph-muted">
@@ -383,23 +457,89 @@ export function gameStatLine(game: keyof typeof gameTitles, data: HomeData): str
   return `${played}/${puzzles.length} puzzles played`;
 }
 
-const progressGames = ["quiz", "flags", "capitals", "recall", "elimination"] as const;
+const tileGames: GameKey[] = ["quiz", "flags", "capitals", "recall", "elimination"];
+
+/**
+ * Chunky game card in the game's tone (ModeHero look) that opens the game's setup. Shared by Home and Games.
+ * The whole card is one link; it presses down like a GameButton and taps once.
+ */
+export function GameTile({
+  to,
+  title,
+  text,
+  stat,
+  icon,
+  tone,
+  badge,
+  size = "md",
+}: {
+  to: string;
+  title: string;
+  text?: string;
+  stat?: string | null;
+  icon: keyof typeof games;
+  tone: keyof typeof games;
+  badge?: ReactNode;
+  size?: "md" | "lg";
+}) {
+  return (
+    <Link
+      to={to}
+      className={`ph-home-tile tone-${games[tone].tone}${size === "lg" ? " ph-home-tile-lg" : ""}`}
+      onClick={() => feel("tap")}
+    >
+      <IconTile name={games[icon].icon} tone={games[icon].tone} size="lg" />
+      <span className="ph-home-tile-body">
+        <strong className="ph-home-tile-title">{title}</strong>
+        {text && <span className="ph-home-tile-text">{text}</span>}
+        {stat && <span className="ph-home-tile-stat">{stat}</span>}
+        {badge}
+      </span>
+      <span className="ph-home-tile-go" aria-hidden="true">
+        <Icon name="chevronRight" size={22} />
+      </span>
+    </Link>
+  );
+}
 
 export function ProgressList({ data }: { data: HomeData }) {
   return (
-    <ul className="ph-stack" aria-label="Progress per game">
-      {progressGames.map((game) => (
-        <li key={game}>
-          <LinkCard
+    <ul className="ph-home-tiles" aria-label="Progress per game">
+      {tileGames.map((game) => (
+        <li key={game} className="ph-home-enter">
+          <GameTile
             to={setupPath[game]}
             title={gameTitles[game]}
-            text={gameStatLine(game, data) ?? "Progress not available right now"}
-            icon={games[game].icon}
-            tone={games[game].tone}
+            stat={gameStatLine(game, data) ?? "Progress not available right now"}
+            icon={game}
+            tone={game}
           />
         </li>
       ))}
+      <li className="ph-home-enter">
+        <GameTile to={paths.explorer} title="Explorer" stat="Browse the atlas – capitals, flags, neighbours" icon="explorer" tone="explorer" />
+      </li>
     </ul>
+  );
+}
+
+/** Seterra-style quick practice: 10 random flags of one region (practice, never a personal best). */
+export function PracticeRegions({ regions }: { regions: string[] }) {
+  if (!regions.length) return null;
+  return (
+    <div className="ph-home-regions">
+      <p className="ph-muted ph-home-small">10 random flags from one region. Practice – it never changes your bests.</p>
+      <ul className="ph-home-region-list" aria-label="Practise a region">
+        {regions.map((region) => (
+          <li key={region}>
+            <Link className="ph-home-region tone-flags" to={regionPracticePath(region)} onClick={() => feel("tap")}>
+              <Icon name="flag" size={16} />
+              {region}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -446,6 +586,7 @@ export function HomeSkeleton() {
         Loading your home…
       </p>
       <div className="ph-home-skel ph-home-skel-hero" aria-hidden="true" />
+      <div className="ph-home-skel ph-home-skel-goal" aria-hidden="true" />
       <div className="ph-home-skel ph-home-skel-title" aria-hidden="true" />
       <div className="ph-home-skel ph-home-skel-row" aria-hidden="true" />
       <div className="ph-home-skel ph-home-skel-row" aria-hidden="true" />

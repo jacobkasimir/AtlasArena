@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   elimHint: vi.fn(),
 }));
 vi.mock("@shared/api", () => ({ api: mocks, isDemo: false, DEMO_UNAVAILABLE: "ONLINE_ONLY" }));
+vi.mock("@shared/sound", () => ({ cue: vi.fn(), playSound: vi.fn(), playNotes: vi.fn() }));
 
+import { feelPattern, resetFeelCooldowns } from "@phone/ui";
 import EliminationArea from "./elimination";
 
 const france = { code: "fr", name: "France" };
@@ -69,8 +71,15 @@ function puzzle(patch: Partial<EliminationPuzzle> = {}): EliminationPuzzle {
 const input = () => screen.getByLabelText("Name a country or territory") as HTMLInputElement;
 const group = (name: string) => screen.getByRole("region", { name: new RegExp(`^${name} group`) });
 
+let vibrate: ReturnType<typeof vi.fn>;
+const vibratedWith = (pattern: number | number[]) =>
+  vibrate.mock.calls.filter(([value]) => JSON.stringify(value) === JSON.stringify(pattern)).length;
+
 beforeEach(() => {
   localStorage.clear();
+  resetFeelCooldowns();
+  vibrate = vi.fn();
+  Object.defineProperty(navigator, "vibrate", { value: vibrate, configurable: true });
   Object.values(mocks).forEach((mock) => mock.mockReset());
 });
 // A round on screen adds a Back-guard history entry; unmounting removes it asynchronously. Let that finish so
@@ -173,6 +182,47 @@ describe("phone Elimination", { timeout: 15_000 }, () => {
     fireEvent.click(go);
     expect(await screen.findByText("“Atlantis” isn't a place in this puzzle.")).toBeInTheDocument();
     expect(input().value).toBe("Atlantis");
+  });
+
+  it("rewards a solved group, says 'correct' for a step and 'wrong' for a place that doesn't fit", async () => {
+    const twoGroups = (greenSolved: number, orangeSolved: number) => [
+      {
+        colour: "green" as const, size: 1, solved: greenSolved, answer: greenSolved ? france : null,
+        steps: [{ label: "In Europe", remaining: 44, answer: greenSolved ? france : null }],
+      },
+      {
+        colour: "orange" as const, size: 2, solved: orangeSolved, answer: null,
+        steps: [
+          { label: "Landlocked", remaining: 32, answer: orangeSolved ? germany : null },
+          ...(orangeSolved ? [{ label: "Borders France", remaining: 5, answer: null }] : []),
+        ],
+      },
+    ];
+    mocks.elimView.mockResolvedValue(view({ total: 3, groups: twoGroups(0, 0) }));
+    mocks.elimGuess
+      .mockResolvedValueOnce({ result: "advanced", place: france, advanced: ["green"], view: view({ total: 3, solved: 1, guesses: 1, groups: twoGroups(1, 0) }) })
+      .mockResolvedValueOnce({ result: "advanced", place: germany, advanced: ["orange"], view: view({ total: 3, solved: 2, guesses: 2, groups: twoGroups(1, 1) }) })
+      .mockResolvedValueOnce({ result: "no_match", place: { code: "jp", name: "Japan" }, view: view({ total: 3, solved: 2, guesses: 3, wrong: 1, groups: twoGroups(1, 1) }) });
+    renderArea("elimination", <EliminationArea />, "/elimination/play/e1");
+    await screen.findByLabelText("Name a country or territory");
+
+    const guess = async (name: string, calls: number) => {
+      resetFeelCooldowns();
+      fireEvent.change(input(), { target: { value: name } });
+      fireEvent.click(screen.getByRole("button", { name: "Go" }));
+      await waitFor(() => expect(mocks.elimGuess).toHaveBeenCalledTimes(calls));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Go" })).not.toHaveAttribute("aria-busy", "true"));
+    };
+    await guess("France", 1);
+    await waitFor(() => expect(vibratedWith(feelPattern("reward"))).toBe(1));
+    expect(vibratedWith(feelPattern("correct"))).toBe(0);
+
+    await guess("Germany", 2);
+    await waitFor(() => expect(vibratedWith(feelPattern("correct"))).toBe(1));
+    expect(vibratedWith(feelPattern("reward"))).toBe(1);
+
+    await guess("Japan", 3);
+    await waitFor(() => expect(vibratedWith(feelPattern("wrong"))).toBe(1));
   });
 
   it("asks before a hint, spends it once, marks the round and re-opens it for free", async () => {
